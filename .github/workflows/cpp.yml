@@ -3,8 +3,12 @@ name: C/C++ CI
 on:
   push:
     branches: [ "main" ]
+    paths:
+      - 'simple_cpp/**'
   pull_request:
     branches: [ "main" ]
+    paths:
+      - 'simple_cpp/**'
 
 jobs:
   build:
