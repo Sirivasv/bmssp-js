@@ -4,11 +4,11 @@ on:
   push:
     branches: [ "main" ]
     paths:
-      - 'simple_cpp/**'
+      - 'cpp/**'
   pull_request:
     branches: [ "main" ]
     paths:
-      - 'simple_cpp/**'
+      - 'cpp/**'
 
 jobs:
   build:
@@ -17,7 +17,7 @@ jobs:
     
     defaults:
       run:
-        working-directory: ./simple_cpp
+        working-directory: ./cpp
 
     container:
       image: gcc:15.2.0
