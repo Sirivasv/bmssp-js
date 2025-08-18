@@ -5,7 +5,7 @@ int main() {
     cin.tie(0); ios_base::sync_with_stdio(0);
     int a, b;
     cin >> a >> b;
-    cout << "Hello, Tsinghua SSSP!" << endl;
+    cout << "Hello, Tsinghua SSSP v1.0!" << endl;
     cout << "The sum of " << a << " and " << b << " is " << a + b << "." << endl;
     return 0;
 }
