@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Tsinghua SSSP - Landing Page</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #e0e7ff 0%, #f0fdfa 100%);
+            color: #22223b;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            background: #fff;
+            border-radius: 18px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+            padding: 2.5rem 2rem;
+            max-width: 420px;
+            text-align: center;
+        }
+        h1 {
+            font-size: 2.2rem;
+            margin-bottom: 0.5rem;
+            color: #3a0ca3;
+        }
+        p {
+            font-size: 1.1rem;
+            margin-bottom: 1.5rem;
+            color: #4a4e69;
+        }
+        .graphics {
+            margin: 1.5rem 0;
+            display: flex;
+            justify-content: center;
+        }
+        .node-graph {
+            width: 120px;
+            height: 120px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 0.7em 1.5em;
+            background: #4361ee;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            text-decoration: none;
+            transition: background 0.2s;
+            cursor: pointer;
+        }
+        .btn:hover {
+            background: #3a0ca3;
+        }
+        footer {
+            margin-top: 2rem;
+            font-size: 0.95rem;
+            color: #adb5bd;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Tsinghua SSSP</h1>
+        <p>
+            A high-performance implementation of the Single Source Shortest Path (SSSP) algorithm, inspired by Tsinghua University's research.
+        </p>
+        <p>
+            Read the original paper: 
+            <a href="https://dl.acm.org/doi/10.1145/3717823.3718179" target="_blank">
+                Tsinghua SSSP Paper
+            </a>
+        </p>
+        <div class="graphics">
+            <!-- SVG: stylized graph with nodes and edges -->
+            <svg class="node-graph" viewBox="0 0 120 120">
+                <circle cx="60" cy="20" r="12" fill="#4361ee" />
+                <circle cx="30" cy="60" r="10" fill="#4cc9f0" />
+                <circle cx="90" cy="60" r="10" fill="#4cc9f0" />
+                <circle cx="60" cy="100" r="12" fill="#3a0ca3" />
+                <line x1="60" y1="20" x2="30" y2="60" stroke="#adb5bd" stroke-width="3"/>
+                <line x1="60" y1="20" x2="90" y2="60" stroke="#adb5bd" stroke-width="3"/>
+                <line x1="30" y1="60" x2="60" y2="100" stroke="#adb5bd" stroke-width="3"/>
+                <line x1="90" y1="60" x2="60" y2="100" stroke="#adb5bd" stroke-width="3"/>
+            </svg>
+        </div>
+        <a class="btn" href="https://github.com/sirivasv/tsinghua-sssp" target="_blank">View on GitHub</a>
+    </div>
+</body>
+</html></svg>
