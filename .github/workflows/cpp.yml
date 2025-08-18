@@ -1,0 +1,26 @@
+name: C/C++ CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: ./simple_cpp
+
+    container:
+      image: gcc:15.2.0
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: build
+      run: g++ -o a.out main.cpp
+    - name: run
+      run: ./a.out < input.in
