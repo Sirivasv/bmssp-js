@@ -1,9 +1,11 @@
 # Tsinghua Single Source Shortest Paths algorithm
 
 This is a repository containing implementation varieties based on the paper written by Duan Ran et. al. from Tsinghua University.
-"Breaking the Sorting Barrier for Directed Single-Source Shortest Paths"
+"Breaking the Sorting Barrier for Directed Single-Source Shortest Paths".
 
 https://dl.acm.org/doi/10.1145/3717823.3718179
+
+BMSSP - Bounded multi-source shortest paths.
 
 ## Abstract
 
