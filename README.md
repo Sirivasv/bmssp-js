@@ -19,8 +19,10 @@ This project is mainly focused in implementations in C++ (std=c++20) and Javascr
 
 Rust:
   - https://github.com/lucas-montes/bmssp - Available as a crate to pull.
+
 Java:
   - https://github.com/PatrickDiallo23/BMSSP-Java
+
 Python:
   - https://github.com/sidharthpunathil/fastest-shortest-path-algo-poc
   - https://github.com/simpsonresearch/tsinghua_benchmarks/tree/main
