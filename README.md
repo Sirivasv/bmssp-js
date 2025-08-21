@@ -17,6 +17,8 @@ This project is mainly focused in implementations in C++ (std=c++20) and Javascr
 
 ### Other Implementations
 
+https://github.com/search?q=bmssp&type=repositories
+
 Rust:
   - https://github.com/lucas-montes/bmssp - Available as a crate to pull.
 
