@@ -5,7 +5,7 @@ on:
 jobs:
   build-and-publish:
     environment:
-      name: github-pages
+      name: npmjs-publish
     runs-on: ubuntu-latest
     permissions:
       contents: read
