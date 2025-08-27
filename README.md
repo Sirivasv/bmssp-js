@@ -13,7 +13,7 @@ We give a deterministic O(mlog2/3n)-time algorithm for single-source shortest pa
 
 ## Development Details
 
-This project is mainly focused in implementations in C++ (std=c++20) and Javascript (in order to be published to npmjs.com via github Actions). It would be interesting to do the same to publish via pypi.org or crates.io.
+This project is mainly focused in Javascript (in order to be published to npmjs.com via github Actions).
 
 ### Other Implementations
 
