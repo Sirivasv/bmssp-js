@@ -1,1 +1,0 @@
-console.log("Hello, World v0.4.0!");

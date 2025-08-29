@@ -5,7 +5,7 @@ on:
 jobs:
   build-and-publish:
     environment:
-      name: npmjs-publish
+      name: npm-bmssp
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -17,6 +17,7 @@ jobs:
         with:
           node-version: '24.x'
           registry-url: 'https://registry.npmjs.org'
+      - run: npm test
       - run: npm ci
       - run: npm publish --provenance --access public
         env:
