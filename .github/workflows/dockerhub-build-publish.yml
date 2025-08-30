@@ -1,17 +1,19 @@
 name: Build and publish Docker image
 
 on:
-  push:
-    tags:
-      - '*.*.*'
+  release:
+    types: [published]
 
 jobs:
   docker-build-and-publish:
     environment:
       name: dockerhub
+
+    runs-on: ubuntu-latest
+
     permissions:
       contents: read
-    runs-on: ubuntu-latest
+
     steps:
       - name: Docker meta
         id: meta
@@ -25,7 +27,7 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v5
 
       - name: Login to Docker Hub
