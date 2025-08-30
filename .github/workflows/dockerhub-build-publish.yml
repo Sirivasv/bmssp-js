@@ -1,9 +1,8 @@
 name: Build and publish Docker image
 
 on:
-  push:
-    tags:
-      - '*.*.*'
+  release:
+    types: [published]
 
 jobs:
   docker-build-and-publish:
@@ -25,7 +24,7 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v5
 
       - name: Login to Docker Hub
