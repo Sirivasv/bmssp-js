@@ -8,9 +8,12 @@ jobs:
   docker-build-and-publish:
     environment:
       name: dockerhub
+
+    runs-on: ubuntu-latest
+
     permissions:
       contents: read
-    runs-on: ubuntu-latest
+
     steps:
       - name: Docker meta
         id: meta

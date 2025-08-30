@@ -6,13 +6,17 @@ jobs:
   npm-publish:
     environment:
       name: npm-bmssp
+
     runs-on: ubuntu-latest
+
     strategy:
       matrix:
         node-version: [24.x]
+
     permissions:
       contents: read
       id-token: write
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
