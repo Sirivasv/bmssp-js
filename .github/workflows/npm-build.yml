@@ -1,4 +1,4 @@
-name: Build on Pull Request
+name: Build npm package
 
 on:
   pull_request:
