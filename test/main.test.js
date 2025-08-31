@@ -7,3 +7,10 @@ describe("printMessage", () => {
     expect(printMessage(testValue)).toBe(testValue);
   });
 });
+
+describe("processMessage", () => {
+  test("processes a message and returns the processed result", () => {
+    let testValue = "Hello, bmssp!! Testing..";
+    expect(processMessage(testValue)).toBe(`Processed: ${testValue}`);
+  });
+});
