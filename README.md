@@ -28,6 +28,7 @@ npm install bmssp
 To use this package, you can import it in your JavaScript code as follows:
 
 ```javascript
+// This is a WIP example
 import { printMessage, processMessage } from "bmssp";
 
 printMessage("Hello, World!");
