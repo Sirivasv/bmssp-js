@@ -1,11 +1,46 @@
-name: Build and publish Docker image
+name: Publish
 
 on:
   release:
     types: [published]
 
 jobs:
+  npm-publish:
+    environment:
+      name: npm-bmssp
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [24.x]
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Publish npm package
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
   docker-build-and-publish:
+    needs: npm-publish
+
     environment:
       name: dockerhub
 
@@ -15,7 +50,7 @@ jobs:
       contents: read
 
     steps:
-      - name: Docker meta
+      - name: Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
