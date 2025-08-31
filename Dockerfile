@@ -1,13 +1,9 @@
 FROM node:24-alpine
 
-WORKDIR /app
+WORKDIR /bmssp-js
 
-# Copy package files and install dependencies
-COPY package*.json ./
-RUN npm install
+RUN npm install bmssp
 
-# Mount src/ directory as a volume
-VOLUME ["src/", "test/"]
+COPY examples/main.js .
 
-# Default command (can be overridden)
-CMD ["node", "test/main.js"]
+CMD ["node", "main.js"]
