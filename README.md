@@ -34,7 +34,7 @@ printMessage("Hello, World!");
 processMessage("Hello, World!");
 ```
 
-The file must use ECMAScript modules (ESM) syntax. and have the `.mjs` file extension. Go to the `examples` directory for more usage examples.
+The file must use ECMAScript modules (ESM) syntax and have the `.mjs` file extension. Go to the `examples` directory for more usage examples.
 
 ### Using the docker image
 
