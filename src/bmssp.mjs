@@ -3,7 +3,6 @@ function printMessage(message) {
 }
 
 function processMessage(message) {
-  // Process the message here
   return `Processed: ${message}`;
 }
 
