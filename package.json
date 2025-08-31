@@ -1,6 +1,6 @@
 {
   "name": "bmssp",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Javascript package implementation of the bmssp algorithm.",
   "keywords": [
     "shortest-paths",
@@ -19,11 +19,33 @@
   "license": "MPL-2.0",
   "author": "Saul Ivan Rivas Vega",
   "type": "module",
-  "main": "index.js",
   "directories": {
     "doc": "docs"
   },
+  "files": [
+    "src/",
+    "docs/",
+    "package.json",
+    "package-lock.json",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
-    "test": "node test/main.js"
+    "test": "node test/main.js",
+    "lint": "npm run prettier && npm run eslint",
+    "format": "npm run prettier:fix && npm run eslint:fix",
+    "eslint": "eslint --max-warnings=0 .",
+    "eslint:fix": "eslint --fix .",
+    "prettier": "prettier --check \"./**/{*.js,*.mjs}\"",
+    "prettier:fix": "prettier --write \"./**/{*.js,*.mjs}\""
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.34.0",
+    "@eslint/markdown": "^7.2.0",
+    "eslint": "^9.34.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "globals": "^16.3.0",
+    "prettier": "3.6.2"
   }
 }
