@@ -2,4 +2,8 @@ function printMessage(message) {
   return message;
 }
 
-export { printMessage };
+function processMessage(message) {
+  return `Processed: ${message}`;
+}
+
+export { printMessage, processMessage };
