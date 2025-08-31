@@ -1,6 +1,6 @@
 # Tsinghua Single Source Shortest Paths algorithm
 
-This is a repository containing implementation varieties based on the paper written by Duan Ran et. al. from Tsinghua University.
+This is a repository containing a simple community driven implementation in Javascript based on the paper written by Duan Ran et. al. from Tsinghua University.
 "Breaking the Sorting Barrier for Directed Single-Source Shortest Paths".
 
 https://dl.acm.org/doi/10.1145/3717823.3718179
@@ -13,18 +13,9 @@ We give a deterministic O(mlog2/3n)-time algorithm for single-source shortest pa
 
 ## Development Details
 
-This project is mainly focused in Javascript (in order to be published to npmjs.com via github Actions).
+This project is mainly focused in Javascript in order to be published to npmjs.com as a JS module (esmodule).
 
-### Other Implementations
+### Other Implementations in GitHub
 
 https://github.com/search?q=bmssp&type=repositories
 
-Rust:
-  - https://github.com/lucas-montes/bmssp - Available as a crate to pull.
-
-Java:
-  - https://github.com/PatrickDiallo23/BMSSP-Java
-
-Python:
-  - https://github.com/sidharthpunathil/fastest-shortest-path-algo-poc
-  - https://github.com/simpsonresearch/tsinghua_benchmarks/tree/main
