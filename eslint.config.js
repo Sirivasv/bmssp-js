@@ -7,17 +7,15 @@ import { defineConfig } from "eslint/config";
 
 export default defineConfig([
   {
-    files: ["**/*.{js,mjs,cjs}"],
+    ...js.configs.recommended,
     plugins: { js, prettier },
-    extends: [js.configs.recommended],
     rules: { "prettier/prettier": "error" },
     languageOptions: { globals: globals.node },
   },
   {
-    files: ["**/*.md"],
+    ...markdown.configs.recommended,
     plugins: { markdown },
     language: "markdown/gfm",
-    extends: [markdown.configs.recommended],
   },
   prettierConfig,
 ]);
