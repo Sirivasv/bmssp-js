@@ -8,6 +8,9 @@ on:
 
 jobs:
   npm-build:
+    environment:
+      name: codecov-bmssp
+
     runs-on: ubuntu-latest
 
     permissions:
