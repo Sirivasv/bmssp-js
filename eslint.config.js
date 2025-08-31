@@ -1,21 +1,29 @@
 import js from "@eslint/js";
+import markdown from "@eslint/markdown";
 import prettier from "eslint-plugin-prettier";
 import prettierConfig from "eslint-config-prettier";
 import globals from "globals";
-import markdown from "@eslint/markdown";
-import { defineConfig } from "eslint/config";
 
-export default defineConfig([
+export default [
   {
-    ...js.configs.recommended,
-    plugins: { js, prettier },
-    rules: { "prettier/prettier": "error" },
-    languageOptions: { globals: globals.node },
+    files: ["**/*.md"],
+    plugins: {
+      markdown,
+    },
+    processor: "markdown/markdown",
   },
+  js.configs.recommended,
   {
-    ...markdown.configs.recommended,
-    plugins: { markdown },
-    language: "markdown/gfm",
+    files: ["**/*.{js,mjs,cjs}"],
+    plugins: {
+      prettier,
+    },
+    rules: {
+      "prettier/prettier": "error",
+    },
+    languageOptions: {
+      globals: globals.node,
+    },
   },
   prettierConfig,
-]);
+];
