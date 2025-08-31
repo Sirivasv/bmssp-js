@@ -1,5 +1,5 @@
 import { describe, test, expect } from "@jest/globals";
-import { printMessage, processMessage } from "../index.js";
+import { printMessage, processMessage } from "../index.mjs";
 
 describe("printMessage", () => {
   test("sends a message and gets the message back", () => {

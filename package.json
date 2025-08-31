@@ -1,8 +1,8 @@
 {
   "name": "bmssp",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "Javascript package implementation of the bmssp algorithm.",
-  "main": "index.js",
+  "main": "index.mjs",
   "keywords": [
     "shortest-paths",
     "bmssp",
@@ -24,7 +24,7 @@
     "doc": "docs"
   },
   "files": [
-    "index.js",
+    "index.mjs",
     "src/",
     "docs/",
     "package.json",
