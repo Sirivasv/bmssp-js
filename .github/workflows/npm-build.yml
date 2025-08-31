@@ -34,4 +34,9 @@ jobs:
       run: npm run lint
 
     - name: Run tests
-      run: npm test
+      run: npm run test
+
+    - name: Upload results to Codecov
+      uses: codecov/codecov-action@v5
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
