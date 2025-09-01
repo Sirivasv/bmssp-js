@@ -44,10 +44,16 @@ The file must use ECMAScript modules (ESM) syntax and have the `.mjs` file exten
 
 ### Using the docker image
 
-You can also use the published docker image and run your tests (assuming a `mytest.mjs` in this example) in a pre-configured environment:
+You can also use the published docker image and run the example:
 
 ```bash
-docker run -it -v ./mytest.mjs:/bmssp-js/mytest.mjs sirivasv/bmssp-js:latest node /bmssp-js/mytest.mjs
+docker run -it sirivasv/bmssp-js:latest
+```
+
+Or your tests in a pre-configured environment (replace `folder-mytest/` with your tests folder and `index.mjs` with your test file):
+
+```bash
+docker run -it -v ./folder-mytest/:/bmssp-js/folder-mytest/ sirivasv/bmssp-js:latest node /bmssp-js/folder-mytest/index.mjs
 ```
 
 Other versions of the docker image can be found on [Docker Hub](https://hub.docker.com/r/sirivasv/bmssp-js/tags).
