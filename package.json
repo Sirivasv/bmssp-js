@@ -1,6 +1,6 @@
 {
   "name": "bmssp",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "Javascript package implementation of the bmssp algorithm.",
   "main": "index.mjs",
   "keywords": [
