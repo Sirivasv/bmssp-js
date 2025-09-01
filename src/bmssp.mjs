@@ -1,9 +1,11 @@
-function printMessage(message) {
-  return message;
+class BMSSP {
+  constructor(inputGraph) {
+    this.graph = [];
+    for (let edge of inputGraph) {
+      // Create a deep copy of each edge array
+      this.graph.push([...edge]);
+    }
+  }
 }
 
-function processMessage(message) {
-  return `Processed: ${message}`;
-}
-
-export { printMessage, processMessage };
+export { BMSSP };

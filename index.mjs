@@ -1,1 +1,1 @@
-export { printMessage, processMessage } from "./src/bmssp.mjs";
+export { BMSSP } from "./src/bmssp.mjs";

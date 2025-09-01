@@ -29,10 +29,15 @@ To use this package, you can import it in your JavaScript code as follows:
 
 ```javascript
 // This is a WIP example
-import { printMessage, processMessage } from "bmssp";
+import { BMSSP } from "bmssp";
 
-printMessage("Hello, World!");
-processMessage("Hello, World!");
+const myBMSSP = new BMSSP([
+  [0, 1, 50],
+  [1, 2, 75],
+  [0, 2, 25],
+]);
+
+console.log(myBMSSP.graph);
 ```
 
 The file must use ECMAScript modules (ESM) syntax and have the `.mjs` file extension. Go to the `examples` directory for more usage examples.
