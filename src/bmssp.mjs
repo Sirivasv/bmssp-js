@@ -29,9 +29,16 @@ class BMSSP {
 
   // Method to calculate shortest paths (placeholder implementation)
   calculateShortestPaths(startNode) {
+    // To clean the state before calculation
+    this.initializeShortestPaths();
+
+    // validate startNode
+    if (!this.nodeIDs.has(startNode)) {
+      throw new Error("Start node not found in the graph");
+    }
+
     // Placeholder logic for shortest path calculation
     // This should be replaced with an actual implementation of BMSSP algorithm
-    this.initializeShortestPaths();
     this.shortestPaths.set(startNode, 0);
   }
 }

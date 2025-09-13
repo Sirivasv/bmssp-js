@@ -2,6 +2,7 @@ import { describe, test, expect } from "@jest/globals";
 import { BMSSP } from "../index.mjs";
 import fs from "fs";
 
+// Load the roadNet-CA.txt graph and parse it into an array of edges
 let roadNetCA = (() => {
   let graph = [];
   const filePath = new URL("./roadNet-CA.txt", import.meta.url).pathname;
@@ -19,16 +20,17 @@ let roadNetCA = (() => {
   return graph;
 })();
 
+// Have a initialized BMSSP instance for tests
+const myBMSSP = new BMSSP(roadNetCA);
+
 describe("BMSSP constructor", () => {
   test("initializes the graph correctly", () => {
-    const myBMSSP = new BMSSP(roadNetCA);
     expect(myBMSSP.graph).toEqual(roadNetCA);
   });
 });
 
 describe("BMSSP nodeIDs", () => {
   test("stores unique node IDs correctly", () => {
-    const myBMSSP = new BMSSP(roadNetCA);
     const uniqueNodeIDs = new Set();
     roadNetCA.forEach((edge) => {
       uniqueNodeIDs.add(edge[0]);
@@ -40,7 +42,6 @@ describe("BMSSP nodeIDs", () => {
 
 describe("BMSSP shortestPaths", () => {
   test("initializes shortest paths with Infinity", () => {
-    const myBMSSP = new BMSSP(roadNetCA);
     const expectedShortestPaths = new Map();
     myBMSSP.nodeIDs.forEach((nodeId) => {
       expectedShortestPaths.set(nodeId, Infinity);
@@ -51,9 +52,14 @@ describe("BMSSP shortestPaths", () => {
 
 describe("BMSSP initialize calculateShortestPaths", () => {
   test("sets the distance to the start node to 0", () => {
-    const myBMSSP = new BMSSP(roadNetCA);
     const startNode = [...myBMSSP.nodeIDs][0];
     myBMSSP.calculateShortestPaths(startNode);
     expect(myBMSSP.shortestPaths.get(startNode)).toBe(0);
+  });
+  test("throws an error if the start node is not in the graph", () => {
+    const invalidStartNode = -1; // Assuming -1 is not a valid node ID in the graph
+    expect(() => {
+      myBMSSP.calculateShortestPaths(invalidStartNode);
+    }).toThrow("Start node not found in the graph");
   });
 });
