@@ -37,3 +37,14 @@ describe("BMSSP nodeIDs", () => {
     expect(myBMSSP.nodeIDs).toEqual(uniqueNodeIDs);
   });
 });
+
+describe("BMSSP shortestPaths", () => {
+  test("initializes shortest paths with Infinity", () => {
+    const myBMSSP = new BMSSP(roadNetCA);
+    const expectedShortestPaths = [];
+    myBMSSP.nodeIDs.forEach((nodeId) => {
+      expectedShortestPaths.push([nodeId, Infinity]);
+    });
+    expect(myBMSSP.shortestPaths).toEqual(expectedShortestPaths);
+  });
+});

@@ -4,6 +4,8 @@ class BMSSP {
     this.graph = [];
     // Set to store unique node IDs
     this.nodeIDs = new Set();
+    // Array to store shortest paths
+    this.shortestPaths = [];
 
     for (let edge of inputGraph) {
       // Create a deep copy of each edge array
@@ -11,6 +13,11 @@ class BMSSP {
       // Add node IDs to the set
       this.nodeIDs.add(edge[0]);
       this.nodeIDs.add(edge[1]);
+
+      // Initialize shortest paths with Infinity on each nodeID
+      for (let nodeId of this.nodeIDs) {
+        this.shortestPaths.push([nodeId, Infinity]);
+      }
     }
   }
 }
