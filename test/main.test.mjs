@@ -20,7 +20,7 @@ let roadNetCA = (() => {
   return graph;
 })();
 
-// Have a initialized BMSSP instance for tests
+// Have an initialized BMSSP instance for tests
 const myBMSSP = new BMSSP(roadNetCA);
 
 describe("BMSSP constructor", () => {
