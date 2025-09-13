@@ -25,3 +25,15 @@ describe("BMSSP constructor", () => {
     expect(myBMSSP.graph).toEqual(roadNetCA);
   });
 });
+
+describe("BMSSP nodeIDs", () => {
+  test("stores unique node IDs correctly", () => {
+    const myBMSSP = new BMSSP(roadNetCA);
+    const uniqueNodeIDs = new Set();
+    roadNetCA.forEach((edge) => {
+      uniqueNodeIDs.add(edge[0]);
+      uniqueNodeIDs.add(edge[1]);
+    });
+    expect(myBMSSP.nodeIDs).toEqual(uniqueNodeIDs);
+  });
+});
