@@ -41,10 +41,19 @@ describe("BMSSP nodeIDs", () => {
 describe("BMSSP shortestPaths", () => {
   test("initializes shortest paths with Infinity", () => {
     const myBMSSP = new BMSSP(roadNetCA);
-    const expectedShortestPaths = [];
+    const expectedShortestPaths = new Map();
     myBMSSP.nodeIDs.forEach((nodeId) => {
-      expectedShortestPaths.push([nodeId, Infinity]);
+      expectedShortestPaths.set(nodeId, Infinity);
     });
     expect(myBMSSP.shortestPaths).toEqual(expectedShortestPaths);
+  });
+});
+
+describe("BMSSP initialize calculateShortestPaths", () => {
+  test("sets the distance to the start node to 0", () => {
+    const myBMSSP = new BMSSP(roadNetCA);
+    const startNode = [...myBMSSP.nodeIDs][0];
+    myBMSSP.calculateShortestPaths(startNode);
+    expect(myBMSSP.shortestPaths.get(startNode)).toBe(0);
   });
 });
