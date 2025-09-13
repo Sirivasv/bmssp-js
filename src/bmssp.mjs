@@ -13,11 +13,11 @@ class BMSSP {
       // Add node IDs to the set
       this.nodeIDs.add(edge[0]);
       this.nodeIDs.add(edge[1]);
+    }
 
-      // Initialize shortest paths with Infinity on each nodeID
-      for (let nodeId of this.nodeIDs) {
-        this.shortestPaths.push([nodeId, Infinity]);
-      }
+    // Initialize shortest paths with Infinity on each nodeID (after all nodes are collected)
+    for (let nodeId of this.nodeIDs) {
+      this.shortestPaths.push([nodeId, Infinity]);
     }
   }
 }
