@@ -67,8 +67,7 @@ describe("BMSSP initialize calculateShortestPaths", () => {
 describe("BMSSP vs Dijkstra shortest paths", () => {
   test("shortest paths from a random source match between BMSSP and Dijkstra", () => {
     const nodeArray = [...myBMSSP.nodeIDs];
-    const source =
-      nodeArray[Math.floor(Math.random() * nodeArray.length)];
+    const source = nodeArray[Math.floor(Math.random() * nodeArray.length)];
 
     myBMSSP.calculateShortestPaths(source);
     const dijkstraPaths = dijkstra(roadNetCA, myBMSSP.nodeIDs, source);
