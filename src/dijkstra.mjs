@@ -1,6 +1,7 @@
 /**
  * Simple Dijkstra single-source shortest path.
- * @param {Array<[number, number, number]>} graph - Array of edges [from, to, weight]
+ * Requires all edge weights to be non-negative; with negative weights it may return incorrect paths.
+ * @param {Array<[number, number, number]>} graph - Array of edges [from, to, weight] with non-negative weight
  * @param {Set<number>} nodeIDs - Set of all node IDs (distances for these will be in the result)
  * @param {number} source - Source node ID
  * @returns {Map<number, number>} Map from node ID to shortest distance from source (Infinity if unreachable)
