@@ -1,5 +1,5 @@
 import { describe, test, expect } from "@jest/globals";
-import { BMSSP } from "../index.mjs";
+import { BMSSP, dijkstra } from "../index.mjs";
 import fs from "fs";
 
 // Load the roadNet-CA.txt graph and parse it into an array of edges
@@ -61,5 +61,21 @@ describe("BMSSP initialize calculateShortestPaths", () => {
     expect(() => {
       myBMSSP.calculateShortestPaths(invalidStartNode);
     }).toThrow("Start node not found in the graph");
+  });
+});
+
+describe("BMSSP vs Dijkstra shortest paths", () => {
+  test("shortest paths from a random source match between BMSSP and Dijkstra", () => {
+    const nodeArray = [...myBMSSP.nodeIDs];
+    const source =
+      nodeArray[Math.floor(Math.random() * nodeArray.length)];
+
+    myBMSSP.calculateShortestPaths(source);
+    const dijkstraPaths = dijkstra(roadNetCA, myBMSSP.nodeIDs, source);
+
+    expect(myBMSSP.shortestPaths.size).toBe(dijkstraPaths.size);
+    for (const [nodeId, distance] of myBMSSP.shortestPaths) {
+      expect(dijkstraPaths.get(nodeId)).toBe(distance);
+    }
   });
 });

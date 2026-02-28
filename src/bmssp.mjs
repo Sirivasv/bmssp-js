@@ -1,3 +1,5 @@
+import { dijkstra } from "./dijkstra.mjs";
+
 class BMSSP {
   constructor(inputGraph) {
     // Main graph represented as an array of edges
@@ -27,7 +29,7 @@ class BMSSP {
     }
   }
 
-  // Method to calculate shortest paths (placeholder implementation)
+  // Method to calculate shortest paths from startNode using Dijkstra
   calculateShortestPaths(startNode) {
     // To clean the state before calculation
     this.initializeShortestPaths();
@@ -37,9 +39,10 @@ class BMSSP {
       throw new Error("Start node not found in the graph");
     }
 
-    // Placeholder logic for shortest path calculation
-    // This should be replaced with an actual implementation of BMSSP algorithm
-    this.shortestPaths.set(startNode, 0);
+    const result = dijkstra(this.graph, this.nodeIDs, startNode);
+    result.forEach((distance, nodeId) => {
+      this.shortestPaths.set(nodeId, distance);
+    });
   }
 }
 
