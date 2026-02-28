@@ -64,6 +64,15 @@ describe("BMSSP initialize calculateShortestPaths", () => {
   });
 });
 
+describe("dijkstra source validation", () => {
+  test("throws an error if the source node is not in nodeIDs", () => {
+    const invalidSource = -1; // Assuming -1 is not a valid node ID in the graph
+    expect(() => {
+      dijkstra(roadNetCA, myBMSSP.nodeIDs, invalidSource);
+    }).toThrow("Source node not found in nodeIDs");
+  });
+});
+
 describe("BMSSP vs Dijkstra shortest paths", () => {
   test("shortest paths from a random source match between BMSSP and Dijkstra", () => {
     const nodeArray = [...myBMSSP.nodeIDs];
