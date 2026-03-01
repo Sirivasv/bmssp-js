@@ -3,10 +3,14 @@
  * Requires all edge weights to be non-negative; with negative weights it may return incorrect paths.
  * @param {Array<[number, number, number]>} graph - Array of edges [from, to, weight] with non-negative weight
  * @param {Set<number>} nodeIDs - Set of all node IDs (distances for these will be in the result)
- * @param {number} source - Source node ID
+ * @param {number} source - Source node ID (must be present in nodeIDs)
+ * @throws {Error} If source is not in nodeIDs
  * @returns {Map<number, number>} Map from node ID to shortest distance from source (Infinity if unreachable)
  */
 function dijkstra(graph, nodeIDs, source) {
+  if (!nodeIDs.has(source)) {
+    throw new Error("Source node not found in nodeIDs");
+  }
   const dist = new Map();
   for (const id of nodeIDs) {
     dist.set(id, Infinity);
