@@ -65,7 +65,7 @@ function dijkstra(graph, nodeIDs, source) {
     const neighbors = adj.get(u);
     if (!neighbors) continue;
     for (const { to, weight } of neighbors) {
-      if (!dist.has(to)) dist.set(to, Infinity);
+      if (!dist.has(to)) continue;
       const alt = d + weight;
       if (alt < dist.get(to)) {
         dist.set(to, alt);
