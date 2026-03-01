@@ -74,7 +74,7 @@ describe("dijkstra source validation", () => {
 });
 
 describe("BMSSP vs Dijkstra shortest paths", () => {
-  test("shortest paths from a random source match between BMSSP and Dijkstra", () => {
+  test("shortest paths from a fixed source match between BMSSP and Dijkstra", () => {
     const nodeArray = [...myBMSSP.nodeIDs];
     const source = nodeArray[0];
 
