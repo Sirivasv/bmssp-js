@@ -6,6 +6,10 @@ import globals from "globals";
 
 export default [
   {
+    // Agent knowledge base — docs with pseudocode fences, not shippable code.
+    ignores: [".claude/**"],
+  },
+  {
     files: ["**/*.md"],
     plugins: {
       markdown,

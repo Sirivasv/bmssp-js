@@ -40,6 +40,56 @@ describe("BMSSP nodeIDs", () => {
   });
 });
 
+describe("BMSSP adjacency map", () => {
+  test("groups outgoing edges by source node", () => {
+    const small = new BMSSP([
+      [0, 1, 50],
+      [1, 2, 75],
+      [0, 2, 25],
+    ]);
+    expect(small.adjacency.get(0)).toEqual([
+      [1, 50],
+      [2, 25],
+    ]);
+    expect(small.adjacency.get(1)).toEqual([[2, 75]]);
+  });
+
+  test("gives sink nodes an empty edge array", () => {
+    const small = new BMSSP([
+      [0, 1, 50],
+      [1, 2, 75],
+      [0, 2, 25],
+    ]);
+    // node 2 has no outgoing edges but is still a known node
+    expect(small.adjacency.has(2)).toBe(true);
+    expect(small.adjacency.get(2)).toEqual([]);
+  });
+
+  test("has one entry per unique node ID", () => {
+    expect(myBMSSP.adjacency.size).toBe(myBMSSP.nodeIDs.size);
+  });
+
+  test("preserves the total number of edges across all adjacency lists", () => {
+    let edgeCount = 0;
+    for (const edges of myBMSSP.adjacency.values()) {
+      edgeCount += edges.length;
+    }
+    expect(edgeCount).toBe(roadNetCA.length);
+  });
+
+  test("getEdges returns a node's edges and [] for unknown nodes", () => {
+    const small = new BMSSP([
+      [0, 1, 50],
+      [0, 2, 25],
+    ]);
+    expect(small.getEdges(0)).toEqual([
+      [1, 50],
+      [2, 25],
+    ]);
+    expect(small.getEdges(999)).toEqual([]);
+  });
+});
+
 describe("BMSSP shortestPaths", () => {
   test("initializes shortest paths with Infinity", () => {
     const expectedShortestPaths = new Map();
