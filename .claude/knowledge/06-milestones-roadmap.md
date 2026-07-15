@@ -88,29 +88,42 @@ Clamp `k`,`t` to `≥ 1` for tiny graphs; correctness must not depend on the asy
 
 ---
 
-## Forward-looking version plan (working proposal — refine/apply on `RKB`)
+## Forward-looking version plan (created on GitHub)
 
-> This is the agent's reasoned proposal for milestones beyond `1.0.0`. On `RKB`, reconcile it
-> with GitHub (create/adjust milestones + issues) **after user confirmation**. Currently only
-> `1.0.0` exists on GitHub; everything below is proposed, not yet created.
+> These milestones and their issues were created on GitHub during an `RKB` two-way sync
+> (after user confirmation). All four milestones now exist; keep this section reconciled with
+> GitHub going forward.
 
-- **`1.0.0` (current, exists):** first end-to-end functional BMSSP matching Dijkstra. Issues
-  #40–#45.
-- **`1.1.0` (proposed minor):** correctness hardening — property/fuzz tests vs. Dijkstra on
-  random graphs, disconnected-graph & tie-breaking edge cases, the constant-degree transform
-  as an option, input validation, and JSDoc/API docs for the new modules.
-- **`1.2.0` (proposed minor):** performance & ergonomics — swap the block-list bound index for
-  a real balanced BST, adjacency/relaxation micro-optimizations, optional path reconstruction
-  (`Pred[]` → paths). _Note:_ a seeded **benchmark harness already landed early** with #45
-  (`benchmarks/`, `npm run bench`) — once #43 is done it gains a BMSSP column and becomes the
-  BMSSP-vs-Dijkstra comparison this milestone was going to build.
-- **`2.0.0` (proposed major):** API-breaking generalization — public multi-source / bounded
-  entrypoint (expose `BMSSP(l, B, S)`-style calls), typed graph inputs, and a stabilized
-  public API surface (possible signature changes to `BMSSP` constructor / methods).
+### `1.0.0` (milestone #1) — first end-to-end functional BMSSP
+Issues #40–#45. #45 done (PR #160); #40–#44 open. See the tables above.
 
-When applying on `RKB`: set milestone descriptions to the one-liners above, and file/assign
-the issues implied by each bullet, keeping labels consistent with the existing repo
-conventions (`help wanted`, `good first issue`).
+### `1.1.0` (milestone #2) — correctness hardening
+| # | Issue | Labels |
+|---|---|---|
+| 161 | Property/fuzz tests: BMSSP vs Dijkstra on random graphs | enhancement · help wanted |
+| 162 | Edge-case tests: disconnected graphs and unreachable nodes | enhancement · help wanted |
+| 163 | Deterministic tie-breaking for equal-length paths (Assumption 2.1) | enhancement · help wanted |
+| 164 | Optional constant-degree transform (in/out-degree ≤ 2) | enhancement · help wanted |
+| 165 | Input validation for the BMSSP constructor | good first issue · help wanted |
+| 166 | JSDoc / API docs for the new modules | documentation · good first issue |
+
+### `1.2.0` (milestone #3) — performance & ergonomics
+| # | Issue | Labels |
+|---|---|---|
+| 167 | Replace block-list bound index with a real balanced BST | enhancement · help wanted |
+| 168 | Adjacency and relaxation micro-optimizations | enhancement · help wanted |
+| 169 | Optional shortest-path reconstruction (`Pred[]` → paths) | enhancement · help wanted |
+| 170 | BMSSP-vs-Dijkstra benchmark comparison | enhancement · help wanted |
+
+_Note:_ the seeded **benchmark harness already landed early** with #45 (`benchmarks/`,
+`npm run bench`); #170 just adds the BMSSP column once #43 is done.
+
+### `2.0.0` (milestone #4) — API-breaking generalization
+| # | Issue | Labels |
+|---|---|---|
+| 171 | Public multi-source / bounded BMSSP entrypoint | enhancement · help wanted |
+| 172 | Typed / flexible graph inputs | enhancement · help wanted |
+| 173 | Stabilize the public API surface for 1.0 → 2.0 | documentation · enhancement |
 
 ---
 
