@@ -48,6 +48,8 @@ the current GitHub state. Do **not** push changes to GitHub during normal sessio
 
 ### Step 4 — Ready to work
 Pick up the issue/milestone in focus (see `06`) and use `02`/`03` as the implementation spec.
+When a session's work **closes an issue**, follow the **Version bump & release** routine below
+(bump inside the PR; tag + release only after the user confirms the merge).
 
 ---
 
@@ -68,6 +70,51 @@ perform a **full two-way refresh**:
    new symbols/terms introduced by code or roadmap changes since the last refresh.
 
 `RKB` = the manual superset of the session-start routine, plus the GitHub write-back for `06`.
+It also **re-checks the release state** (`git tag` / `gh release list` vs. `package.json`) so a
+version that was bumped-but-not-yet-released is surfaced.
+
+---
+
+## 🚀 Version bump & release (when a working session closes an issue)
+
+The repo ships via **tag → GitHub Release → CI/CD**. Publishing a GitHub Release
+(`release: published`) fires `.github/workflows/publish.yml`, which **publishes the package to
+npm** (`npm publish --provenance --access public`) **and builds + pushes the multi-arch Docker
+image** to Docker Hub. Tags are the **bare version with no `v` prefix** (`0.15.0`, not
+`v0.15.0`) and must match `package.json`. (Separately: pushes/PRs to `main` run lint + test via
+`npm-build.yml`, and `docs/**` changes deploy Pages via `static.yml` — those need no action.)
+
+> **This is an outward-facing publish (npm + Docker Hub). The release half is GATED on explicit
+> user confirmation that the PR merged. Never create a tag or GitHub Release autonomously.**
+
+### Phase 1 — bump the version *inside the PR that closes the issue*
+Do this as part of the same PR that closes the issue, so `package.json` **and**
+`package-lock.json` (both the root `version` and the `packages[""]` entry) move together. Use
+npm so all stay in sync — **do not hand-edit** the version fields:
+
+```bash
+# repo root, on the feature branch, before committing the PR:
+npm version minor --no-git-tag-version   # e.g. 0.15.0 → 0.16.0; edits package.json + package-lock.json, no git tag/commit
+```
+
+Convention: every historical release is a **minor** bump (`0.N.0`), one per closed issue while
+pre-1.0 — use `minor` unless the user directs otherwise (e.g. the final `1.0.0` milestone close
+is a `major` bump). Commit the bump with the rest of the PR's changes.
+
+### Phase 2 — tag + release *after the user confirms the PR is merged*
+Only once the user confirms the PR is merged (issue closed), from an up-to-date `main`:
+
+```bash
+git checkout main && git pull origin main               # pull the merged bump commit
+git fetch --tags --force                                # sync local tags with GitHub (local can be stale)
+VERSION=$(node -p "require('./package.json').version")  # e.g. 0.16.0
+git tag "$VERSION" && git push origin "$VERSION"        # tag == version, no "v" prefix
+gh release create "$VERSION" --title "$VERSION" --target main --generate-notes
+```
+
+Publishing the release triggers `publish.yml` → npm + Docker Hub. After creating it, confirm the
+CD started (`gh run list --workflow=publish.yml` / `gh release view "$VERSION"`) and report the
+result to the user.
 
 ---
 

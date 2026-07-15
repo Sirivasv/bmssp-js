@@ -1,9 +1,10 @@
 # 05 — Codebase Map (current state)
 
-<!-- BOOKMARK-COMMIT: 611cd53306240b182b6be29c2ad7867de87ae7a4 -->
-<!-- BOOKMARK-BRANCH: feat/45-adjacency-map -->
-<!-- Last validated against the above commit (RKB refresh). This commit is on the #45 feature
-     branch; when PR #160 merges, main HEAD will differ and session start will re-validate. -->
+<!-- BOOKMARK-COMMIT: c71f6b919df9eb12d6f3b65fec2be82428c98db9 -->
+<!-- BOOKMARK-BRANCH: main -->
+<!-- Last validated at session start. PR #160 (#45 adjacency map + benchmark harness) is now
+     MERGED to main; the 611cd53..c71f6b9 diff touched only .claude/knowledge/ files, so the
+     src/test/benchmarks/package.json layout below is unchanged from the prior validation. -->
 <!-- Update both the comment and the body when HEAD moves. -->
 
 Snapshot of what exists in `bmssp-js` today, so you know what to build on vs. what's missing.
