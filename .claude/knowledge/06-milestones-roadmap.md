@@ -1,6 +1,6 @@
 # 06 — Milestones Roadmap
 
-<!-- SYNCED-FROM-GITHUB: 2026-07-15 -->
+<!-- SYNCED-FROM-GITHUB: 2026-07-15 (RKB refresh) -->
 <!-- Current package version: 0.15.0 -->
 
 Maps GitHub **milestones** and **issues** (Sirivasv/bmssp-js) to the paper's building blocks,
@@ -32,19 +32,22 @@ build next); `05-codebase-map.md` is the "reality" side (what exists now).
 
 - **Package version:** `0.15.0` (pre-1.0; the algorithm is not yet functional end-to-end).
 - **Active milestone:** **`1.0.0` — "Have a first functional version of the whole algorithm."**
-  - Progress: **5 closed / 6 open** issues.
+  - GitHub progress: **5 closed / 6 open** issues (issue #45 is implemented but its PR #160 is
+    not merged yet, so GitHub still counts it open).
   - The 6 open issues (#40–#45) are exactly the algorithm pieces from §02–§03.
+- **In flight:** **#45 — adjacency map — implemented in PR #160** (`feat/45-adjacency-map`),
+  awaiting merge. See `05-codebase-map.md` for the shipped `this.adjacency` / `getEdges` API.
 
-## Milestone `1.0.0` — open issues → paper
+## Milestone `1.0.0` — issues → paper
 
-| # | Title | What it is (paper) | Labels | Depends on |
-|---|---|---|---|---|
-| **41** | Implement a priority heap | Binary min-heap for the base case (Alg 2). §03-A | help wanted · good first issue | — |
-| **40** | Implement the base case of the bmssp algorithm | `BaseCase(B, S)` bounded mini-Dijkstra. **Alg 2**, §02 | help wanted | #41 |
-| **45** | Add a map of arrays for edges of each node | Adjacency map so edge lookups aren't O(m). §05 | help wanted · good first issue | — |
-| **42** | Implement Lema 3.3 data structure | Block-based partial-sort list `D`. **Lemma 3.3**, §03-B | help wanted | — |
-| **44** | Implement the findingPivots function | `FindPivots(B, S)` frontier shrink. **Alg 1**, §02 | help wanted | #45 (helpful) |
-| **43** | Implement main bmssp algorithm | `BMSSP(l, B, S)` recursion + `k,t`. **Alg 3**, §02 | help wanted | #40, #42, #44 |
+| # | Title | What it is (paper) | Labels | Depends on | Status |
+|---|---|---|---|---|---|
+| **45** | Add a map of arrays for edges of each node | Adjacency map so edge lookups aren't O(m). §05 | help wanted · good first issue | — | ✅ PR #160 (open) |
+| **41** | Implement a priority heap | Binary min-heap for the base case (Alg 2). §03-A | help wanted · good first issue | — | ⬜ open |
+| **40** | Implement the base case of the bmssp algorithm | `BaseCase(B, S)` bounded mini-Dijkstra. **Alg 2**, §02 | help wanted | #41 | ⬜ open |
+| **42** | Implement Lema 3.3 data structure | Block-based partial-sort list `D`. **Lemma 3.3**, §03-B | help wanted | — | ⬜ open |
+| **44** | Implement the findingPivots function | `FindPivots(B, S)` frontier shrink. **Alg 1**, §02 | help wanted | #45 (helpful) | ⬜ open |
+| **43** | Implement main bmssp algorithm | `BMSSP(l, B, S)` recursion + `k,t`. **Alg 3**, §02 | help wanted | #40, #42, #44 | ⬜ open |
 
 ### Closed (context)
 `#36` main `calculateShortestPaths` (currently delegates to Dijkstra — placeholder) ·
@@ -56,16 +59,19 @@ build next); `05-codebase-map.md` is the "reality" side (what exists now).
 Leaves first; two independent tracks converge on the main recursion:
 
 ```
-Track A (base case):     #45 adjacency map ─┬─▶ #41 heap ─▶ #40 BaseCase ─┐
-Track B (recursion core):                   └─▶ #44 FindPivots ───────────┼─▶ #43 BMSSP main
+Track A (base case):     #45 adjacency map ─┬─▶ #41 heap ─▶ #40 BaseCase ─┐   (#45 ✅ done)
+Track B (recursion core):    (✅ done)       └─▶ #44 FindPivots ───────────┼─▶ #43 BMSSP main
                                                 #42 BlockList ─────────────┘
 ```
 
-1. **#45** adjacency map — small; add `this.adjacency: Map<nodeId, Array<[to, weight]>>`.
+1. ~~**#45** adjacency map~~ — ✅ **done (PR #160):** `this.adjacency: Map<nodeId, [to,w][]>`
+   + `getEdges()`, built in the constructor. Unblocks #40 and #44.
 2. **#41** binary min-heap — standalone, unit-testable (or reuse `dijkstra.mjs`'s lazy heap).
+   **← recommended next (leaf on Track A).**
 3. **#42** block-list `D` — standalone; biggest/riskiest; do early in isolation (§03-B tests).
-4. **#40** BaseCase — needs #41 (+ #45). Test vs. a plain bounded Dijkstra from `x`.
-5. **#44** FindPivots — needs relaxation + adjacency. Test both branches (`|W|>k|S|` and forest roots).
+4. **#40** BaseCase — needs #41 (+ #45 ✅). Test vs. a plain bounded Dijkstra from `x`.
+5. **#44** FindPivots — needs relaxation + adjacency (#45 ✅). Test both branches (`|W|>k|S|`
+   and forest roots).
 6. **#43** BMSSP main — wires #40+#42+#44 with `k`/`t`; replaces the Dijkstra delegation in
    `calculateShortestPaths`. **Definition of done:** BMSSP computes distances via the paper's
    method and the "BMSSP vs Dijkstra" test still passes for every node.
@@ -94,8 +100,10 @@ Clamp `k`,`t` to `≥ 1` for tiny graphs; correctness must not depend on the asy
   random graphs, disconnected-graph & tie-breaking edge cases, the constant-degree transform
   as an option, input validation, and JSDoc/API docs for the new modules.
 - **`1.2.0` (proposed minor):** performance & ergonomics — swap the block-list bound index for
-  a real balanced BST, adjacency/relaxation micro-optimizations, benchmark harness comparing
-  BMSSP vs. Dijkstra on the SNAP datasets, optional path reconstruction (`Pred[]` → paths).
+  a real balanced BST, adjacency/relaxation micro-optimizations, optional path reconstruction
+  (`Pred[]` → paths). _Note:_ a seeded **benchmark harness already landed early** with #45
+  (`benchmarks/`, `npm run bench`) — once #43 is done it gains a BMSSP column and becomes the
+  BMSSP-vs-Dijkstra comparison this milestone was going to build.
 - **`2.0.0` (proposed major):** API-breaking generalization — public multi-source / bounded
   entrypoint (expose `BMSSP(l, B, S)`-style calls), typed graph inputs, and a stabilized
   public API surface (possible signature changes to `BMSSP` constructor / methods).

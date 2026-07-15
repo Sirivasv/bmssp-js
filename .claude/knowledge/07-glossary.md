@@ -59,3 +59,21 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
 - **BaseCase / FindPivots / BMSSP** — Algorithm 2 / Algorithm 1 / Algorithm 3. See §02.
 - **BlockList (`D`)** — Lemma 3.3 semi-sorted structure. See §03-B.
 - **Oracle** — the reference `dijkstra()` in `src/dijkstra.mjs`; ground truth for tests.
+
+## Code / repo terms
+
+- **`adjacency`** (#45) — `Map<nodeId, Array<[to, weight]>>` field on the `BMSSP` class:
+  a node's outgoing edges, so lookups are O(1) instead of scanning the whole edge array.
+  Every known node has an entry (empty array for sinks). Built in the constructor.
+- **`buildAdjacency()`** (#45) — class method that (re)builds `this.adjacency` from
+  `this.graph`. Called by the constructor.
+- **`getEdges(nodeId)`** (#45) — class method returning a node's outgoing edges as
+  `[to, weight]` pairs; returns `[]` for unknown nodes.
+- **Adjacency list (oracle)** — the *local* adjacency `Map` that `src/dijkstra.mjs` builds
+  internally per call; distinct from the class's persistent `this.adjacency`.
+- **Benchmark harness** — `benchmarks/` (run via `npm run bench`): seeded graph
+  **generators** + a `SCENARIOS` registry (sparse-random / dense-random / grid / chain /
+  star), `timeMany` timing, and two benchmarks (adjacency-vs-scan, per-shape Dijkstra). Will
+  host the BMSSP-vs-Dijkstra comparison once #43 lands.
+- **Scenario** — a named, seeded graph shape in the benchmark registry used to probe where
+  BMSSP's asymptotics would help vs. where Dijkstra dominates. See `benchmarks/README.md`.
