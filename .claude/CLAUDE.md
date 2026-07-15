@@ -21,18 +21,26 @@ Read these once per session for full algorithm context. They are **static** — 
 - [knowledge/03-data-structures.md](knowledge/03-data-structures.md) — Lemma 3.3 block-list + heap
 - [knowledge/04-external-enhancement.md](knowledge/04-external-enhancement.md) — consolidated intuition (fixed)
 
-### Step 2 — Validate the codebase map against the bookmark commit
-Open [knowledge/05-codebase-map.md](knowledge/05-codebase-map.md) and read its
-**`<!-- BOOKMARK-COMMIT: … -->`** line, then compare to the repo's current `main` HEAD:
+### Step 2 — Sync `main`, then validate the codebase map bookmark
+**Always pull the latest `main` first — never reason from a stale local checkout.** PRs may
+have merged between sessions (e.g. a local branch that "has no open PR" may simply be merged
+already), so sync with GitHub before drawing any conclusion about branch or merge state:
 
 ```bash
-git rev-parse HEAD
+git checkout main && git pull origin main   # sync with GitHub before anything else
+git rev-parse HEAD                          # now compare to the bookmark
 ```
+
+Open [knowledge/05-codebase-map.md](knowledge/05-codebase-map.md) and read its
+**`<!-- BOOKMARK-COMMIT: … -->`** line, then compare to the freshly-pulled `main` HEAD:
 
 - **If HEAD == bookmark** → `05` is current; do nothing.
 - **If HEAD != bookmark** → the repo moved. Re-inspect `src/`, `test/`, `examples/`,
   `package.json`, update `05` to match the new reality, and set the bookmark to the new HEAD.
   (See the "Session-start validation" block inside `05` for the exact procedure.)
+- Need to judge whether some local branch or commit is merged? Check
+  `gh pr list --state merged` or `git branch --contains <commit>` against the fresh
+  `origin/main` — do **not** infer merge state from the local working tree.
 
 ### Step 3 — Refresh the milestones roadmap from GitHub (read)
 Using `gh`, read the live milestones and issues and reconcile
@@ -58,8 +66,9 @@ When a session's work **closes an issue**, follow the **Version bump & release**
 When the user types **`RKB`** or **`revitalize_knowledge_base`** at any point in a session,
 perform a **full two-way refresh**:
 
-1. **`05` codebase-map** — re-inspect the repo regardless of the bookmark, rewrite `05`, and
-   reset the bookmark commit to current HEAD.
+1. **`05` codebase-map** — first sync `main` exactly as in session-start Step 2
+   (`git checkout main && git pull origin main`), then re-inspect the repo regardless of the
+   bookmark, rewrite `05`, and reset the bookmark commit to current HEAD.
 2. **`06` milestones-roadmap — two-way sync with GitHub.** Beyond reading, you should
    **use `gh` to make GitHub match the roadmap**, treating the freshly-updated `.claude/`
    knowledge base (post-task learnings from `05`/`07` and the code) as the source of truth:

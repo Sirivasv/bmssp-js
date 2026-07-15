@@ -1,10 +1,12 @@
 # 05 — Codebase Map (current state)
 
-<!-- BOOKMARK-COMMIT: c71f6b919df9eb12d6f3b65fec2be82428c98db9 -->
+<!-- BOOKMARK-COMMIT: 3210c091b6b7638574a95e8b58a1a19b74b7972a -->
 <!-- BOOKMARK-BRANCH: main -->
-<!-- Last validated at session start. PR #160 (#45 adjacency map + benchmark harness) is now
-     MERGED to main; the 611cd53..c71f6b9 diff touched only .claude/knowledge/ files, so the
-     src/test/benchmarks/package.json layout below is unchanged from the prior validation. -->
+<!-- Last validated after pulling main. PR #174 (docs: version-bump & release routine) is
+     MERGED to main; the c71f6b9..3210c09 diff touched only .claude/ files, so the
+     src/test/benchmarks/package.json layout below is unchanged from the prior validation.
+     Pending: PR #175 (feat(#42) BlockList, src/blockList.mjs + tests, bump to 0.16.0) is
+     OPEN — fold it into this map once merged. -->
 <!-- Update both the comment and the body when HEAD moves. -->
 
 Snapshot of what exists in `bmssp-js` today, so you know what to build on vs. what's missing.
@@ -13,9 +15,11 @@ Snapshot of what exists in `bmssp-js` today, so you know what to build on vs. wh
 
 This map is only true as of the **bookmark commit** recorded in the HTML comment at the top
 of this file (`BOOKMARK-COMMIT`). The repo changes as commits land, so validate at the start
-of every session:
+of every session — **after pulling the latest `main`** (never validate against a stale local
+checkout; a branch that looks unmerged locally may already be on `origin/main`):
 
 ```bash
+git checkout main && git pull origin main
 git rev-parse HEAD          # compare to BOOKMARK-COMMIT above
 ```
 
