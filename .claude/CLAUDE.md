@@ -61,11 +61,18 @@ perform a **full two-way refresh**:
 1. **`05` codebase-map** — re-inspect the repo regardless of the bookmark, rewrite `05`, and
    reset the bookmark commit to current HEAD.
 2. **`06` milestones-roadmap — two-way sync with GitHub.** Beyond reading, you should
-   **use `gh` to make GitHub match the roadmap**: reconcile milestone titles/descriptions and
-   issue descriptions, and reason about **(a) the current package version, (b) the next one or
-   two minor-version milestones, and (c) the next major-version milestone** — proposing the
-   issues that each should contain. (Confirm with the user before creating/editing GitHub
-   milestones or issues — these are outward-facing writes.)
+   **use `gh` to make GitHub match the roadmap**, treating the freshly-updated `.claude/`
+   knowledge base (post-task learnings from `05`/`07` and the code) as the source of truth:
+   - **Reconcile existing open issues** (created by you or the user). As new learnings land,
+     issues may need their **titles/descriptions edited**, be **closed** (already done, obsolete,
+     or superseded), be **re-scoped/split/merged**, or be **moved to a different milestone**.
+   - **Reconcile the milestones themselves.** Reason about **(a) the current package version,
+     (b) the next one or two minor-version milestones, and (c) the next major-version
+     milestone** — and adjust as learnings dictate: the **number of remaining future minor
+     versions**, each milestone's **scope and issue set**, and the same for the **next major
+     version** (titles, descriptions, which issues belong where, adding/removing issues).
+   - Propose the concrete `gh` edits (issue closes/edits, milestone edits, new issues). **Confirm
+     with the user before any create/edit/close — these are outward-facing writes.**
 3. **`07` glossary** — update [knowledge/07-glossary.md](knowledge/07-glossary.md) to add any
    new symbols/terms introduced by code or roadmap changes since the last refresh.
 

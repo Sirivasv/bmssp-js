@@ -17,14 +17,17 @@ build next); `05-codebase-map.md` is the "reality" side (what exists now).
   gh issue list --repo Sirivasv/bmssp-js --state closed --limit 100 --json number,title,milestone
   ```
 - **On-demand `RKB` (`revitalize_knowledge_base`) — two-way sync.** In addition to the read
-  above, **make GitHub match this roadmap**: reconcile milestone titles/descriptions and issue
-  descriptions via `gh`, and reason forward about versioning:
-  - the **current version** (from `package.json`),
-  - the **next one or two minor-version milestones**, and
-  - the **next major-version milestone**,
-  proposing which issues each should contain.
-  Outward-facing writes (creating/editing milestones or issues) are **confirmed with the user
-  first**. See the "Forward-looking version plan" section for the working proposal.
+  above, **make GitHub match this roadmap**, using the just-refreshed knowledge base + code as
+  the source of truth:
+  - **Existing open issues** (yours or the user's) may be **edited** (title/description),
+    **closed** (done/obsolete/superseded), **re-scoped/split/merged**, or **moved** to another
+    milestone as new learnings dictate.
+  - **Milestones** are adjusted the same way — reason forward about versioning and update the
+    **current version** (from `package.json`), the **number and scope of the next one or two
+    minor-version milestones**, and the **next major-version milestone** (titles, descriptions,
+    and which issues belong to each — adding or removing issues as needed).
+  Outward-facing writes (creating/editing/closing milestones or issues) are **confirmed with the
+  user first**. See the "Forward-looking version plan" section for the working proposal.
 
 ---
 
