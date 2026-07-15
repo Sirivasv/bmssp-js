@@ -92,6 +92,16 @@ perform a **full two-way refresh**:
 > The same gate applies: propose the concrete edits and **confirm with the user before any
 > outward-facing GitHub write**.
 
+> **You co-own the roadmap.** Do not wait to be told to fold post-session learnings into it —
+> the user expects that **every RKB after real progress produces concrete edit proposals**,
+> because every increment of progress teaches something about the issues ahead. On each `RKB`,
+> actively re-derive: are existing issue titles/descriptions still the best statement of the
+> work? Is the issue layout of the **current and future minor versions** still the right
+> slicing? Does the **next major version** still have the right scope? Then put the specific
+> edits in front of the user — **asking per edit** (issues / versions / milestones), since the
+> confirmation gate is per outward-facing write, not per batch. An RKB that proposes nothing
+> after a session that shipped code should be the rare exception, not the default.
+
 `RKB` = the manual superset of the session-start routine, plus the GitHub write-back for `06`.
 It also **re-checks the release state** (`git tag` / `gh release list` vs. `package.json`) so a
 version that was bumped-but-not-yet-released is surfaced.

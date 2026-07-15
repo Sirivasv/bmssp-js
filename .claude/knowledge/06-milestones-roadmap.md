@@ -27,7 +27,10 @@ build next); `05-codebase-map.md` is the "reality" side (what exists now).
     minor-version milestones**, and the **next major-version milestone** (titles, descriptions,
     and which issues belong to each — adding or removing issues as needed).
   Outward-facing writes (creating/editing/closing milestones or issues) are **confirmed with the
-  user first**. See the "Forward-looking version plan" section for the working proposal.
+  user first, one ask per edit**. See the "Forward-looking version plan" section for the working
+  proposal. **The agent co-owns this roadmap**: every RKB after real progress should proactively
+  propose issue/milestone improvements from the session's learnings (see `../CLAUDE.md`), rather
+  than waiting for the user to request them.
 
 ---
 
@@ -116,13 +119,19 @@ tables above.
 ### `1.2.0` (milestone #3) — performance & ergonomics
 | # | Issue | Labels |
 |---|---|---|
-| 167 | Replace block-list bound index with a real balanced BST | enhancement · help wanted |
+| 167 | Restore Lemma 3.3's exact asymptotics in BlockList (balanced-BST bound index + linear-time selection) | enhancement · help wanted |
 | 168 | Adjacency and relaxation micro-optimizations | enhancement · help wanted |
 | 169 | Optional shortest-path reconstruction (`Pred[]` → paths) | enhancement · help wanted |
 | 170 | BMSSP-vs-Dijkstra benchmark comparison | enhancement · help wanted |
 
 _Note:_ the seeded **benchmark harness already landed early** with #45 (`benchmarks/`,
 `npm run bench`); #170 just adds the BMSSP column once #43 is done.
+
+_RKB 2026-07-15 (post #42/#41) — issue bodies updated on GitHub:_ #167 widened to both
+BlockList shortcuts (bound index **and** sort-based median selection); #168 widened with the
+indexed-vs-lazy **heap strategy** benchmark/consolidation; #166 re-scoped to the older doc
+surface (new modules ship with JSDoc already); #173 gained the explicit internal-vs-public
+exposure decision (BlockList/MinHeap are not re-exported from `index.mjs`).
 
 ### `2.0.0` (milestone #4) — API-breaking generalization
 | # | Issue | Labels |

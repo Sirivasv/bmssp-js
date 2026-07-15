@@ -82,9 +82,9 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
 - **`locator`** (#42) — the `BlockList`'s `Map<key, block>` giving O(1) duplicate handling
   (find/replace an existing key without scanning blocks).
 - **Bound index shortcut** (#42) — `d1`'s block bounds are binary-searched in a plain array
-  instead of the paper's balanced BST; upgrading it is issue #167. Block **splits** use a
-  sort (O(M log M)) instead of linear-time median selection — same correctness, worse
-  constants.
+  instead of the paper's balanced BST, and block **splits**/batch chunking use a sort
+  (O(M log M)) instead of linear-time median selection — same correctness, worse constants.
+  Both upgrades are tracked together in issue #167.
 - **`MinHeap`** (#41) — `src/heap.mjs`, the *indexed* binary min-heap for BaseCase (Alg 2):
   `insert` / `extractMin()` / `peekMin() → { key, value }` / `decreaseKey` / `has` /
   `getValue` / `size` / `isEmpty()`. `has` is Algorithm 2's "is `v` in `H`?" branch;
