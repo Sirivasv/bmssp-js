@@ -1,6 +1,6 @@
 # 06 — Milestones Roadmap
 
-<!-- SYNCED-FROM-GITHUB: 2026-07-15 (RKB refresh) -->
+<!-- SYNCED-FROM-GITHUB: 2026-07-15 (session-start reconciliation; PR #160 merged) -->
 <!-- Current package version: 0.15.0 -->
 
 Maps GitHub **milestones** and **issues** (Sirivasv/bmssp-js) to the paper's building blocks,
@@ -17,14 +17,17 @@ build next); `05-codebase-map.md` is the "reality" side (what exists now).
   gh issue list --repo Sirivasv/bmssp-js --state closed --limit 100 --json number,title,milestone
   ```
 - **On-demand `RKB` (`revitalize_knowledge_base`) — two-way sync.** In addition to the read
-  above, **make GitHub match this roadmap**: reconcile milestone titles/descriptions and issue
-  descriptions via `gh`, and reason forward about versioning:
-  - the **current version** (from `package.json`),
-  - the **next one or two minor-version milestones**, and
-  - the **next major-version milestone**,
-  proposing which issues each should contain.
-  Outward-facing writes (creating/editing milestones or issues) are **confirmed with the user
-  first**. See the "Forward-looking version plan" section for the working proposal.
+  above, **make GitHub match this roadmap**, using the just-refreshed knowledge base + code as
+  the source of truth:
+  - **Existing open issues** (yours or the user's) may be **edited** (title/description),
+    **closed** (done/obsolete/superseded), **re-scoped/split/merged**, or **moved** to another
+    milestone as new learnings dictate.
+  - **Milestones** are adjusted the same way — reason forward about versioning and update the
+    **current version** (from `package.json`), the **number and scope of the next one or two
+    minor-version milestones**, and the **next major-version milestone** (titles, descriptions,
+    and which issues belong to each — adding or removing issues as needed).
+  Outward-facing writes (creating/editing/closing milestones or issues) are **confirmed with the
+  user first**. See the "Forward-looking version plan" section for the working proposal.
 
 ---
 
@@ -32,17 +35,16 @@ build next); `05-codebase-map.md` is the "reality" side (what exists now).
 
 - **Package version:** `0.15.0` (pre-1.0; the algorithm is not yet functional end-to-end).
 - **Active milestone:** **`1.0.0` — "Have a first functional version of the whole algorithm."**
-  - GitHub progress: **5 closed / 6 open** issues (issue #45 is implemented but its PR #160 is
-    not merged yet, so GitHub still counts it open).
-  - The 6 open issues (#40–#45) are exactly the algorithm pieces from §02–§03.
-- **In flight:** **#45 — adjacency map — implemented in PR #160** (`feat/45-adjacency-map`),
-  awaiting merge. See `05-codebase-map.md` for the shipped `this.adjacency` / `getEdges` API.
+  - GitHub progress: **6 closed / 5 open** issues (PR #160 merged, so #45 now counts closed).
+  - The 5 open issues (#40–#44) are exactly the remaining algorithm pieces from §02–§03.
+- **Just merged:** **#45 — adjacency map + benchmark harness — PR #160 is now on `main`**
+  (commit `c71f6b9`). See `05-codebase-map.md` for the shipped `this.adjacency` / `getEdges` API.
 
 ## Milestone `1.0.0` — issues → paper
 
 | # | Title | What it is (paper) | Labels | Depends on | Status |
 |---|---|---|---|---|---|
-| **45** | Add a map of arrays for edges of each node | Adjacency map so edge lookups aren't O(m). §05 | help wanted · good first issue | — | ✅ PR #160 (open) |
+| **45** | Add a map of arrays for edges of each node | Adjacency map so edge lookups aren't O(m). §05 | help wanted · good first issue | — | ✅ merged (PR #160) |
 | **41** | Implement a priority heap | Binary min-heap for the base case (Alg 2). §03-A | help wanted · good first issue | — | ⬜ open |
 | **40** | Implement the base case of the bmssp algorithm | `BaseCase(B, S)` bounded mini-Dijkstra. **Alg 2**, §02 | help wanted | #41 | ⬜ open |
 | **42** | Implement Lema 3.3 data structure | Block-based partial-sort list `D`. **Lemma 3.3**, §03-B | help wanted | — | ⬜ open |
@@ -126,6 +128,19 @@ _Note:_ the seeded **benchmark harness already landed early** with #45 (`benchma
 | 173 | Stabilize the public API surface for 1.0 → 2.0 | documentation · enhancement |
 
 ---
+
+## Release mechanics (version bump per closed issue)
+
+Closing an issue bumps the package version and, after the PR merges, ships a release:
+
+1. **In the PR that closes the issue** — `npm version minor --no-git-tag-version` (keeps
+   `package.json` + `package-lock.json` in sync; historical cadence is a **minor** `0.N.0` bump
+   per issue). The `1.0.0` milestone close is the `major` bump to `1.0.0`.
+2. **After the user confirms the merge** — tag `main` with the bare version (no `v` prefix) and
+   `gh release create` it; publishing the release fires `publish.yml` → **npm + Docker Hub**.
+
+Full procedure + exact commands live in **`../CLAUDE.md` → "Version bump & release"**. The
+release step is an outward-facing publish and is **gated on explicit user confirmation**.
 
 ## Definition of done for `1.0.0`
 
