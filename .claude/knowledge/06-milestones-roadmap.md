@@ -1,7 +1,7 @@
 # 06 — Milestones Roadmap
 
-<!-- SYNCED-FROM-GITHUB: 2026-07-15 (session-start reconciliation; PR #160 merged) -->
-<!-- Current package version: 0.15.0 -->
+<!-- SYNCED-FROM-GITHUB: 2026-07-15 (session-start reconciliation; PR #175 merged, #42 closed) -->
+<!-- Current package version: 0.16.0 (tagged + released) -->
 
 Maps GitHub **milestones** and **issues** (Sirivasv/bmssp-js) to the paper's building blocks,
 with a dependency-aware build order. This is the "intent" side of the knowledge base (what to
@@ -33,12 +33,14 @@ build next); `05-codebase-map.md` is the "reality" side (what exists now).
 
 ## Current state (as synced)
 
-- **Package version:** `0.15.0` (pre-1.0; the algorithm is not yet functional end-to-end).
+- **Package version:** `0.16.0` (pre-1.0; the algorithm is not yet functional end-to-end).
+  The `0.16.0` tag + GitHub Release are published (npm + Docker Hub CD fired).
 - **Active milestone:** **`1.0.0` — "Have a first functional version of the whole algorithm."**
-  - GitHub progress: **6 closed / 5 open** issues (PR #160 merged, so #45 now counts closed).
-  - The 5 open issues (#40–#44) are exactly the remaining algorithm pieces from §02–§03.
-- **Just merged:** **#45 — adjacency map + benchmark harness — PR #160 is now on `main`**
-  (commit `c71f6b9`). See `05-codebase-map.md` for the shipped `this.adjacency` / `getEdges` API.
+  - GitHub progress: **7 closed / 4 open** issues (PR #175 merged, so #42 now counts closed).
+  - The 4 open issues (#40, #41, #43, #44) are the remaining algorithm pieces from §02–§03.
+- **Just merged:** **#42 — Lemma 3.3 BlockList — PR #175 is now on `main`** (commit `3cca82a`).
+  See `05-codebase-map.md` for the shipped `src/blockList.mjs` API (`insert` / `batchPrepend` /
+  `pull`) and its documented shortcuts (array bound index → #167).
 
 ## Milestone `1.0.0` — issues → paper
 
@@ -47,7 +49,7 @@ build next); `05-codebase-map.md` is the "reality" side (what exists now).
 | **45** | Add a map of arrays for edges of each node | Adjacency map so edge lookups aren't O(m). §05 | help wanted · good first issue | — | ✅ merged (PR #160) |
 | **41** | Implement a priority heap | Binary min-heap for the base case (Alg 2). §03-A | help wanted · good first issue | — | ⬜ open |
 | **40** | Implement the base case of the bmssp algorithm | `BaseCase(B, S)` bounded mini-Dijkstra. **Alg 2**, §02 | help wanted | #41 | ⬜ open |
-| **42** | Implement Lema 3.3 data structure | Block-based partial-sort list `D`. **Lemma 3.3**, §03-B | help wanted | — | ⬜ open |
+| **42** | Implement Lema 3.3 data structure | Block-based partial-sort list `D`. **Lemma 3.3**, §03-B | help wanted | — | ✅ merged (PR #175) |
 | **44** | Implement the findingPivots function | `FindPivots(B, S)` frontier shrink. **Alg 1**, §02 | help wanted | #45 (helpful) | ⬜ open |
 | **43** | Implement main bmssp algorithm | `BMSSP(l, B, S)` recursion + `k,t`. **Alg 3**, §02 | help wanted | #40, #42, #44 | ⬜ open |
 
@@ -63,14 +65,15 @@ Leaves first; two independent tracks converge on the main recursion:
 ```
 Track A (base case):     #45 adjacency map ─┬─▶ #41 heap ─▶ #40 BaseCase ─┐   (#45 ✅ done)
 Track B (recursion core):    (✅ done)       └─▶ #44 FindPivots ───────────┼─▶ #43 BMSSP main
-                                                #42 BlockList ─────────────┘
+                                                #42 BlockList (✅ done) ───┘
 ```
 
 1. ~~**#45** adjacency map~~ — ✅ **done (PR #160):** `this.adjacency: Map<nodeId, [to,w][]>`
    + `getEdges()`, built in the constructor. Unblocks #40 and #44.
-2. **#41** binary min-heap — standalone, unit-testable (or reuse `dijkstra.mjs`'s lazy heap).
-   **← recommended next (leaf on Track A).**
-3. **#42** block-list `D` — standalone; biggest/riskiest; do early in isolation (§03-B tests).
+2. ~~**#42** block-list `D`~~ — ✅ **done (PR #175):** `src/blockList.mjs` + 18 tests
+   (§03-B contracts incl. seeded stress). Bound index is a sorted array for now (#167).
+3. **#41** binary min-heap — 🔶 **PR open:** `src/heap.mjs` indexed `MinHeap`
+   (insert/extractMin/decreaseKey/has) + 16 tests; bump to 0.17.0. Unblocks #40 once merged.
 4. **#40** BaseCase — needs #41 (+ #45 ✅). Test vs. a plain bounded Dijkstra from `x`.
 5. **#44** FindPivots — needs relaxation + adjacency (#45 ✅). Test both branches (`|W|>k|S|`
    and forest roots).
@@ -97,7 +100,8 @@ Clamp `k`,`t` to `≥ 1` for tiny graphs; correctness must not depend on the asy
 > GitHub going forward.
 
 ### `1.0.0` (milestone #1) — first end-to-end functional BMSSP
-Issues #40–#45. #45 done (PR #160); #40–#44 open. See the tables above.
+Issues #40–#45. #45 done (PR #160), #42 done (PR #175); #40, #41, #43, #44 open. See the
+tables above.
 
 ### `1.1.0` (milestone #2) — correctness hardening
 | # | Issue | Labels |

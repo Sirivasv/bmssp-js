@@ -85,6 +85,13 @@ perform a **full two-way refresh**:
 3. **`07` glossary** — update [knowledge/07-glossary.md](knowledge/07-glossary.md) to add any
    new symbols/terms introduced by code or roadmap changes since the last refresh.
 
+> **Not gated on the `RKB` keyword:** the roadmap-reshaping powers of item 2 — adjusting the
+> **number, scope, and issue sets of the upcoming minor-version milestones** and the **next
+> major-version milestone** (and the issues within them) — may be exercised **at any point in
+> a working session** when new learnings warrant it, not only when the user types `RKB`.
+> The same gate applies: propose the concrete edits and **confirm with the user before any
+> outward-facing GitHub write**.
+
 `RKB` = the manual superset of the session-start routine, plus the GitHub write-back for `06`.
 It also **re-checks the release state** (`git tag` / `gh release list` vs. `package.json`) so a
 version that was bumped-but-not-yet-released is surfaced.
