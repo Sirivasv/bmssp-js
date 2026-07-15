@@ -1,6 +1,6 @@
 # 07 — Glossary
 
-<!-- Updated on: RKB (revitalize_knowledge_base) -->
+<!-- Updated on: RKB 2026-07-15 (added #42 BlockList and #41 MinHeap code terms) -->
 
 > **Lifecycle: dynamic — updated on `RKB`.** This glossary is refreshed on the on-demand
 > `revitalize_knowledge_base` (`RKB`) command (see `../CLAUDE.md`). When code or the roadmap
@@ -71,6 +71,30 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
   `[to, weight]` pairs; returns `[]` for unknown nodes.
 - **Adjacency list (oracle)** — the *local* adjacency `Map` that `src/dijkstra.mjs` builds
   internally per call; distinct from the class's persistent `this.adjacency`.
+- **`BlockList`** (#42) — `src/blockList.mjs`, the Lemma 3.3 structure `D`. API:
+  `insert(key, value)` / `batchPrepend(pairs)` / `pull() → { keys, bound }`, plus
+  `size` / `isEmpty()`. `pull()`'s `{ keys, bound }` is Algorithm 3's `Si, Bi`. Values must
+  be `< B`; duplicate keys keep the smallest value everywhere. Internal to the algorithm
+  (not re-exported from `index.mjs`).
+- **`d0` / `d1`** (#42) — the `BlockList`'s two block sequences: `d1` receives `insert`s
+  (each block carries an upper `bound`, non-decreasing across blocks; the last block's bound
+  is `B`), `d0` receives `batchPrepend` blocks and conceptually sits in front of `d1`.
+- **`locator`** (#42) — the `BlockList`'s `Map<key, block>` giving O(1) duplicate handling
+  (find/replace an existing key without scanning blocks).
+- **Bound index shortcut** (#42) — `d1`'s block bounds are binary-searched in a plain array
+  instead of the paper's balanced BST, and block **splits**/batch chunking use a sort
+  (O(M log M)) instead of linear-time median selection — same correctness, worse constants.
+  Both upgrades are tracked together in issue #167.
+- **`MinHeap`** (#41) — `src/heap.mjs`, the *indexed* binary min-heap for BaseCase (Alg 2):
+  `insert` / `extractMin()` / `peekMin() → { key, value }` / `decreaseKey` / `has` /
+  `getValue` / `size` / `isEmpty()`. `has` is Algorithm 2's "is `v` in `H`?" branch;
+  `decreaseKey` ignores non-decreasing values (smallest wins, mirroring `≤` relaxation);
+  an extracted key may be re-inserted. Internal (not re-exported from `index.mjs`).
+- **`position` map** (#41) — the `MinHeap`'s `Map<key, arrayIndex>` kept in sync on every
+  swap; what makes `has`/`getValue` O(1) and `decreaseKey` O(log n).
+- **Indexed vs. lazy heap** — `MinHeap` is the paper-literal *indexed* variant (true
+  `DecreaseKey`); `src/dijkstra.mjs` internally uses the *lazy* variant (push duplicates,
+  skip stale pops). Both are correct; §03-A discusses the trade-off.
 - **Benchmark harness** — `benchmarks/` (run via `npm run bench`): seeded graph
   **generators** + a `SCENARIOS` registry (sparse-random / dense-random / grid / chain /
   star), `timeMany` timing, and two benchmarks (adjacency-vs-scan, per-shape Dijkstra). Will

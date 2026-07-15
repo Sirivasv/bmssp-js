@@ -1,12 +1,13 @@
 # 05 — Codebase Map (current state)
 
-<!-- BOOKMARK-COMMIT: 3210c091b6b7638574a95e8b58a1a19b74b7972a -->
+<!-- BOOKMARK-COMMIT: 3cca82a35595f97a9c7b2420af55772ae95eed8a -->
 <!-- BOOKMARK-BRANCH: main -->
-<!-- Last validated after pulling main. PR #174 (docs: version-bump & release routine) is
-     MERGED to main; the c71f6b9..3210c09 diff touched only .claude/ files, so the
-     src/test/benchmarks/package.json layout below is unchanged from the prior validation.
-     Pending: PR #175 (feat(#42) BlockList, src/blockList.mjs + tests, bump to 0.16.0) is
-     OPEN — fold it into this map once merged. -->
+<!-- Last validated after pulling main. PR #175 (feat(#42) Lemma 3.3 BlockList) is MERGED:
+     adds src/blockList.mjs + test/blockList.test.mjs and bumps the version to 0.16.0
+     (tagged + released; publish.yml fired). #42 is closed — remaining 1.0.0 issues are
+     #40, #41, #43, #44.
+     Pending: PR for #41 (feat: src/heap.mjs indexed MinHeap + tests, bump to 0.17.0) is
+     OPEN — re-stamp the bookmark once merged. -->
 <!-- Update both the comment and the body when HEAD moves. -->
 
 Snapshot of what exists in `bmssp-js` today, so you know what to build on vs. what's missing.
@@ -43,8 +44,12 @@ index.mjs                 # re-exports { BMSSP } and { dijkstra }
 src/
   bmssp.mjs               # BMSSP class — scaffolding + #45 adjacency map (no real algorithm yet)
   dijkstra.mjs            # reference Dijkstra (array binary-heap) — DONE, used as oracle
+  blockList.mjs           # NEW (#42, PR #175): Lemma 3.3 block-based partial-sort structure D
+  heap.mjs                # NEW (#41): indexed binary min-heap (MinHeap) for BaseCase (Alg 2)
 test/
   main.test.mjs           # Jest tests: constructor, nodeIDs, adjacency map, shortestPaths, BMSSP-vs-Dijkstra
+  blockList.test.mjs      # NEW (#42): 18 BlockList tests incl. a seeded random stress test
+  heap.test.mjs           # NEW (#41): 16 MinHeap tests incl. a seeded stress test vs. a naive queue
   roadNet-CA.txt          # real road-network edge list (SNAP roadNet-CA), weights randomized at load
   README.md
 benchmarks/               # NEW (#45 PR): dependency-free benchmark harness, `npm run bench`
@@ -94,6 +99,50 @@ FindPivots → block list → main recursion) has **not** been written yet — t
 #40–#44. The eventual BMSSP entry point should reproduce Dijkstra's answers via the paper's
 method, not by calling Dijkstra.
 
+## `src/blockList.mjs` — Lemma 3.3 structure `D` (#42, DONE in PR #175)
+
+```js
+class BlockList {
+  constructor(M, B)        // block/pull size M >= 1 (floored), strict value upper bound B (Infinity OK)
+  get size / isEmpty()
+  insert(key, value)       // throws if !(value < B); duplicate key keeps the smallest value
+  batchPrepend(pairs)      // iterable of [key, value]; caller guarantees "smaller than everything stored"
+  pull()                   // → { keys: Set, bound } — the ≤M smallest keys; max(pulled) ≤ bound ≤ min(remaining);
+}                          //   bound === B when the pull drains the structure
+export { BlockList };      // NOT re-exported from index.mjs — internal to the algorithm
+```
+
+Implementation notes (matches §03-B including its documented shortcuts):
+- `d1` (insert blocks) + `d0` (prepend blocks); values ordered between blocks, unsorted within.
+  Blocks are `{ bound, entries: Map }`; a `locator` Map (key → block) gives O(1) duplicate handling.
+- Bound index = plain array + binary search instead of a balanced BST (upgrade tracked as #167).
+- Overfull `d1` block splits around the median via sort (O(M log M), not linear-time selection).
+- Big `batchPrepend` batches are sorted and chunked into blocks of ≤ ⌈M/2⌉, prepended to `d0`.
+- Last `d1` block (bound `B`) is kept even when empty so every `insert` finds a home.
+- API surface for Algorithm 3: `Bi, Si ← D.Pull()` maps to `const { keys, bound } = d.pull()`.
+
+## `src/heap.mjs` — indexed binary min-heap (#41)
+
+```js
+class MinHeap {
+  constructor()            // no parameters
+  get size / isEmpty()
+  has(key)                 // O(1) membership — Algorithm 2's "if v not in H"
+  getValue(key)            // current value or undefined
+  peekMin()                // → { key, value } without removing; throws when empty
+  insert(key, value)       // throws on duplicate key or non-number value
+  decreaseKey(key, value)  // throws on missing key; ignored unless value < current (smallest wins)
+  extractMin()             // → { key, value }; throws when empty
+}
+export { MinHeap };        // NOT re-exported from index.mjs — internal to the algorithm
+```
+
+The **true indexed heap** from §03-A (entries array + `position` Map for O(log n)
+`decreaseKey`), matching Algorithm 2 literally — deliberately not the lazy duplicate-and-skip
+variant `src/dijkstra.mjs` uses internally. An extracted key may be re-inserted later.
+16 tests in `test/heap.test.mjs` (contracts, ordering, decreaseKey, the BaseCase
+insert-or-decrease relaxation pattern, seeded stress vs. a naive linear-scan queue).
+
 ## `src/dijkstra.mjs` — the oracle (already done)
 
 `dijkstra(graph, nodeIDs, source) → Map<nodeId, distance>`. Standard array binary min-heap
@@ -111,7 +160,12 @@ implementation is tested against. Reuse its heap style / adjacency-list building
 - `dijkstra` throws on a source not in `nodeIDs`.
 - **Key one:** "BMSSP vs Dijkstra" — for a fixed source, `myBMSSP.shortestPaths` must equal
   `dijkstra(...)` for every node. **Any real BMSSP implementation must keep this passing.**
-- Current suite: **12 tests, all passing; 100% coverage on `bmssp.mjs`.**
+- Current suite: **12 tests in `main.test.mjs` + 18 in `blockList.test.mjs` + 16 in
+  `heap.test.mjs`, all passing.**
+- **BlockList (#42):** init validation, `value < B` enforcement, drain-pull returns bound `B`,
+  batch-sorted pulls of the M smallest, separator invariant, smallest-value-wins dedupe
+  (insert and batchPrepend, vs. stored and within-batch), split correctness, re-insert after
+  pull, chunked large prepends, and a seeded random stress test checking global sorted order.
 
 Graph data: `roadNet-CA.txt` is a large real directed road network; edge weights are assigned
 a random integer in `[1, 1e8]` at load time (so weights differ per run, but BMSSP and Dijkstra
@@ -130,9 +184,9 @@ lands. `benchmarks/README.md` holds the "when to use which" guidance.
 | Missing piece | Lives where (suggested) | Issue | Status |
 |---|---|---|---|
 | Per-node edge adjacency map | `BMSSP` constructor | #45 | ✅ done (PR #160) |
-| Binary min-heap module | `src/heap.mjs` (or inline) | #41 | ⬜ open |
+| Lemma 3.3 block-list `D` | `src/blockList.mjs` | #42 | ✅ done (PR #175) |
+| Binary min-heap module | `src/heap.mjs` | #41 | 🔶 PR open (this branch) |
 | Base case (bounded Dijkstra) | `src/baseCase.mjs` / method | #40 | ⬜ open |
-| Lemma 3.3 block-list `D` | `src/blockList.mjs` | #42 | ⬜ open |
 | FindPivots | `src/findPivots.mjs` / method | #44 | ⬜ open |
 | Main `BMSSP(l, B, S)` recursion + `k,t` derivation | `src/bmssp.mjs` | #43 | ⬜ open |
 
