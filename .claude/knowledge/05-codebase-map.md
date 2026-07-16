@@ -1,11 +1,11 @@
 # 05 — Codebase Map (current state)
 
-<!-- BOOKMARK-COMMIT: 79b58f2636a05c88d5937966710d3d0a3f3b781d -->
-<!-- PENDING-PR-BRANCH: feat/44-find-pivots -->
-<!-- Last validated: 2026-07-16, rewritten in Phase C of the #44 PR (feat/44-find-pivots).
-     Describes the tree as it will exist once that PR merges. Version 0.19.0 (bumped in the
-     PR; tag + release pending the merge). #44 (FindPivots) done in this PR; the only
-     remaining 1.0.0 issue is #43 (main recursion). -->
+<!-- BOOKMARK-COMMIT: bccc78d56a6433050238b7f54f8871e37a5cd79b -->
+<!-- PENDING-PR-BRANCH: (none) -->
+<!-- Last validated: 2026-07-16, Phase E after PR #180 (feat/44-find-pivots) merged as
+     bccc78d. Version 0.19.0 (tagged + released; publish.yml fired). #44 (FindPivots)
+     closed; the only remaining 1.0.0 issue is #43 (main recursion). Commits after the
+     bookmark touch only .claude/knowledge (Phase E bookkeeping). -->
 
 Snapshot of what exists in `bmssp-js` today, so you know what to build on vs. what's missing.
 

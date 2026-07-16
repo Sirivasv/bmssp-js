@@ -1,7 +1,7 @@
 # 06 — Milestones Roadmap
 
-<!-- SYNCED-FROM-GITHUB: 2026-07-16 (Phase C of the #44 PR, feat/44-find-pivots) -->
-<!-- Current package version: 0.19.0 (bumped in the #44 PR; tag + release pending merge) -->
+<!-- SYNCED-FROM-GITHUB: 2026-07-16 (Phase E after PR #180 merged; #44 closed, 0.19.0 released) -->
+<!-- Current package version: 0.19.0 (tagged + released) -->
 
 Maps GitHub **milestones** and **issues** (Sirivasv/bmssp-js) to the paper's building blocks,
 with a dependency-aware build order. This is the "intent" side of the knowledge base (what to
@@ -37,31 +37,24 @@ it runs the same Phase C reconciliation directly on `main`.
 
 ## 📋 Roadmap proposals (pending user approval)
 
-Written in Phase C of the #44 PR (2026-07-16); execute in Phase E, one confirmation each.
-
-1. **Edit #43 (main BMSSP recursion):** append the shipped FindPivots API to its wiring
-   contract — `findPivots(B, S, dHat, adjacency, k) → { pivots, W }` (`P, W ← FindPivots(B, S)`
-   maps to `const { pivots, W } = findPivots(B, S, dHat, adjacency, k)`). All three legs of
-   #43 (baseCase, BlockList, findPivots) now have concrete signatures in the issue body.
-2. **Edit #163 (deterministic tie-breaking):** add the third tie manifestation, found while
-   implementing #44 — vertices on a **tight (zero-weight) cycle** all receive parents in the
-   one-parent forest, so none of them is a root and none can be a pivot; harmless for
-   termination but worth revisiting when Assumption 2.1 tie-breaking is formalized.
+_None right now. Phase C writes proposed GitHub edits here (and in the PR body); Phase E
+executes the approved ones — one confirmation each — and clears them from this list._
+_(The two #44-PR proposals — FindPivots API into #43, tight-cycle tie note into #163 —
+were approved and executed on GitHub in Phase E, 2026-07-16.)_
 
 ---
 
 ## Current state (as synced)
 
-- **Package version:** `0.19.0`, bumped in the in-flight #44 PR (pre-1.0; the algorithm is
-  not yet functional end-to-end). Tag + GitHub Release happen after the merge (Phase E).
-  Last published release: `0.18.0`.
+- **Package version:** `0.19.0` (pre-1.0; the algorithm is not yet functional end-to-end).
+  The `0.19.0` tag + GitHub Release are published (npm + Docker Hub CD fired).
 - **Active milestone:** **`1.0.0` — "Have a first functional version of the whole algorithm."**
-  - GitHub progress once the #44 PR merges: **10 closed / 1 open**.
+  - GitHub progress: **10 closed / 1 open** (PR #180 merged, so #44 now counts closed).
   - The one open issue, **#43 (main recursion), is the last 1.0.0 piece**.
-- **In flight:** **#44 — FindPivots(B, S), Algorithm 1 — done in the `feat/44-find-pivots`
-  PR** (this branch). See `05-codebase-map.md` for the shipped `src/findPivots.mjs` API.
-  **#43 is next and last** — its issue body carries the wiring contract; all three legs
-  (baseCase #40, BlockList #42, findPivots #44) are now on `main` or in this PR.
+- **Just merged:** **#44 — FindPivots(B, S), Algorithm 1 — PR #180 is now on `main`**
+  (commit `bccc78d`). See `05-codebase-map.md` for the shipped `src/findPivots.mjs` API.
+  **#43 is next and last** — its issue body carries the full wiring contract (baseCase #40,
+  BlockList #42, findPivots #44 signatures all appended on GitHub, Phase E 2026-07-16).
 
 ## Milestone `1.0.0` — issues → paper
 
