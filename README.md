@@ -32,11 +32,15 @@ with every building block shipped, tested, and released individually:
 | `BMSSP(l, B, S)` — Algorithm 3, the main recursion ([#43](https://github.com/Sirivasv/bmssp-js/issues/43)) | `src/bmssp.mjs` | ✅ done — **1.0.0** |
 
 > **Honest note:** the paper's win is asymptotic, and this repo optimizes for correctness
-> and readability, not raw speed. On the full California road network (~2 M nodes, ~5.5 M
-> edges) this implementation currently runs about 2× slower than its own reference
-> Dijkstra — consistent with published experimental studies of the algorithm. Where inputs
-> violate the paper's distinct-path-lengths assumption (e.g. zero-weight edges), documented
-> tie guards keep the results correct
+> and readability, not raw speed. Measured head-to-head (algorithm time only, graph
+> loading excluded — see [benchmarks/HEAD-TO-HEAD.md](benchmarks/HEAD-TO-HEAD.md)):
+> Dijkstra still wins on wall-clock at every practical size, though the gap narrows as
+> sparse graphs grow (2.5× at 50k nodes → 1.57× at 2M). But in the paper's own metric —
+> **comparisons between path lengths** — BMSSP does **fewer comparisons than Dijkstra
+> from about n = 1M on sparse graphs** (0.91× at n = 2M), and the advantage grows with
+> size: the "sorting barrier" is measurably broken; what remains is JS constant factors.
+> Where inputs violate the paper's distinct-path-lengths assumption (e.g. zero-weight
+> edges), documented tie guards keep the results correct
 > ([#163](https://github.com/Sirivasv/bmssp-js/issues/163) tracks a principled tie-break).
 
 ## How it works (in two ideas)
@@ -49,7 +53,9 @@ with every building block shipped, tested, and released individually:
    ordered *between* blocks but unsorted *within* them — enough to repeatedly pull the next
    closest batch without paying the Θ(log n)-per-vertex "sorting barrier."
 
-The asymptotic win is theoretical (the crossover point is astronomically large); this repo
+The wall-clock crossover point is astronomically large, but the asymptotics are real: in
+measured comparison counts this implementation already beats Dijkstra past ~1M nodes on
+sparse graphs ([benchmarks/HEAD-TO-HEAD.md](benchmarks/HEAD-TO-HEAD.md)). This repo
 optimizes for a **correct, readable, well-tested** implementation, validated line-by-line
 against a Dijkstra oracle — not for raw speed.
 
@@ -105,6 +111,10 @@ npm test          # Jest suite, incl. BMSSP-vs-Dijkstra equivalence on a real ro
 npm run lint      # Prettier + ESLint
 npm run bench     # seeded micro-benchmarks (see benchmarks/README.md)
 ```
+
+The measured BMSSP-vs-Dijkstra head-to-head — wall-clock and comparison counts, with
+methodology — lives in [benchmarks/HEAD-TO-HEAD.md](benchmarks/HEAD-TO-HEAD.md)
+([#170](https://github.com/Sirivasv/bmssp-js/issues/170) tracks harness integration).
 
 The test suite's core contract: for every node, BMSSP's distances must equal the Dijkstra
 oracle's — including on `test/roadNet-CA.txt`, a real road network from SNAP.
