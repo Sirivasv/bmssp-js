@@ -1,14 +1,13 @@
 # 05 — Codebase Map (current state)
 
-<!-- BOOKMARK-COMMIT: bccc78d56a6433050238b7f54f8871e37a5cd79b -->
-<!-- PENDING-PR-BRANCH: feat/43-bmssp-main -->
-<!-- Last validated: 2026-07-16, Phase C of the #43 PR (feat/43-bmssp-main). Describes the
-     tree as it will exist once that PR merges: the main BMSSP recursion (Algorithm 3) is
-     implemented and calculateShortestPaths no longer delegates to Dijkstra. Version bumped
-     to 1.0.0 (major — the PR closes the last 1.0.0-milestone issue). Note: the branch also
-     carries main's un-pushable Phase E bookkeeping commit 56a19fb (docs-only) — origin/main
-     now has branch-protection rules (PRs only, verified signatures, CodeQL), so it rides in
-     this PR instead of being pushed directly. -->
+<!-- BOOKMARK-COMMIT: 909a606ba7b455e6d20211d02cfbaa4778648333 -->
+<!-- PENDING-PR-BRANCH: (none) -->
+<!-- Last validated: 2026-07-16, Phase E after PR #181 (feat/43-bmssp-main) merged as
+     909a606. Version 1.0.0 (tagged + released; publish.yml fired). #43 closed, milestone
+     1.0.0 closed — the algorithm is functional end-to-end. All five #43 roadmap proposals
+     executed on GitHub. Commits after the bookmark (if any) touch only .claude/knowledge
+     (Phase E bookkeeping — rides in the next PR; direct pushes to main are blocked by
+     branch protection). -->
 
 Snapshot of what exists in `bmssp-js` today, so you know what to build on vs. what's missing.
 
