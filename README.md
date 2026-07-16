@@ -15,9 +15,11 @@ first to beat Dijkstra's O(m + n·log n) bound on sparse directed graphs.
 
 ## Project status
 
-The project is built piece by piece against the paper, with every building block shipped,
-tested, and released individually. Current focus: milestone
-[`1.0.0` — first end-to-end functional BMSSP](https://github.com/Sirivasv/bmssp-js/milestones).
+**The algorithm is functional end-to-end as of `1.0.0`** 🎉 — `calculateShortestPaths()`
+computes distances via the paper's method (FindPivots → block list → recursive BMSSP with
+the bounded base case), validated node-by-node against a Dijkstra oracle, including on a
+real 2-million-node road network. The project was built piece by piece against the paper,
+with every building block shipped, tested, and released individually:
 
 | Building block (paper) | Where | Status |
 | --- | --- | --- |
@@ -27,12 +29,15 @@ tested, and released individually. Current focus: milestone
 | Indexed binary min-heap ([#41](https://github.com/Sirivasv/bmssp-js/issues/41)) | `src/heap.mjs` | ✅ done |
 | `BaseCase(B, S)` — Algorithm 2, bounded mini-Dijkstra ([#40](https://github.com/Sirivasv/bmssp-js/issues/40)) | `src/baseCase.mjs` | ✅ done |
 | `FindPivots(B, S)` — Algorithm 1, frontier shrinking ([#44](https://github.com/Sirivasv/bmssp-js/issues/44)) | `src/findPivots.mjs` | ✅ done |
-| `BMSSP(l, B, S)` — Algorithm 3, the main recursion ([#43](https://github.com/Sirivasv/bmssp-js/issues/43)) | — | 🔨 next up — the last piece |
+| `BMSSP(l, B, S)` — Algorithm 3, the main recursion ([#43](https://github.com/Sirivasv/bmssp-js/issues/43)) | `src/bmssp.mjs` | ✅ done — **1.0.0** |
 
-> **Honest note:** until [#43](https://github.com/Sirivasv/bmssp-js/issues/43) lands,
-> `calculateShortestPaths()` computes distances with the reference Dijkstra implementation.
-> The shipped BMSSP building blocks (block list, heap, base case, pivot finding) are fully
-> tested but not yet wired into the public entry point.
+> **Honest note:** the paper's win is asymptotic, and this repo optimizes for correctness
+> and readability, not raw speed. On the full California road network (~2 M nodes, ~5.5 M
+> edges) this implementation currently runs about 2× slower than its own reference
+> Dijkstra — consistent with published experimental studies of the algorithm. Where inputs
+> violate the paper's distinct-path-lengths assumption (e.g. zero-weight edges), documented
+> tie guards keep the results correct
+> ([#163](https://github.com/Sirivasv/bmssp-js/issues/163) tracks a principled tie-break).
 
 ## How it works (in two ideas)
 
@@ -106,12 +111,12 @@ oracle's — including on `test/roadNet-CA.txt`, a real road network from SNAP.
 
 ## Roadmap
 
-| Milestone | Theme |
-| --- | --- |
-| [`1.0.0`](https://github.com/Sirivasv/bmssp-js/milestones) | First end-to-end functional BMSSP (issues #40–#45) |
-| `1.1.0` | Correctness hardening — fuzz tests, edge cases, tie-breaking, input validation |
-| `1.2.0` | Performance & ergonomics — exact Lemma 3.3 asymptotics, path reconstruction, BMSSP-vs-Dijkstra benchmarks |
-| `2.0.0` | API generalization — public multi-source/bounded entry point, flexible inputs |
+| Milestone | Theme | Status |
+| --- | --- | --- |
+| [`1.0.0`](https://github.com/Sirivasv/bmssp-js/milestones) | First end-to-end functional BMSSP (issues #40–#45) | ✅ done |
+| `1.1.0` | Correctness hardening — fuzz tests, edge cases, tie-breaking, input validation | 🔨 current focus |
+| `1.2.0` | Performance & ergonomics — exact Lemma 3.3 asymptotics, path reconstruction, BMSSP-vs-Dijkstra benchmarks | planned |
+| `2.0.0` | API generalization — public multi-source/bounded entry point, flexible inputs | planned |
 
 Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and the
 [`help wanted` / `good first issue` labels](https://github.com/Sirivasv/bmssp-js/issues).

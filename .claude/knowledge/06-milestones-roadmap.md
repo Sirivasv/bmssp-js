@@ -1,7 +1,7 @@
 # 06 — Milestones Roadmap
 
-<!-- SYNCED-FROM-GITHUB: 2026-07-16 (Phase C of the #44 PR, feat/44-find-pivots) -->
-<!-- Current package version: 0.19.0 (bumped in the #44 PR; tag + release pending merge) -->
+<!-- SYNCED-FROM-GITHUB: 2026-07-16 (Phase C of the #43 PR, feat/43-bmssp-main) -->
+<!-- Current package version: 1.0.0 (bumped in the #43 PR; NOT tagged/released yet) -->
 
 Maps GitHub **milestones** and **issues** (Sirivasv/bmssp-js) to the paper's building blocks,
 with a dependency-aware build order. This is the "intent" side of the knowledge base (what to
@@ -37,107 +37,88 @@ it runs the same Phase C reconciliation directly on `main`.
 
 ## 📋 Roadmap proposals (pending user approval)
 
-Written in Phase C of the #44 PR (2026-07-16); execute in Phase E, one confirmation each.
+_Written in Phase C of the #43 PR (2026-07-16). Phase E executes the approved ones — one
+confirmation each — and clears them from this list._
 
-1. **Edit #43 (main BMSSP recursion):** append the shipped FindPivots API to its wiring
-   contract — `findPivots(B, S, dHat, adjacency, k) → { pivots, W }` (`P, W ← FindPivots(B, S)`
-   maps to `const { pivots, W } = findPivots(B, S, dHat, adjacency, k)`). All three legs of
-   #43 (baseCase, BlockList, findPivots) now have concrete signatures in the issue body.
-2. **Edit #163 (deterministic tie-breaking):** add the third tie manifestation, found while
-   implementing #44 — vertices on a **tight (zero-weight) cycle** all receive parents in the
-   one-parent forest, so none of them is a root and none can be a pivot; harmless for
-   termination but worth revisiting when Assumption 2.1 tie-breaking is formalized.
+1. **Close milestone `1.0.0` (milestone #1)** once this PR merges and #43 auto-closes —
+   all 11 of its issues will then be closed. (`gh api -X PATCH` on the milestone,
+   `state: closed`.)
+2. **Append the #43 tie findings to #163** (deterministic tie-breaking): implementing the
+   main recursion surfaced three concrete Assumption 2.1 violations, each now handled by a
+   documented guard in `bmssp()`: (a) `BlockList.pull()` can return a key tied with its
+   separator, so a frontier member can arrive at a level with `d̂ == B` — out-of-scope
+   pivots are filtered at seeding; (b) batch members with `d̂ == Bi < B` must be re-queued
+   via a regular insert or they are silently dropped; (c) a child call can return zero
+   vertices when everything it settled tied at its boundary — without an escape hatch the
+   batch is re-pulled forever. A principled tie-break (Assumption 2.1 in code) would make
+   all three guards unnecessary; until then they define the behavior tests rely on
+   (`test/bmssp.test.mjs`, "degenerate ties" describe block).
+3. **Update #170** (BMSSP-vs-Dijkstra benchmark): now unblocked by #43. Record the first
+   ad-hoc baseline — full roadNet-CA (n ≈ 1.97 M, m ≈ 5.5 M): BMSSP ≈ 7.8 s vs
+   Dijkstra ≈ 3.8 s (≈ 2.1×, Apple Silicon, node 24) — and scope the issue to adding the
+   BMSSP column to `benchmarks/scenarios.bench.mjs` + a fresh `RESULTS.md` capture.
+4. **Re-scope #161** (property/fuzz tests): `test/bmssp.test.mjs` already ships seeded
+   random-graph stress (full-map oracle equality across sizes, tiny-weight tie stress,
+   bounded-call Lemma 3.1 contract checks). #161's remaining value: much higher volume, more
+   graph shapes (grids, DAGs, stars, disconnected forests), extreme weight regimes (0, huge,
+   mixed magnitudes), and multi-source `bmssp()` calls — as a dedicated slow/fuzz suite.
+5. **Note on #162** (disconnected/unreachable edge cases): partially covered by #43's tests
+   (unreachable ⇒ Infinity). Keep the issue for systematic coverage (multiple components,
+   source in a small component, empty-adjacency corner cases), pointing at the existing test
+   as the pattern.
 
 ---
 
 ## Current state (as synced)
 
-- **Package version:** `0.19.0`, bumped in the in-flight #44 PR (pre-1.0; the algorithm is
-  not yet functional end-to-end). Tag + GitHub Release happen after the merge (Phase E).
-  Last published release: `0.18.0`.
-- **Active milestone:** **`1.0.0` — "Have a first functional version of the whole algorithm."**
-  - GitHub progress once the #44 PR merges: **10 closed / 1 open**.
-  - The one open issue, **#43 (main recursion), is the last 1.0.0 piece**.
-- **In flight:** **#44 — FindPivots(B, S), Algorithm 1 — done in the `feat/44-find-pivots`
-  PR** (this branch). See `05-codebase-map.md` for the shipped `src/findPivots.mjs` API.
-  **#43 is next and last** — its issue body carries the wiring contract; all three legs
-  (baseCase #40, BlockList #42, findPivots #44) are now on `main` or in this PR.
+- **Package version:** `1.0.0` in `package.json` on the PR branch — the **major** bump for
+  closing the `1.0.0` milestone. Tag + GitHub Release happen in Phase E after the user
+  confirms the merge (gate 3). Last released version: `0.19.0`.
+- **Milestone `1.0.0`:** **complete pending this PR's merge** — #43 was the last open issue.
+- **Just built:** **#43 — `BMSSP(l, B, S)` main recursion (Algorithm 3), this PR.**
+  `calculateShortestPaths` now runs the paper's method end-to-end (no Dijkstra delegation);
+  the "BMSSP vs Dijkstra" test passes on the full road network. See `05-codebase-map.md`
+  for the shipped API and the degenerate-tie guards.
+- **Next milestone:** **`1.1.0` — correctness hardening** (6 open issues). Recommended next
+  issue: **#161** (fuzz suite — cheapest way to protect everything else), then #162, #163.
 
-## Milestone `1.0.0` — issues → paper
+## Milestone `1.0.0` — issues → paper (all done pending merge)
 
-| # | Title | What it is (paper) | Labels | Depends on | Status |
-|---|---|---|---|---|---|
-| **45** | Add a map of arrays for edges of each node | Adjacency map so edge lookups aren't O(m). §05 | help wanted · good first issue | — | ✅ merged (PR #160) |
-| **41** | Implement a priority heap | Binary min-heap for the base case (Alg 2). §03-A | help wanted · good first issue | — | ✅ merged (PR #177) |
-| **40** | Implement the base case of the bmssp algorithm | `BaseCase(B, S)` bounded mini-Dijkstra. **Alg 2**, §02 | help wanted | #41 | ✅ merged (PR #178) |
-| **42** | Implement Lema 3.3 data structure | Block-based partial-sort list `D`. **Lemma 3.3**, §03-B | help wanted | — | ✅ merged (PR #175) |
-| **44** | Implement the findingPivots function | `FindPivots(B, S)` frontier shrink. **Alg 1**, §02 | help wanted | #45 (helpful) | ✅ done (this PR) |
-| **43** | Implement main bmssp algorithm | `BMSSP(l, B, S)` recursion + `k,t`. **Alg 3**, §02 | help wanted | #40, #42, #44 | ⬜ open — next & last |
+| # | Title | What it is (paper) | Depends on | Status |
+|---|---|---|---|---|
+| **45** | Add a map of arrays for edges of each node | Adjacency map. §05 | — | ✅ merged (PR #160) |
+| **41** | Implement a priority heap | Binary min-heap (Alg 2). §03-A | — | ✅ merged (PR #177) |
+| **40** | Implement the base case of the bmssp algorithm | `BaseCase(B, S)`. **Alg 2**, §02 | #41 | ✅ merged (PR #178) |
+| **42** | Implement Lema 3.3 data structure | Block-list `D`. **Lemma 3.3**, §03-B | — | ✅ merged (PR #175) |
+| **44** | Implement the findingPivots function | `FindPivots(B, S)`. **Alg 1**, §02 | #45 | ✅ merged (PR #180) |
+| **43** | Implement main bmssp algorithm | `BMSSP(l, B, S)` + `k,t`. **Alg 3**, §02 | #40, #42, #44 | ✅ done (**this PR**) |
 
 ### Closed (context)
-`#36` main `calculateShortestPaths` (currently delegates to Dijkstra — placeholder) ·
-`#35` Dijkstra oracle + BMSSP-vs-Dijkstra test · `#28` `shortestPaths` output map (∞ init) ·
-`#27` `nodeIDs` vertex index · `#24` datasets research (roadNet-CA).
+`#36` main `calculateShortestPaths` · `#35` Dijkstra oracle + BMSSP-vs-Dijkstra test ·
+`#28` `shortestPaths` output map (∞ init) · `#27` `nodeIDs` vertex index ·
+`#24` datasets research (roadNet-CA).
 
-## Recommended build order (within 1.0.0)
+### Definition of done for `1.0.0` — ✅ met by this PR
+- `calculateShortestPaths(source)` computes distances **via BMSSP** (not by calling
+  `dijkstra`), and the "BMSSP vs Dijkstra" test passes for every node. ✅
+- Each sub-piece (#40/#41/#42/#44/#45) shipped with focused unit tests. ✅
+- `npm run lint` clean; ESM + Prettier style preserved. ✅
 
-Leaves first; two independent tracks converge on the main recursion:
+## Milestone `1.1.0` (milestone #2) — correctness hardening — NEXT
 
-```
-Track A (base case):     #45 adjacency map ─┬─▶ #41 heap ─▶ #40 BaseCase ─┐   (all ✅ —
-Track B (recursion core):    (✅ done)       └─▶ #44 FindPivots (✅) ──────┼─▶ #43 BMSSP main
-                                                #42 BlockList (✅ done) ───┘    only #43 left)
-```
+Recommended order (cheapest protection first, then the deep work):
 
-1. ~~**#45** adjacency map~~ — ✅ **done (PR #160):** `this.adjacency: Map<nodeId, [to,w][]>`
-   + `getEdges()`, built in the constructor. Unblocks #40 and #44.
-2. ~~**#42** block-list `D`~~ — ✅ **done (PR #175):** `src/blockList.mjs` + 18 tests
-   (§03-B contracts incl. seeded stress). Bound index is a sorted array for now (#167).
-3. ~~**#41** binary min-heap~~ — ✅ **done (PR #177):** `src/heap.mjs` indexed `MinHeap`
-   (insert/extractMin/decreaseKey/has) + 16 tests; version 0.17.0 released. Unblocks #40.
-4. ~~**#40** BaseCase~~ — ✅ **done (PR #178):** `src/baseCase.mjs`
-   `baseCase(B, S, dHat, adjacency, k)` + 13 tests (incl. seeded oracle stress); version
-   0.18.0 released. The level-0 leg of #43 is ready.
-5. ~~**#44** FindPivots~~ — ✅ **done (this PR):** `src/findPivots.mjs`
-   `findPivots(B, S, dHat, adjacency, k) → { pivots, W }` + 12 tests (both branches, tie/DAG
-   determinism, two seeded oracle stress tests); version 0.19.0 bumped.
-6. **#43** BMSSP main — wires #40+#42+#44 with `k`/`t`; replaces the Dijkstra delegation in
-   `calculateShortestPaths`. **Definition of done:** BMSSP computes distances via the paper's
-   method and the "BMSSP vs Dijkstra" test still passes for every node.
+| Order | # | Issue | Labels | Notes after #43 |
+|---|---|---|---|---|
+| 1 | 161 | Property/fuzz tests: BMSSP vs Dijkstra on random graphs | enhancement · help wanted | Extend the seeded stress already in `test/bmssp.test.mjs` (see proposal 4) |
+| 2 | 162 | Edge-case tests: disconnected graphs and unreachable nodes | enhancement · help wanted | Partially covered by #43 tests (see proposal 5) |
+| 3 | 163 | Deterministic tie-breaking for equal-length paths (Assumption 2.1) | enhancement · help wanted | Three concrete manifestations found in #43 (see proposal 2) |
+| 4 | 165 | Input validation for the BMSSP constructor | good first issue · help wanted | — |
+| 5 | 164 | Optional constant-degree transform (in/out-degree ≤ 2) | enhancement · help wanted | — |
+| 6 | 166 | JSDoc / API docs for the new modules | documentation · good first issue | `bmssp()` / `deriveParameters()` ship with JSDoc already |
 
-### Parameter derivation (for #43)
-```js
-const n = this.nodeIDs.size;
-const logn = Math.log2(n);
-const k = Math.max(1, Math.floor(logn ** (1 / 3)));
-const t = Math.max(1, Math.floor(logn ** (2 / 3)));
-const topLevel = Math.ceil(logn / t);   // top call: BMSSP(topLevel, Infinity, new Set([source]))
-```
-Clamp `k`,`t` to `≥ 1` for tiny graphs; correctness must not depend on the asymptotic regime.
+## Milestone `1.2.0` (milestone #3) — performance & ergonomics
 
----
-
-## Forward-looking version plan (created on GitHub)
-
-> These milestones and their issues were created on GitHub during an `RKB` two-way sync
-> (after user confirmation). All four milestones now exist; keep this section reconciled with
-> GitHub going forward.
-
-### `1.0.0` (milestone #1) — first end-to-end functional BMSSP
-Issues #40–#45. #45 done (PR #160), #42 done (PR #175), #41 done (PR #177), #40 done
-(PR #178), #44 done (this PR); only #43 open. See the tables above.
-
-### `1.1.0` (milestone #2) — correctness hardening
-| # | Issue | Labels |
-|---|---|---|
-| 161 | Property/fuzz tests: BMSSP vs Dijkstra on random graphs | enhancement · help wanted |
-| 162 | Edge-case tests: disconnected graphs and unreachable nodes | enhancement · help wanted |
-| 163 | Deterministic tie-breaking for equal-length paths (Assumption 2.1) | enhancement · help wanted |
-| 164 | Optional constant-degree transform (in/out-degree ≤ 2) | enhancement · help wanted |
-| 165 | Input validation for the BMSSP constructor | good first issue · help wanted |
-| 166 | JSDoc / API docs for the new modules | documentation · good first issue |
-
-### `1.2.0` (milestone #3) — performance & ergonomics
 | # | Issue | Labels |
 |---|---|---|
 | 167 | Restore Lemma 3.3's exact asymptotics in BlockList (balanced-BST bound index + linear-time selection) | enhancement · help wanted |
@@ -145,29 +126,20 @@ Issues #40–#45. #45 done (PR #160), #42 done (PR #175), #41 done (PR #177), #4
 | 169 | Optional shortest-path reconstruction (`Pred[]` → paths) | enhancement · help wanted |
 | 170 | BMSSP-vs-Dijkstra benchmark comparison | enhancement · help wanted |
 
-_Note:_ the seeded **benchmark harness already landed early** with #45 (`benchmarks/`,
-`npm run bench`); #170 just adds the BMSSP column once #43 is done.
+_Note:_ the seeded **benchmark harness already exists** (`benchmarks/`, `npm run bench`);
+#170 is unblocked by #43 and has a first baseline (see proposal 3).
 
-_RKB 2026-07-16 (post #40) — issue bodies updated on GitHub:_ #44 rewritten as a full
-FindPivots spec (signature mirroring `baseCase`, early exit, tight-edge forest, tie caveat,
-test plan); #43 gained the concrete wiring contract (baseCase/BlockList APIs, `k`/`t`
-derivation, workload guard, definition of done); #163 gained the two tie manifestations
-found in #40 (settled-vertex guard vs zero-weight cycles; forest-DAG ambiguity in
-FindPivots); #169 noted that `Pred[]` must be wired into all three relaxation sites.
-Milestone slicing unchanged — 1.0.0 (#44 → #43 after #40 merges) still the right shape.
+## Milestone `2.0.0` (milestone #4) — API-breaking generalization
 
-_RKB 2026-07-15 (post #42/#41) — issue bodies updated on GitHub:_ #167 widened to both
-BlockList shortcuts (bound index **and** sort-based median selection); #168 widened with the
-indexed-vs-lazy **heap strategy** benchmark/consolidation; #166 re-scoped to the older doc
-surface (new modules ship with JSDoc already); #173 gained the explicit internal-vs-public
-exposure decision (BlockList/MinHeap are not re-exported from `index.mjs`).
-
-### `2.0.0` (milestone #4) — API-breaking generalization
 | # | Issue | Labels |
 |---|---|---|
 | 171 | Public multi-source / bounded BMSSP entrypoint | enhancement · help wanted |
 | 172 | Typed / flexible graph inputs | enhancement · help wanted |
 | 173 | Stabilize the public API surface for 1.0 → 2.0 | documentation · enhancement |
+
+_Note after #43:_ `bmssp(l, B, S)` already **is** a bounded multi-source call internally —
+#171 is mostly about designing the public API around it (initial per-source distances,
+returning `{ bound, vertices }` sensibly) rather than new algorithm work.
 
 ---
 
@@ -176,24 +148,21 @@ exposure decision (BlockList/MinHeap are not re-exported from `index.mjs`).
 Closing an issue bumps the package version and, after the PR merges, ships a release:
 
 1. **In the PR that closes the issue** — `npm version minor --no-git-tag-version` (keeps
-   `package.json` + `package-lock.json` in sync; historical cadence is a **minor** `0.N.0` bump
-   per issue). The `1.0.0` milestone close is the `major` bump to `1.0.0`.
-2. **After the user confirms the merge** — tag `main` with the bare version (no `v` prefix) and
-   `gh release create` it; publishing the release fires `publish.yml` → **npm + Docker Hub**.
+   `package.json` + `package-lock.json` in sync; historical cadence is a **minor** `0.N.0`
+   bump per issue). **This PR used `npm version major`** — the `1.0.0` milestone close is
+   the major bump, per convention.
+2. **After the user confirms the merge** — tag `main` with the bare version (no `v` prefix)
+   and `gh release create` it; publishing the release fires `publish.yml` → **npm + Docker
+   Hub**.
 
 Full procedure + exact commands live in **`../CLAUDE.md` → "Version bump & release"**. The
 release step is an outward-facing publish and is **gated on explicit user confirmation**.
 
-## Definition of done for `1.0.0`
-
-- `calculateShortestPaths(source)` computes distances **via BMSSP** (not by calling
-  `dijkstra`), and the "BMSSP vs Dijkstra" test in `test/main.test.mjs` passes for every node.
-- Each sub-piece (#40/#41/#42/#44/#45) ships with focused unit tests.
-- `npm run lint` clean; ESM + Prettier style preserved.
-
 ## Testing tips
 - Small hand-built graphs with known distances for unit tests; `roadNet-CA.txt` for the big
-  equivalence test.
-- Any `BMSSP(l, B, S)` call's completed vertices+distances must equal
-  `{ v : d_dijkstra(v) < B', shortest path visits S }`.
-- Break distance ties deterministically (Assumption 2.1, §01) so `Pred[]` stays a tree.
+  equivalence test (120 s Jest timeouts on the two tests that run BMSSP on it).
+- Any `bmssp(l, B, S)` call's completed vertices+distances must equal
+  `{ v : d_dijkstra(v) < B', shortest path visits S }` — `test/bmssp.test.mjs` has the
+  pattern ("recursion contract" describe block).
+- Ties (equal path lengths) are the #1 source of subtle bugs — see the degenerate-tie
+  guards in `05-codebase-map.md` and the notes headed for #163.
