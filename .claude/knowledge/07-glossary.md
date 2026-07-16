@@ -1,11 +1,11 @@
 # 07 — Glossary
 
-<!-- Updated on: 2026-07-16, in the #40 PR (added the baseCase code terms) -->
+<!-- Updated on: 2026-07-16 (lifecycle note; terms last extended in the #40 PR) -->
 
-> **Lifecycle: dynamic — updated on `RKB`.** This glossary is refreshed on the on-demand
-> `revitalize_knowledge_base` (`RKB`) command (see `../CLAUDE.md`). When code or the roadmap
-> introduces new symbols/terms (e.g. new module names, new data-structure fields), add them
-> here during the `RKB` refresh. Not touched during normal session start.
+> **Lifecycle: dynamic — updated in Phase C of every PR.** When a PR introduces new symbols
+> or terms (module names, data-structure fields, paper notation newly used in code), add
+> them here as part of the automatic pre-PR sync (see `../CLAUDE.md`, Phase C), inside the
+> same PR. Also refreshed by the on-demand `RKB` command. Not touched during session start.
 
 Quick lookup for the symbols and terms used across the paper, the notes, and the code.
 

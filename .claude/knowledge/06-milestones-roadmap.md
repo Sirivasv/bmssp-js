@@ -1,7 +1,7 @@
 # 06 — Milestones Roadmap
 
-<!-- SYNCED-FROM-GITHUB: 2026-07-16 (RKB after #40 implementation; PR #178 open, bump to 0.18.0 riding in it) -->
-<!-- Current released version: 0.17.0; 0.18.0 bumped in open PR #178 (tag+release after merge) -->
+<!-- SYNCED-FROM-GITHUB: 2026-07-16 (PR #178 merged, #40 closed, 0.18.0 tagged + released) -->
+<!-- Current package version: 0.18.0 (tagged + released) -->
 
 Maps GitHub **milestones** and **issues** (Sirivasv/bmssp-js) to the paper's building blocks,
 with a dependency-aware build order. This is the "intent" side of the knowledge base (what to
@@ -9,42 +9,50 @@ build next); `05-codebase-map.md` is the "reality" side (what exists now).
 
 ## 🔄 How this file stays current (this file is DYNAMIC)
 
-- **Session start — read-only reconciliation.** Pull live milestones + issues via `gh` and
-  update the markdown below to match GitHub. Do **not** write to GitHub here.
+Three touch-points, matching the lifecycle in `../CLAUDE.md`:
+
+- **Phase A (session start) — read-only reconciliation.** Pull live milestones + issues via
+  `gh` and update the markdown below to match GitHub. Do **not** write to GitHub here.
   ```bash
   gh api repos/Sirivasv/bmssp-js/milestones --jq '.[] | {number,title,state,description,open_issues,closed_issues}'
   gh issue list --repo Sirivasv/bmssp-js --state open  --limit 100 --json number,title,milestone,labels
   gh issue list --repo Sirivasv/bmssp-js --state closed --limit 100 --json number,title,milestone
   ```
-- **On-demand `RKB` (`revitalize_knowledge_base`) — two-way sync.** In addition to the read
-  above, **make GitHub match this roadmap**, using the just-refreshed knowledge base + code as
-  the source of truth:
-  - **Existing open issues** (yours or the user's) may be **edited** (title/description),
-    **closed** (done/obsolete/superseded), **re-scoped/split/merged**, or **moved** to another
-    milestone as new learnings dictate.
-  - **Milestones** are adjusted the same way — reason forward about versioning and update the
-    **current version** (from `package.json`), the **number and scope of the next one or two
-    minor-version milestones**, and the **next major-version milestone** (titles, descriptions,
-    and which issues belong to each — adding or removing issues as needed).
-  Outward-facing writes (creating/editing/closing milestones or issues) are **confirmed with the
-  user first, one ask per edit**. See the "Forward-looking version plan" section for the working
-  proposal. **The agent co-owns this roadmap**: every RKB after real progress should proactively
-  propose issue/milestone improvements from the session's learnings (see `../CLAUDE.md`), rather
-  than waiting for the user to request them.
+- **Phase C (pre-PR, automatic — the old on-request `RKB`).** Inside the PR branch: mark the
+  closed issue done-pending-merge, re-derive the build order, and **re-examine the roadmap
+  itself** with the session's learnings — issue titles/descriptions, the slicing of the next
+  one or two minor-version milestones, and the next major-version milestone (which issues
+  belong where; add/remove/split/merge as warranted). Write the resulting GitHub edits as a
+  **"Roadmap proposals"** list here and in the PR body. **Do not execute them in this phase.**
+  Proposing nothing after real progress should be the rare exception: every increment teaches
+  something about the issues ahead, and the agent co-owns this roadmap.
+- **Phase E (post-merge) — gated GitHub writes.** Walk the Roadmap proposals with the user and
+  execute each approved edit (`gh issue edit/close/create`, milestone edits) — **one
+  confirmation per edit**. Then clear the executed proposals from this file.
+
+The on-demand **`RKB`** command still exists for out-of-band refreshes (see `../CLAUDE.md`);
+it runs the same Phase C reconciliation directly on `main`.
+
+---
+
+## 📋 Roadmap proposals (pending user approval)
+
+_None right now. Phase C writes proposed GitHub edits here (and in the PR body); Phase E
+executes the approved ones — one confirmation each — and clears them from this list._
 
 ---
 
 ## Current state (as synced)
 
-- **Package version:** `0.17.0` (pre-1.0; the algorithm is not yet functional end-to-end).
-  The `0.17.0` tag + GitHub Release are published (npm + Docker Hub CD fired).
+- **Package version:** `0.18.0` (pre-1.0; the algorithm is not yet functional end-to-end).
+  The `0.18.0` tag + GitHub Release are published (npm + Docker Hub CD fired).
 - **Active milestone:** **`1.0.0` — "Have a first functional version of the whole algorithm."**
-  - GitHub progress: **8 closed / 3 open** issues (PR #177 merged, so #41 now counts closed).
-  - The 3 open issues (#40, #43, #44) are the remaining algorithm pieces from §02–§03.
-- **Just merged:** **#41 — indexed binary MinHeap — PR #177 is now on `main`** (commit
-  `7e36afc`). See `05-codebase-map.md` for the shipped `src/heap.mjs` API
-  (`insert` / `extractMin` / `decreaseKey` / `has` / `peekMin`). With #41 done, **#40
-  (BaseCase) is fully unblocked** — both its dependencies (#41 heap, #45 adjacency) are in.
+  - GitHub progress: **9 closed / 2 open** issues (PR #178 merged, so #40 now counts closed).
+  - The 2 open issues (#44, #43) are the remaining algorithm pieces from §02–§03.
+- **Just merged:** **#40 — BaseCase(B, S), Algorithm 2 — PR #178 is now on `main`** (commit
+  `9a753b0`). See `05-codebase-map.md` for the shipped `src/baseCase.mjs` API. **#44
+  (FindPivots) is next** — fully specced in its GitHub issue body (RKB 2026-07-16) — and
+  then #43 wires everything together.
 
 ## Milestone `1.0.0` — issues → paper
 
@@ -52,7 +60,7 @@ build next); `05-codebase-map.md` is the "reality" side (what exists now).
 |---|---|---|---|---|---|
 | **45** | Add a map of arrays for edges of each node | Adjacency map so edge lookups aren't O(m). §05 | help wanted · good first issue | — | ✅ merged (PR #160) |
 | **41** | Implement a priority heap | Binary min-heap for the base case (Alg 2). §03-A | help wanted · good first issue | — | ✅ merged (PR #177) |
-| **40** | Implement the base case of the bmssp algorithm | `BaseCase(B, S)` bounded mini-Dijkstra. **Alg 2**, §02 | help wanted | #41 | 🔶 PR open |
+| **40** | Implement the base case of the bmssp algorithm | `BaseCase(B, S)` bounded mini-Dijkstra. **Alg 2**, §02 | help wanted | #41 | ✅ merged (PR #178) |
 | **42** | Implement Lema 3.3 data structure | Block-based partial-sort list `D`. **Lemma 3.3**, §03-B | help wanted | — | ✅ merged (PR #175) |
 | **44** | Implement the findingPivots function | `FindPivots(B, S)` frontier shrink. **Alg 1**, §02 | help wanted | #45 (helpful) | ⬜ open |
 | **43** | Implement main bmssp algorithm | `BMSSP(l, B, S)` recursion + `k,t`. **Alg 3**, §02 | help wanted | #40, #42, #44 | ⬜ open |
@@ -78,8 +86,9 @@ Track B (recursion core):    (✅ done)       └─▶ #44 FindPivots ───
    (§03-B contracts incl. seeded stress). Bound index is a sorted array for now (#167).
 3. ~~**#41** binary min-heap~~ — ✅ **done (PR #177):** `src/heap.mjs` indexed `MinHeap`
    (insert/extractMin/decreaseKey/has) + 16 tests; version 0.17.0 released. Unblocks #40.
-4. **#40** BaseCase — 🔶 **PR open:** `src/baseCase.mjs` `baseCase(B, S, dHat, adjacency, k)`
-   + 13 tests (incl. seeded oracle stress); bump to 0.18.0. Unblocks the level-0 leg of #43.
+4. ~~**#40** BaseCase~~ — ✅ **done (PR #178):** `src/baseCase.mjs`
+   `baseCase(B, S, dHat, adjacency, k)` + 13 tests (incl. seeded oracle stress); version
+   0.18.0 released. The level-0 leg of #43 is ready.
 5. **#44** FindPivots — needs relaxation + adjacency (#45 ✅). Test both branches (`|W|>k|S|`
    and forest roots).
 6. **#43** BMSSP main — wires #40+#42+#44 with `k`/`t`; replaces the Dijkstra delegation in
@@ -105,8 +114,8 @@ Clamp `k`,`t` to `≥ 1` for tiny graphs; correctness must not depend on the asy
 > GitHub going forward.
 
 ### `1.0.0` (milestone #1) — first end-to-end functional BMSSP
-Issues #40–#45. #45 done (PR #160), #42 done (PR #175), #41 done (PR #177); #40, #43, #44
-open. See the tables above.
+Issues #40–#45. #45 done (PR #160), #42 done (PR #175), #41 done (PR #177), #40 done
+(PR #178); #44 and #43 open. See the tables above.
 
 ### `1.1.0` (milestone #2) — correctness hardening
 | # | Issue | Labels |
