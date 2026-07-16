@@ -4,10 +4,10 @@
 //   - construct: building the BMSSP instance (includes the #45 adjacency map)
 //   - dijkstra: one full single-source shortest-path run from node 0
 //
-// Today calculateShortestPaths delegates to the Dijkstra oracle, so this is a
-// Dijkstra baseline. Once the real BMSSP recursion lands (issues #40-#44), the
-// same harness will contrast BMSSP against this column shape-by-shape — which
-// is exactly where the "when to use which" guidance gets its evidence.
+// This is the Dijkstra baseline column of the head-to-head. The real BMSSP
+// recursion landed in 1.0.0 (#43); adding an algorithm-only bmssp column (and
+// an optional comparison-count mode) is tracked in #170. Measured results so
+// far: benchmarks/HEAD-TO-HEAD.md.
 
 import { BMSSP } from "../src/bmssp.mjs";
 import { dijkstra } from "../src/dijkstra.mjs";

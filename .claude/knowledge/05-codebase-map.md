@@ -1,14 +1,13 @@
 # 05 — Codebase Map (current state)
 
-<!-- BOOKMARK-COMMIT: bccc78d56a6433050238b7f54f8871e37a5cd79b -->
-<!-- PENDING-PR-BRANCH: feat/43-bmssp-main -->
-<!-- Last validated: 2026-07-16, Phase C of the #43 PR (feat/43-bmssp-main). Describes the
-     tree as it will exist once that PR merges: the main BMSSP recursion (Algorithm 3) is
-     implemented and calculateShortestPaths no longer delegates to Dijkstra. Version bumped
-     to 1.0.0 (major — the PR closes the last 1.0.0-milestone issue). Note: the branch also
-     carries main's un-pushable Phase E bookkeeping commit 56a19fb (docs-only) — origin/main
-     now has branch-protection rules (PRs only, verified signatures, CodeQL), so it rides in
-     this PR instead of being pushed directly. -->
+<!-- BOOKMARK-COMMIT: 909a606ba7b455e6d20211d02cfbaa4778648333 -->
+<!-- PENDING-PR-BRANCH: docs/head-to-head-vs-dijkstra -->
+<!-- Last validated: 2026-07-16, reflection session after the 1.0.0 release. This map
+     describes the tree of the docs/head-to-head-vs-dijkstra branch (docs-only PR: the
+     measured BMSSP-vs-Dijkstra head-to-head in benchmarks/HEAD-TO-HEAD.md + README/KB
+     refresh; no code behavior change, no version bump — closes no issue). The branch also
+     carries the earlier Phase E bookkeeping commit c54ad76 that branch protection kept
+     off origin/main. -->
 
 Snapshot of what exists in `bmssp-js` today, so you know what to build on vs. what's missing.
 
@@ -81,6 +80,7 @@ benchmarks/               # dependency-free benchmark harness, `npm run bench`
   run.mjs                 #   runs all benchmarks, prints markdown report
   README.md               #   methodology + "when to use which" guidance
   RESULTS.md              #   captured sample run
+  HEAD-TO-HEAD.md         #   measured BMSSP-vs-Dijkstra (1.0.0): wall-clock + comparison counts
 examples/
   main.mjs                # tiny usage example (constructs BMSSP, prints .graph)
 docs/index.html           # published docs page
@@ -137,10 +137,16 @@ zero-weight edges) occur; all are covered by tests in `test/bmssp.test.mjs`:
    just not sublinear. Boundary-tied `Si` members (`d̂ == Bi < B`) re-enter `D` via a regular
    insert rather than being dropped.
 
-**Performance (measured 2026-07-16, Apple Silicon, node 24):** full roadNet-CA
-(n = 1,965,206, m = 5,533,214): construct ~1.9 s, Dijkstra ~3.8 s, BMSSP ~7.8 s (≈2.1×
-Dijkstra), 0 mismatches. The two roadNet tests in `main.test.mjs` carry explicit 120 s Jest
-timeouts (the default 5 s is not enough for a real BMSSP run under CI).
+**Performance (measured 2026-07-16, Apple Silicon, node v26.5.0 — full data + methodology
+in `benchmarks/HEAD-TO-HEAD.md`):** algorithm-only wall-clock (construction excluded,
+Dijkstra fed the same prebuilt adjacency): Dijkstra wins every shape/size; sparse-graph
+ratio narrows with n (2.54× at 50k → **1.57× at 2M**), roadNet-CA ≈2.1×. **Comparison
+counts (the paper's metric) cross over:** BMSSP does fewer distance comparisons than
+Dijkstra past ~n = 1M sparse (0.96× at 1M, **0.91× at 2M**). Two measured pathologies,
+tracked in **#182**: star graphs blow up superlinearly (67.8× at n = 500k) and the ratio
+cliffs to 5× at n = 4M where `topLevel` steps 3→4. The two roadNet tests in
+`main.test.mjs` carry explicit 120 s Jest timeouts (the default 5 s is not enough for a
+real BMSSP run under CI).
 
 ## `src/blockList.mjs` — Lemma 3.3 structure `D` (#42)
 
@@ -258,8 +264,11 @@ see the same array within a run).
 
 Deterministic (seeded) micro-benchmarks. `adjacency.bench.mjs` shows the #45 map is
 ~thousands× faster per-node than a linear scan. `scenarios.bench.mjs` times construction +
-a Dijkstra run across five graph shapes. **#43 unblocks #170** (the BMSSP-vs-Dijkstra
-head-to-head column); first ad-hoc measurement above (~2.1× Dijkstra on roadNet-CA).
+a Dijkstra run across five graph shapes. **`HEAD-TO-HEAD.md` records the measured
+BMSSP-vs-Dijkstra comparison** (2026-07-16): wall-clock tables by shape and size, the
+sparse scaling trend, and the comparison-count crossover (~n = 1M). #170 tracks folding
+both measurements into the harness itself (algorithm-only `bmssp` column + optional
+comparison-count mode); the raw baseline is also on #170 as a comment.
 
 ## Gaps to fill (the actual work)
 

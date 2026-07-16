@@ -1,6 +1,7 @@
 # 07 — Glossary
 
-<!-- Updated on: 2026-07-16 (terms last extended in the #43 PR: main bmssp recursion) -->
+<!-- Updated on: 2026-07-16 (terms last extended in the docs/head-to-head-vs-dijkstra PR:
+     measured head-to-head terms) -->
 
 > **Lifecycle: dynamic — updated in Phase C of every PR.** When a PR introduces new symbols
 > or terms (module names, data-structure fields, paper notation newly used in code), add
@@ -146,3 +147,16 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
   host the BMSSP-vs-Dijkstra comparison once #43 lands.
 - **Scenario** — a named, seeded graph shape in the benchmark registry used to probe where
   BMSSP's asymptotics would help vs. where Dijkstra dominates. See `benchmarks/README.md`.
+- **Head-to-head** — the measured BMSSP-vs-Dijkstra comparison
+  (`benchmarks/HEAD-TO-HEAD.md`, 2026-07-16). **Algorithm-only timing**: construction and
+  adjacency building are excluded for both sides; the Dijkstra variant consumes the BMSSP
+  instance's own prebuilt `adjacency` Map (the exported `dijkstra()` builds its own per
+  call — that's loading, not algorithm). Harness integration tracked in #170.
+- **Comparison-count crossover** — head-to-head result in the paper's comparison-addition
+  model: counting every comparison between two distance values (heap sifts, BlockList
+  searches/sorts, relaxations), BMSSP does **fewer** comparisons than Dijkstra past
+  ~n = 1M on sparse graphs (0.91× at n = 2M) even though Dijkstra still wins wall-clock —
+  the sorting barrier measurably broken, with constant factors as the remaining gap.
+- **Performance cliffs (#182)** — two measured regimes where the head-to-head ratio breaks
+  from its ~1.6–2× pattern: star graphs (superlinear blowup, 67.8× at n = 500k) and the
+  `topLevel = ⌈log₂n / t⌉` 3→4 transition (5× at n = 4M on sparse). Milestone 1.2.0.
