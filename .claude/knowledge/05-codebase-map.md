@@ -1,11 +1,12 @@
 # 05 — Codebase Map (current state)
 
-<!-- BOOKMARK-COMMIT: 29de94bba02bf5ce6d342ace5a179660ead0a547 -->
-<!-- PENDING-PR-BRANCH: test/161-property-fuzz-suite -->
-<!-- Last validated: 2026-07-16, inside the #161 PR (high-volume property/fuzz suite,
-     version 1.0.0 → 1.0.1). This map describes the tree of the
-     test/161-property-fuzz-suite branch: new test/fuzz.test.mjs (15 tests), no src/
-     changes. Also carries the session-start marker flip after PR #183 merged. -->
+<!-- BOOKMARK-COMMIT: b59f8860c3e900acdd26374e16cc4c16852e83f4 -->
+<!-- PENDING-PR-BRANCH: chore/remove-roadnet-ca -->
+<!-- Last validated: 2026-07-16, inside the roadNet-CA removal PR (no issue, no version
+     bump). This map describes the tree of the chore/remove-roadnet-ca branch:
+     test/roadNet-CA.txt deleted, main.test.mjs rewritten on a seeded 10k sparse graph,
+     fuzz.test.mjs gains seeded scale runs (+FUZZ_XL). No src/ changes. Also carries the
+     session-start marker flip after PR #184 (#161 fuzz suite) merged. -->
 
 Snapshot of what exists in `bmssp-js` today, so you know what to build on vs. what's missing.
 
@@ -62,15 +63,14 @@ src/
   baseCase.mjs            # #40: BaseCase(B, S) — Algorithm 2 bounded mini-Dijkstra
   findPivots.mjs          # #44: FindPivots(B, S) — Algorithm 1 frontier shrink
 test/
-  main.test.mjs           # Jest tests: constructor, nodeIDs, adjacency, shortestPaths, BMSSP-vs-Dijkstra (roadNet-CA)
+  main.test.mjs           # Jest tests: constructor, nodeIDs, adjacency, shortestPaths, BMSSP-vs-Dijkstra (seeded 10k sparse)
   bmssp.test.mjs          # #43: 15 recursion tests — params, hand graphs, ties, Lemma 3.1 contract, seeded stress
-  fuzz.test.mjs           # NEW (#161): 15 high-volume fuzz tests — shapes × weight regimes × multi-source; FUZZ_ROUNDS env multiplier
+  fuzz.test.mjs           # #161: 18 high-volume fuzz tests — shapes × weight regimes × multi-source × seeded scale; FUZZ_ROUNDS / FUZZ_XL env vars
   blockList.test.mjs      # #42: 18 BlockList tests incl. a seeded random stress test
   heap.test.mjs           # #41: 16 MinHeap tests incl. a seeded stress test vs. a naive queue
   baseCase.test.mjs       # #40: 13 BaseCase tests incl. seeded oracle-comparison stress
   findPivots.test.mjs     # #44: 12 FindPivots tests incl. two seeded oracle stress tests
-  roadNet-CA.txt          # real road-network edge list (SNAP roadNet-CA), weights randomized at load
-  README.md
+  README.md               # test-suite principles (everything seeded, no data files) + file map
 benchmarks/               # dependency-free benchmark harness, `npm run bench`
   generators.mjs          #   seeded graph builders + SCENARIOS registry (sparse/dense/grid/chain/star)
   bench-util.mjs          #   timing (timeMany) + markdown-table helpers
@@ -146,13 +146,13 @@ zero-weight edges) occur; all are covered by tests in `test/bmssp.test.mjs`:
 **Performance (measured 2026-07-16, Apple Silicon, node v26.5.0 — full data + methodology
 in `benchmarks/HEAD-TO-HEAD.md`):** algorithm-only wall-clock (construction excluded,
 Dijkstra fed the same prebuilt adjacency): Dijkstra wins every shape/size; sparse-graph
-ratio narrows with n (2.54× at 50k → **1.57× at 2M**), roadNet-CA ≈2.1×. **Comparison
+ratio narrows with n (2.54× at 50k → **1.57× at 2M**). **Comparison
 counts (the paper's metric) cross over:** BMSSP does fewer distance comparisons than
 Dijkstra past ~n = 1M sparse (0.96× at 1M, **0.91× at 2M**). Two measured pathologies,
 tracked in **#182**: star graphs blow up superlinearly (67.8× at n = 500k) and the ratio
-cliffs to 5× at n = 4M where `topLevel` steps 3→4. The two roadNet tests in
-`main.test.mjs` carry explicit 120 s Jest timeouts (the default 5 s is not enough for a
-real BMSSP run under CI).
+cliffs to 5× at n = 4M where `topLevel` steps 3→4. Note `topLevel` is **3 from n = 10k
+all the way to 2M** — scale tests buy volume/memory pressure, not recursion depth. The
+default suite runs in ~3 s; the opt-in `FUZZ_XL=1` 2M-node round takes ~30 s.
 
 ## `src/blockList.mjs` — Lemma 3.3 structure `D` (#42)
 
@@ -247,9 +247,11 @@ implementation is tested against — and, since #43, no longer part of the BMSSP
 ## Tests — the contract
 
 - `test/main.test.mjs` (12): constructor/nodeIDs/adjacency/shortestPaths contracts, plus the
-  **key one** — "BMSSP vs Dijkstra" on roadNet-CA: for a fixed source, `myBMSSP.shortestPaths`
-  must equal `dijkstra(...)` for every node. **Now exercises the real algorithm** (120 s
-  timeouts on the two tests that run it on the road network).
+  **key one** — "BMSSP vs Dijkstra" on a **seeded 10k-node sparse graph** (`sparseRandom(10_000,
+  3, 1601)`, already `topLevel` 3): for a fixed source, `myBMSSP.shortestPaths` must equal
+  `dijkstra(...)` for every node. (Until 2026-07-16 this ran on `roadNet-CA.txt`, an 87 MB
+  SNAP road network with unseeded random weights — removed: irreproducible failures, ~71 s
+  of every run, coverage superseded by the seeded fuzz + scale suite.)
 - `test/bmssp.test.mjs` (15, NEW in #43): parameter derivation (clamps, paper formulas,
   `k·2^(topLevel·t) ≥ n` guard), end-to-end hand-built graphs (README example, multi-hop vs
   direct, unreachable ⇒ Infinity, self-loop, source switch), degenerate ties (zero-weight
@@ -260,22 +262,21 @@ implementation is tested against — and, since #43, no longer part of the BMSSP
 - `test/blockList.test.mjs` (18), `test/heap.test.mjs` (16), `test/baseCase.test.mjs` (13),
   `test/findPivots.test.mjs` (12): per-module contracts incl. seeded stress — see the
   module sections above.
-- `test/fuzz.test.mjs` (15, NEW in #161): the high-volume property/fuzz suite. Full-map
-  oracle equality across 8 shapes (the 5 benchmark generators reused, plus local random-DAG,
-  disconnected-forest and uniform-multigraph generators; 2 sources per graph; a
-  thousands-of-nodes round), 4 extreme weight regimes (all-zero, zero-or-huge, tiny-int
-  0–2, dyadic floats — multiples of 1/256 so every path sum is exact in float64 and oracle
-  equality stays bit-exact), and direct multi-source `bmssp(topLevel, B, S)` fuzzing:
-  random source sets (1–4) with initial distances, ground truth = per-source Dijkstra
+- `test/fuzz.test.mjs` (18, #161 + scale runs added 2026-07-16): the high-volume
+  property/fuzz suite. Full-map oracle equality across 8 shapes (the 5 benchmark generators
+  reused, plus local random-DAG, disconnected-forest and uniform-multigraph generators; 2
+  sources per graph; a thousands-of-nodes round), 4 extreme weight regimes (all-zero,
+  zero-or-huge, tiny-int 0–2, dyadic floats — multiples of 1/256 so every path sum is exact
+  in float64 and oracle equality stays bit-exact), direct multi-source `bmssp(topLevel, B, S)`
+  fuzzing: random source sets (1–4) with initial distances, ground truth = per-source Dijkstra
   oracles (`trueDist(v) = min_s(d0[s] + dist_s(v))`), checking the Lemma 3.1 contract for
-  bounded (incl. boundary-tie `B` choices) and unbounded calls. Every failure message
-  carries the round's seed for reproduction. **`FUZZ_ROUNDS=<x>`** multiplies all round
-  counts (default 1 ≈ 0.5 s; 25 ≈ 5 s, several thousand graphs).
-- Current suite: **101 tests, all passing**, 100% statement coverage.
-
-Graph data: `roadNet-CA.txt` is a large real directed road network; edge weights are assigned
-a random integer in `[1, 1e8]` at load time (so weights differ per run, but BMSSP and Dijkstra
-see the same array within a run).
+  bounded (incl. boundary-tie `B` choices) and unbounded calls — plus **seeded scale runs**:
+  sparse n = 150k (asserted `topLevel` 3) and grid 300×300 in the default suite, and an
+  **opt-in `FUZZ_XL=1` sparse n = 2M round** (~30 s, `test.skip` otherwise). Every failure
+  message carries the round's seed for reproduction. **`FUZZ_ROUNDS=<x>`** multiplies all
+  round counts (default 1 ≈ 0.5 s; 25 ≈ 5 s, several thousand graphs).
+- Current suite: **104 tests — 103 passing + 1 XL skipped by default**, 100% statement
+  coverage, ~3 s wall-clock. No graph data files: every test graph is generated from a seed.
 
 ## Benchmarks (`benchmarks/`, `npm run bench`)
 

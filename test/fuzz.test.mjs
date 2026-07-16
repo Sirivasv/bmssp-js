@@ -18,6 +18,8 @@ import {
 //
 // FUZZ_ROUNDS multiplies every round count (default 1) for high-volume runs:
 //   FUZZ_ROUNDS=25 npm test -- test/fuzz.test.mjs
+// FUZZ_XL=1 additionally runs the 2M-node seeded scale round (~30 s):
+//   FUZZ_XL=1 npm test -- test/fuzz.test.mjs
 
 const ROUNDS = Math.max(1, Math.floor(Number(process.env.FUZZ_ROUNDS) || 1));
 const FUZZ_TIMEOUT = 120_000;
@@ -239,6 +241,43 @@ describe("fuzz: extreme weight regimes", () => {
       FUZZ_TIMEOUT,
     );
   }
+});
+
+describe("fuzz: seeded scale runs", () => {
+  // These replace the old roadNet-CA.txt fixture (a real 2M-node road
+  // network with unseeded random weights): same sparse m = O(n) regime, but
+  // reproducible and generated on the fly. Recursion depth is NOT what scale
+  // buys here — topLevel is 3 from n = 10k all the way to 2M (the 3 → 4 step
+  // sits near n = 4M, see #182) — the value is volume: block-list churn,
+  // memory pressure, and millions of oracle-checked distances.
+  test(
+    "sparse n = 150k matches the oracle at topLevel 3",
+    () => {
+      const edges = sparseRandom(150_000, 3, 1651);
+      expect(new BMSSP(edges).topLevel).toBe(3);
+      checkFullMapAgainstOracle(edges, 0, "scale sparse seed=1651");
+    },
+    FUZZ_TIMEOUT,
+  );
+
+  test(
+    "grid 300×300 (n = 90k) matches the oracle",
+    () => {
+      checkFullMapAgainstOracle(grid(300, 1652), 0, "scale grid seed=1652");
+    },
+    FUZZ_TIMEOUT,
+  );
+
+  // Opt-in XL round: the old road-network scale, seeded. ~30 s, so it stays
+  // out of the default `npm test` (and CI) budget.
+  (process.env.FUZZ_XL ? test : test.skip)(
+    "XL: sparse n = 2M matches the oracle",
+    () => {
+      const edges = sparseRandom(2_000_000, 3, 1653);
+      checkFullMapAgainstOracle(edges, 0, "xl sparse seed=1653");
+    },
+    600_000,
+  );
 });
 
 describe("fuzz: multi-source bounded bmssp() against per-source oracles", () => {

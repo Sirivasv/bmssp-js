@@ -1,7 +1,7 @@
 # 07 — Glossary
 
-<!-- Updated on: 2026-07-16 (terms last extended in the #161 PR: fuzz-suite terms +
-     the boundary-tied-return tie caveat) -->
+<!-- Updated on: 2026-07-16 (terms last extended in the roadNet-CA removal PR: FUZZ_XL,
+     seeded scale runs; roadNet-CA itself removed) -->
 
 > **Lifecycle: dynamic — updated in Phase C of every PR.** When a PR introduces new symbols
 > or terms (module names, data-structure fields, paper notation newly used in code), add
@@ -153,6 +153,11 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
 - **`FUZZ_ROUNDS`** (#161) — environment variable multiplying every fuzz round count
   (default 1). `FUZZ_ROUNDS=25 npm test -- test/fuzz.test.mjs` runs several thousand
   graphs in ~5 s.
+- **`FUZZ_XL`** — environment variable opting into the seeded 2M-node sparse scale round
+  in `test/fuzz.test.mjs` (~30 s; `test.skip` otherwise). With the default-suite scale
+  runs (sparse 150k, grid 300×300) it replaced `roadNet-CA.txt` — the 87 MB SNAP road
+  network removed 2026-07-16 (unseeded weights, ~71 s per run). Note: `topLevel` is 3
+  from n = 10k to 2M, so scale rounds buy volume and memory pressure, not depth.
 - **Dyadic-float regime** (#161) — fuzz weight regime using multiples of `1/256` (dyadic
   rationals) of bounded magnitude: every path sum is exact in float64, so float-weight
   testing keeps bit-exact oracle equality instead of needing tolerances.

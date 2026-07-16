@@ -1,38 +1,28 @@
 import { describe, test, expect } from "@jest/globals";
 import { BMSSP, dijkstra } from "../index.mjs";
-import fs from "fs";
+import { sparseRandom } from "../benchmarks/generators.mjs";
 
-// Load the roadNet-CA.txt graph and parse it into an array of edges
-let roadNetCA = (() => {
-  let graph = [];
-  const filePath = new URL("./roadNet-CA.txt", import.meta.url).pathname;
-  const data = fs.readFileSync(filePath, "utf-8");
-  data.split("\n").forEach((line) => {
-    if (line.startsWith("#") || line.trim() === "") return;
-    const [from, to] = line.trim().split(/\s+/).map(Number);
-    if (!isNaN(from) && !isNaN(to)) {
-      let min = 1,
-        max = 1e8;
-      let randomWeight = Math.floor(Math.random() * (max - min + 1)) + min;
-      graph.push([from, to, randomWeight]);
-    }
-  });
-  return graph;
-})();
+// Seeded medium-size sparse graph (m = O(n) — the regime the paper targets).
+// It replaces the old 87 MB roadNet-CA.txt fixture: the same full-map
+// BMSSP-vs-Dijkstra contract, but reproducible (fixed seed instead of
+// unseeded random weights) and orders of magnitude faster. Even at this size
+// the recursion already runs at topLevel = 3, the same depth a 2M-node graph
+// reaches; larger seeded scale runs live in test/fuzz.test.mjs.
+const mediumSparse = sparseRandom(10_000, 3, 1601);
 
 // Have an initialized BMSSP instance for tests
-const myBMSSP = new BMSSP(roadNetCA);
+const myBMSSP = new BMSSP(mediumSparse);
 
 describe("BMSSP constructor", () => {
   test("initializes the graph correctly", () => {
-    expect(myBMSSP.graph).toEqual(roadNetCA);
+    expect(myBMSSP.graph).toEqual(mediumSparse);
   });
 });
 
 describe("BMSSP nodeIDs", () => {
   test("stores unique node IDs correctly", () => {
     const uniqueNodeIDs = new Set();
-    roadNetCA.forEach((edge) => {
+    mediumSparse.forEach((edge) => {
       uniqueNodeIDs.add(edge[0]);
       uniqueNodeIDs.add(edge[1]);
     });
@@ -74,7 +64,7 @@ describe("BMSSP adjacency map", () => {
     for (const edges of myBMSSP.adjacency.values()) {
       edgeCount += edges.length;
     }
-    expect(edgeCount).toBe(roadNetCA.length);
+    expect(edgeCount).toBe(mediumSparse.length);
   });
 
   test("getEdges returns a node's edges and [] for unknown nodes", () => {
@@ -105,7 +95,7 @@ describe("BMSSP initialize calculateShortestPaths", () => {
     const startNode = [...myBMSSP.nodeIDs][0];
     myBMSSP.calculateShortestPaths(startNode);
     expect(myBMSSP.shortestPaths.get(startNode)).toBe(0);
-  }, 120000); // A real BMSSP run over the full road network takes a few seconds
+  });
   test("throws an error if the start node is not in the graph", () => {
     const invalidStartNode = -1; // Assuming -1 is not a valid node ID in the graph
     expect(() => {
@@ -118,7 +108,7 @@ describe("dijkstra source validation", () => {
   test("throws an error if the source node is not in nodeIDs", () => {
     const invalidSource = -1; // Assuming -1 is not a valid node ID in the graph
     expect(() => {
-      dijkstra(roadNetCA, myBMSSP.nodeIDs, invalidSource);
+      dijkstra(mediumSparse, myBMSSP.nodeIDs, invalidSource);
     }).toThrow("Source node not found in nodeIDs");
   });
 });
@@ -129,11 +119,11 @@ describe("BMSSP vs Dijkstra shortest paths", () => {
     const source = nodeArray[0];
 
     myBMSSP.calculateShortestPaths(source);
-    const dijkstraPaths = dijkstra(roadNetCA, myBMSSP.nodeIDs, source);
+    const dijkstraPaths = dijkstra(mediumSparse, myBMSSP.nodeIDs, source);
 
     expect(myBMSSP.shortestPaths.size).toBe(dijkstraPaths.size);
     for (const [nodeId, distance] of myBMSSP.shortestPaths) {
       expect(dijkstraPaths.get(nodeId)).toBe(distance);
     }
-  }, 120000); // A real BMSSP run + a Dijkstra oracle run over the full road network
+  });
 });

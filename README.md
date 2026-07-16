@@ -17,8 +17,8 @@ first to beat Dijkstra's O(m + n·log n) bound on sparse directed graphs.
 
 **The algorithm is functional end-to-end as of `1.0.0`** 🎉 — `calculateShortestPaths()`
 computes distances via the paper's method (FindPivots → block list → recursive BMSSP with
-the bounded base case), validated node-by-node against a Dijkstra oracle, including on a
-real 2-million-node road network. The project was built piece by piece against the paper,
+the bounded base case), validated node-by-node against a Dijkstra oracle on thousands of
+seeded graphs — up to 2 million nodes. The project was built piece by piece against the paper,
 with every building block shipped, tested, and released individually:
 
 | Building block (paper) | Where | Status |
@@ -107,7 +107,7 @@ Other image versions are on [Docker Hub](https://hub.docker.com/r/sirivasv/bmssp
 
 ```bash
 npm install
-npm test          # Jest suite, incl. BMSSP-vs-Dijkstra equivalence on a real road network
+npm test          # Jest suite — every graph seeded, every failure reproducible (~3 s)
 npm run lint      # Prettier + ESLint
 npm run bench     # seeded micro-benchmarks (see benchmarks/README.md)
 ```
@@ -117,14 +117,14 @@ methodology — lives in [benchmarks/HEAD-TO-HEAD.md](benchmarks/HEAD-TO-HEAD.md
 ([#170](https://github.com/Sirivasv/bmssp-js/issues/170) tracks harness integration).
 
 The test suite's core contract: for every node, BMSSP's distances must equal the Dijkstra
-oracle's — including on `test/roadNet-CA.txt`, a real road network from SNAP. A seeded
-property/fuzz suite (`test/fuzz.test.mjs`) hammers that contract across eight graph shapes
-(sparse/dense random, grids, chains, stars, DAGs, disconnected forests, multigraphs),
-extreme weight regimes (all-zero, mixed zero/huge, exact floats), and direct multi-source
-bounded calls checked against per-source oracles. It runs in `npm test` by default; crank
-the volume with the `FUZZ_ROUNDS` multiplier (e.g. `FUZZ_ROUNDS=25 npm test -- test/fuzz.test.mjs`
-checks several thousand graphs in a few seconds). Failures always report the seed that
-produced them.
+oracle's. A seeded property/fuzz suite (`test/fuzz.test.mjs`) hammers that contract across
+eight graph shapes (sparse/dense random, grids, chains, stars, DAGs, disconnected forests,
+multigraphs), extreme weight regimes (all-zero, mixed zero/huge, exact floats), direct
+multi-source bounded calls checked against per-source oracles, and seeded scale runs up to
+150k nodes. It runs in `npm test` by default; crank the volume with the `FUZZ_ROUNDS`
+multiplier (e.g. `FUZZ_ROUNDS=25 npm test -- test/fuzz.test.mjs` checks several thousand
+graphs in a few seconds), and set `FUZZ_XL=1` for an additional 2-million-node round
+(~30 s). Failures always report the seed that produced them.
 
 ## Roadmap
 
