@@ -26,13 +26,13 @@ tested, and released individually. Current focus: milestone
 | Lemma 3.3 block-based partial-sort structure `D` ([#42](https://github.com/Sirivasv/bmssp-js/issues/42)) | `src/blockList.mjs` | ✅ done |
 | Indexed binary min-heap ([#41](https://github.com/Sirivasv/bmssp-js/issues/41)) | `src/heap.mjs` | ✅ done |
 | `BaseCase(B, S)` — Algorithm 2, bounded mini-Dijkstra ([#40](https://github.com/Sirivasv/bmssp-js/issues/40)) | `src/baseCase.mjs` | ✅ done |
-| `FindPivots(B, S)` — Algorithm 1, frontier shrinking ([#44](https://github.com/Sirivasv/bmssp-js/issues/44)) | — | 🔨 next up |
-| `BMSSP(l, B, S)` — Algorithm 3, the main recursion ([#43](https://github.com/Sirivasv/bmssp-js/issues/43)) | — | ⬜ open |
+| `FindPivots(B, S)` — Algorithm 1, frontier shrinking ([#44](https://github.com/Sirivasv/bmssp-js/issues/44)) | `src/findPivots.mjs` | ✅ done |
+| `BMSSP(l, B, S)` — Algorithm 3, the main recursion ([#43](https://github.com/Sirivasv/bmssp-js/issues/43)) | — | 🔨 next up — the last piece |
 
 > **Honest note:** until [#43](https://github.com/Sirivasv/bmssp-js/issues/43) lands,
 > `calculateShortestPaths()` computes distances with the reference Dijkstra implementation.
-> The shipped BMSSP building blocks (block list, heap, base case) are fully tested but not
-> yet wired into the public entry point.
+> The shipped BMSSP building blocks (block list, heap, base case, pivot finding) are fully
+> tested but not yet wired into the public entry point.
 
 ## How it works (in two ideas)
 

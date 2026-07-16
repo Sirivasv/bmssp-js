@@ -1,10 +1,11 @@
 # 05 — Codebase Map (current state)
 
-<!-- BOOKMARK-COMMIT: 9a753b09d77d8b7b2f72118c17b74dafa5d0df0f -->
-<!-- PENDING-PR-BRANCH: chore/agent-process-v2 -->
-<!-- Last validated: 2026-07-16, on main. Version 0.18.0 (tagged + released; publish.yml
-     fired). #40 (BaseCase) closed via PR #178; remaining 1.0.0 issues: #44 (FindPivots,
-     fully specced on GitHub) then #43 (main recursion). No pending release work. -->
+<!-- BOOKMARK-COMMIT: 79b58f2636a05c88d5937966710d3d0a3f3b781d -->
+<!-- PENDING-PR-BRANCH: feat/44-find-pivots -->
+<!-- Last validated: 2026-07-16, rewritten in Phase C of the #44 PR (feat/44-find-pivots).
+     Describes the tree as it will exist once that PR merges. Version 0.19.0 (bumped in the
+     PR; tag + release pending the merge). #44 (FindPivots) done in this PR; the only
+     remaining 1.0.0 issue is #43 (main recursion). -->
 
 Snapshot of what exists in `bmssp-js` today, so you know what to build on vs. what's missing.
 
@@ -59,11 +60,13 @@ src/
   blockList.mjs           # NEW (#42, PR #175): Lemma 3.3 block-based partial-sort structure D
   heap.mjs                # NEW (#41): indexed binary min-heap (MinHeap) for BaseCase (Alg 2)
   baseCase.mjs            # NEW (#40): BaseCase(B, S) — Algorithm 2 bounded mini-Dijkstra
+  findPivots.mjs          # NEW (#44): FindPivots(B, S) — Algorithm 1 frontier shrink
 test/
   main.test.mjs           # Jest tests: constructor, nodeIDs, adjacency map, shortestPaths, BMSSP-vs-Dijkstra
   blockList.test.mjs      # NEW (#42): 18 BlockList tests incl. a seeded random stress test
   heap.test.mjs           # NEW (#41): 16 MinHeap tests incl. a seeded stress test vs. a naive queue
   baseCase.test.mjs       # NEW (#40): 13 BaseCase tests incl. seeded oracle-comparison stress
+  findPivots.test.mjs     # NEW (#44): 12 FindPivots tests incl. two seeded oracle stress tests
   roadNet-CA.txt          # real road-network edge list (SNAP roadNet-CA), weights randomized at load
   README.md
 benchmarks/               # NEW (#45 PR): dependency-free benchmark harness, `npm run bench`
@@ -177,6 +180,28 @@ never re-inserted into the heap (an equal-sum relaxation — e.g. a zero-weight 
 otherwise loop forever; with non-negative weights a settled vertex cannot strictly improve,
 so nothing is lost). Callers wire it as `Bi', Ui ← BaseCase(Bi, Si)` at level 0 of #43.
 
+## `src/findPivots.mjs` — `FindPivots(B, S)`, Algorithm 1 (#44)
+
+```js
+findPivots(B, S, dHat, adjacency, k)  // → { pivots, W }
+// B         : strict bound gating membership in W (Infinity OK); d̂ updates are NOT gated
+// S         : non-empty Set of complete frontier sources (throws if empty / any d̂ not finite)
+// dHat      : Map<nodeId, number> — the global d̂[·]; RELAXED IN PLACE
+// adjacency : Map<nodeId, [to, weight][]> — the class's this.adjacency
+// k         : rounds + tree-size threshold >= 1 (floored); throws otherwise
+export { findPivots };   // NOT re-exported from index.mjs — internal to the algorithm
+```
+
+`k` rounds of Bellman-Ford relaxation out of `S` (paper's `≤` test; `< B` gates only the
+membership in `W`, the d̂ write itself is unconditional). **Early exit:** as soon as
+`|W| > k·|S|`, returns `pivots = S` (copy) with the partial `W`. Otherwise builds the
+tight-edge forest `F` inside `W` — each vertex takes **at most one parent**, chosen
+deterministically in W-iteration order (ties/DAG caveat, see #163) — and returns as pivots
+the `S`-roots of trees with `≥ k` vertices. Vertices on tight cycles (zero-weight cycles)
+all receive parents, so they root no tree and can't be pivots (degenerate-tie behavior,
+documented in the tests). Guarantees `|pivots| ≤ |W|/k`. Callers wire it as
+`P, W ← FindPivots(B, S)` at the top of #43.
+
 ## `src/dijkstra.mjs` — the oracle (already done)
 
 `dijkstra(graph, nodeIDs, source) → Map<nodeId, distance>`. Standard array binary min-heap
@@ -195,12 +220,19 @@ implementation is tested against. Reuse its heap style / adjacency-list building
 - **Key one:** "BMSSP vs Dijkstra" — for a fixed source, `myBMSSP.shortestPaths` must equal
   `dijkstra(...)` for every node. **Any real BMSSP implementation must keep this passing.**
 - Current suite: **12 tests in `main.test.mjs` + 18 in `blockList.test.mjs` + 16 in
-  `heap.test.mjs` + 13 in `baseCase.test.mjs`, all passing (59).**
+  `heap.test.mjs` + 13 in `baseCase.test.mjs` + 12 in `findPivots.test.mjs`, all
+  passing (71).**
 - **BaseCase (#40):** validation (k, singleton S, complete source), full-success vs. finite/
   infinite B, partial k+1-cap boundary reporting (incl. ties excluded by the strict filter),
   zero-weight-cycle termination, and two seeded stress tests checking the Algorithm 2
   contract against the Dijkstra oracle (exact distances, completeness below B', d̂ never
   underestimates).
+- **FindPivots (#44):** validation (k, non-empty S, complete sources), both branches (early
+  exit incl. multi-source, forest roots with the `≥ k` size filter), `< B` gating W but not
+  d̂ writes, zero-weight tight-cycle termination, DAG-of-tight-edges determinism, and two
+  seeded oracle stress tests (k = n completes the reachable set exactly; bounded runs keep
+  the frontier-shrink contract: every `d(v) < B` vertex is complete-in-W or reachable
+  optimally through a pivot, `|P|·k ≤ |W|`, d̂ never underestimates).
 - **BlockList (#42):** init validation, `value < B` enforcement, drain-pull returns bound `B`,
   batch-sorted pulls of the M smallest, separator invariant, smallest-value-wins dedupe
   (insert and batchPrepend, vs. stored and within-batch), split correctness, re-insert after
@@ -226,7 +258,7 @@ lands. `benchmarks/README.md` holds the "when to use which" guidance.
 | Lemma 3.3 block-list `D` | `src/blockList.mjs` | #42 | ✅ done (PR #175) |
 | Binary min-heap module | `src/heap.mjs` | #41 | ✅ done (PR #177) |
 | Base case (bounded Dijkstra) | `src/baseCase.mjs` | #40 | ✅ done (PR #178) |
-| FindPivots | `src/findPivots.mjs` / method | #44 | ⬜ open |
-| Main `BMSSP(l, B, S)` recursion + `k,t` derivation | `src/bmssp.mjs` | #43 | ⬜ open |
+| FindPivots | `src/findPivots.mjs` | #44 | ✅ done (this PR) |
+| Main `BMSSP(l, B, S)` recursion + `k,t` derivation | `src/bmssp.mjs` | #43 | ⬜ open — **the last 1.0.0 piece** |
 
 See [06-milestones-roadmap.md](06-milestones-roadmap.md) for the recommended order and test strategy.
