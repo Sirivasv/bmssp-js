@@ -1,41 +1,53 @@
 # 05 — Codebase Map (current state)
 
-<!-- BOOKMARK-COMMIT: 7e36afc63828ccefea4db037c0d506d28ae3100a -->
-<!-- BOOKMARK-BRANCH: main -->
-<!-- Last validated 2026-07-16 after pulling main. PR #177 (feat(#41) indexed MinHeap) is
-     MERGED: src/heap.mjs + test/heap.test.mjs are on main and the version is 0.17.0
-     (tagged + released 2026-07-15; publish.yml fired). #41 is closed — remaining 1.0.0
-     issues are #40, #43, #44.
-     Pending: PR for #40 (feat: src/baseCase.mjs BaseCase(B, S) + tests, bump to 0.18.0)
-     is OPEN — re-stamp the bookmark once merged. -->
-<!-- Update both the comment and the body when HEAD moves. -->
+<!-- BOOKMARK-COMMIT: 9a753b09d77d8b7b2f72118c17b74dafa5d0df0f -->
+<!-- PENDING-PR-BRANCH: chore/agent-process-v2 -->
+<!-- Last validated: 2026-07-16, on main. Version 0.18.0 (tagged + released; publish.yml
+     fired). #40 (BaseCase) closed via PR #178; remaining 1.0.0 issues: #44 (FindPivots,
+     fully specced on GitHub) then #43 (main recursion). No pending release work. -->
 
 Snapshot of what exists in `bmssp-js` today, so you know what to build on vs. what's missing.
 
-## 🔄 Session-start validation (this file is DYNAMIC)
+## 🔄 Bookmark validation procedure (this file is DYNAMIC)
 
-This map is only true as of the **bookmark commit** recorded in the HTML comment at the top
-of this file (`BOOKMARK-COMMIT`). The repo changes as commits land, so validate at the start
-of every session — **after pulling the latest `main`** (never validate against a stale local
-checkout; a branch that looks unmerged locally may already be on `origin/main`):
+This map describes the repo **as of the tree identified by the two markers above**:
 
-```bash
-git checkout main && git pull origin main
-git rev-parse HEAD          # compare to BOOKMARK-COMMIT above
-```
+- `BOOKMARK-COMMIT` — the `main` commit this map was last validated against.
+- `PENDING-PR-BRANCH` — set only while a PR is in flight: this map was rewritten **inside
+  that PR** (Phase C of `../CLAUDE.md`) and already describes the tree that PR will merge.
+  `(none)` otherwise.
 
-- **HEAD == bookmark** → this map is current; nothing to do.
-- **HEAD != bookmark** → the repo moved. Re-inspect and reconcile:
-  1. `git diff --stat <BOOKMARK-COMMIT> HEAD` to see what changed.
-  2. Re-read anything under `src/`, `test/`, `examples/`, `benchmarks/`, `index.mjs`,
-     `package.json` that changed (especially: did any of the missing pieces below get built?).
-  3. Rewrite the affected sections below (layout, class behavior, "Gaps to fill" table,
-     package version).
-  4. **Update the `BOOKMARK-COMMIT` comment to the new `HEAD`.**
+**At session start** (Phase A — after `git checkout main && git pull origin main`), run
+`git rev-parse HEAD` and follow exactly one branch:
 
-This same procedure runs in full on the on-demand **`RKB`** (`revitalize_knowledge_base`)
-command — see `../CLAUDE.md`. `RKB` always rewrites this file and re-stamps the bookmark,
-regardless of whether HEAD moved.
+1. **HEAD == `BOOKMARK-COMMIT`** → map is current. Done.
+2. **`PENDING-PR-BRANCH` is set** (not `(none)`) → our own PR may have just merged:
+   ```bash
+   gh pr list --repo Sirivasv/bmssp-js --head <PENDING-PR-BRANCH> --state merged \
+     --json number,mergeCommit --jq '.[0]'
+   ```
+   - If it merged and its `mergeCommit` **== HEAD** → this map already describes HEAD.
+     Set `BOOKMARK-COMMIT` to HEAD, set `PENDING-PR-BRANCH` to `(none)`, refresh the
+     "Last validated" comment. Done — no re-inspection needed.
+   - If it merged but HEAD moved **past** the merge commit → do step 3 using the merge
+     commit as the baseline instead of `BOOKMARK-COMMIT`.
+   - If it did **not** merge (PR still open/closed unmerged) → the map describes a tree
+     that isn't on `main`; rewrite the map from `main`'s actual tree (step 3 with
+     `BOOKMARK-COMMIT` as baseline), keep or clear the marker to match PR reality.
+3. **Otherwise (repo moved under us)** →
+   ```bash
+   git diff --stat <baseline> HEAD    # if the baseline commit is unresolvable locally,
+                                      # skip the diff and re-inspect everything below
+   ```
+   Re-read whatever changed under `src/`, `test/`, `benchmarks/`, `examples/`,
+   `index.mjs`, `package.json`; rewrite the affected sections (layout, module APIs,
+   "Gaps to fill" table); set `BOOKMARK-COMMIT` to HEAD and `PENDING-PR-BRANCH` to
+   `(none)`.
+
+**In Phase C (pre-PR, on the feature branch):** rewrite the body of this map to describe
+the branch's tree (i.e. post-merge reality), leave `BOOKMARK-COMMIT` at the `main` commit
+the branch is based on (`git merge-base main HEAD`), and set `PENDING-PR-BRANCH` to the
+feature branch name. Step 2 above then fast-paths the post-merge session start.
 
 ## Layout
 
@@ -213,7 +225,7 @@ lands. `benchmarks/README.md` holds the "when to use which" guidance.
 | Per-node edge adjacency map | `BMSSP` constructor | #45 | ✅ done (PR #160) |
 | Lemma 3.3 block-list `D` | `src/blockList.mjs` | #42 | ✅ done (PR #175) |
 | Binary min-heap module | `src/heap.mjs` | #41 | ✅ done (PR #177) |
-| Base case (bounded Dijkstra) | `src/baseCase.mjs` | #40 | 🔶 PR open (this branch) |
+| Base case (bounded Dijkstra) | `src/baseCase.mjs` | #40 | ✅ done (PR #178) |
 | FindPivots | `src/findPivots.mjs` / method | #44 | ⬜ open |
 | Main `BMSSP(l, B, S)` recursion + `k,t` derivation | `src/bmssp.mjs` | #43 | ⬜ open |
 
