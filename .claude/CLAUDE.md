@@ -5,149 +5,178 @@ _"Breaking the Sorting Barrier for Directed Single-Source Shortest Paths"_ — a
 **O(m·log^(2/3) n)** SSSP algorithm, the first to beat Dijkstra on sparse directed graphs.
 **BMSSP** = **B**ounded **M**ulti-**S**ource **S**hortest **P**ath.
 
-This file is the **operational entrypoint**. It tells you what to run at the **start of every
-working session** in this repo so the `.claude/knowledge/` base stays in sync with reality
-(the codebase) and intent (the GitHub milestones/issues). The knowledge base exists so you can
-work on the project **without** re-reading the paper, PDF, or any external article.
+This file is the **operational entrypoint**: the complete lifecycle of a working session,
+from session start to release. The `.claude/knowledge/` base exists so **any agent — any
+model** — can work on this project without re-reading the paper, PDF, or any external
+article. Follow the checklists literally; every decision point is written as an explicit
+if/else so nothing depends on inference.
 
 ---
 
-## ▶ Session-start routine (run these every time, in order)
+## Ground rules (apply to everything below)
 
-### Step 1 — Load the fixed knowledge (read-only, never changes)
-Read these once per session for full algorithm context. They are **static** — do not edit:
-- [knowledge/01-paper-overview.md](knowledge/01-paper-overview.md) — core idea, `k`/`t`, model
-- [knowledge/02-algorithms.md](knowledge/02-algorithms.md) — FindPivots / BaseCase / BMSSP pseudocode
-- [knowledge/03-data-structures.md](knowledge/03-data-structures.md) — Lemma 3.3 block-list + heap
-- [knowledge/04-external-enhancement.md](knowledge/04-external-enhancement.md) — consolidated intuition (fixed)
+1. **Single source of truth.** Static files (this file, `knowledge/01–04`) must never carry
+   dynamic facts (version numbers, issue states, test counts, module lists). Every dynamic
+   fact lives in exactly one dynamic file:
+   - What the code looks like today → [knowledge/05-codebase-map.md](knowledge/05-codebase-map.md)
+   - What to build next (milestones/issues) → [knowledge/06-milestones-roadmap.md](knowledge/06-milestones-roadmap.md)
+   - Symbol/term lookup → [knowledge/07-glossary.md](knowledge/07-glossary.md)
+   If you spot a dynamic fact anywhere else (including this file), treat it as a bug: move
+   it to the right dynamic file and replace it with a pointer.
+2. **One PR per issue, and that PR carries everything**: code + tests + version bump +
+   refreshed `05`/`06`/`07` + `README.md` updates. Never open a second "sync the docs" PR —
+   the pre-PR sync (Phase C below) exists precisely to prevent that.
+3. **Two hard gates — never bypass:**
+   - **GitHub writes beyond the PR itself** (creating/editing/closing issues or milestones):
+     _propose_ first, _execute_ only after explicit user confirmation, **one ask per edit**.
+     Collect proposals in the PR body (Phase C) and execute approved ones in Phase E.
+   - **Tag + GitHub Release** (fires npm + Docker Hub publish): only after the user
+     explicitly confirms the PR is merged. Never tag or release autonomously.
+4. **Correctness over speed.** BMSSP output must match the Dijkstra oracle exactly
+   (`test/main.test.mjs`, "BMSSP vs Dijkstra"). The asymptotic win is theoretical; this repo
+   optimizes for a correct, readable implementation.
+5. **Knowledge-base authoring style** (when you rewrite `05`/`06`/`07`): keep the existing
+   heading/table structure stable, write procedures as numbered steps with exact commands,
+   use absolute dates (never "yesterday"), and prefer short declarative sentences. The next
+   reader may be a smaller model — leave it nothing to guess.
 
-### Step 2 — Sync `main`, then validate the codebase map bookmark
-**Always pull the latest `main` first — never reason from a stale local checkout.** PRs may
-have merged between sessions (e.g. a local branch that "has no open PR" may simply be merged
-already), so sync with GitHub before drawing any conclusion about branch or merge state:
+---
 
-```bash
-git checkout main && git pull origin main   # sync with GitHub before anything else
-git rev-parse HEAD                          # now compare to the bookmark
+## The session lifecycle
+
+```
+A. Session start  →  B. Implement  →  C. Pre-PR sync (automatic RKB)  →  D. Open the PR
+        →  (user reviews & merges, then confirms)  →  E. Release + approved GitHub edits
 ```
 
-Open [knowledge/05-codebase-map.md](knowledge/05-codebase-map.md) and read its
-**`<!-- BOOKMARK-COMMIT: … -->`** line, then compare to the freshly-pulled `main` HEAD:
+### Phase A — Session start (run every time, in order)
 
-- **If HEAD == bookmark** → `05` is current; do nothing.
-- **If HEAD != bookmark** → the repo moved. Re-inspect `src/`, `test/`, `examples/`,
-  `package.json`, update `05` to match the new reality, and set the bookmark to the new HEAD.
-  (See the "Session-start validation" block inside `05` for the exact procedure.)
-- Need to judge whether some local branch or commit is merged? Check
-  `gh pr list --state merged` or `git branch --contains <commit>` against the fresh
-  `origin/main` — do **not** infer merge state from the local working tree.
+1. **Load the fixed knowledge** (read-only, never changes):
+   [01-paper-overview.md](knowledge/01-paper-overview.md) ·
+   [02-algorithms.md](knowledge/02-algorithms.md) ·
+   [03-data-structures.md](knowledge/03-data-structures.md) ·
+   [04-external-enhancement.md](knowledge/04-external-enhancement.md).
+   For a task-scoped shortcut ("implementing issue X → read exactly this"), see the
+   reading map in [knowledge/README.md](knowledge/README.md).
+2. **Sync `main` — never reason from a stale checkout:**
+   ```bash
+   git checkout main && git pull origin main
+   git rev-parse HEAD
+   ```
+3. **Validate the codebase map** (`05`): follow the **bookmark validation procedure written
+   at the top of `05` itself** — it is an explicit if/else covering the normal case, the
+   "our own PR just merged" case (`PENDING-PR-BRANCH` marker), and the "repo moved under
+   us" case. Outcome: `05` describes reality and its bookmark equals `main` HEAD.
+4. **Reconcile the roadmap** (`06`) — read-only against live GitHub:
+   ```bash
+   gh api repos/Sirivasv/bmssp-js/milestones --jq '.[] | {number,title,state,description,open_issues,closed_issues}'
+   gh issue list --repo Sirivasv/bmssp-js --state open --limit 100 --json number,title,milestone,labels
+   ```
+   Update the `06` markdown to match GitHub. Do **not** write to GitHub in this phase.
+5. **Check release state** — surface a bumped-but-unreleased version instead of silently
+   working past it:
+   ```bash
+   git fetch --tags --force && git tag --sort=-creatordate | head -3
+   node -p "require('./package.json').version"
+   ```
+   If `package.json`'s version has no matching tag, tell the user before doing anything else.
+6. **Check `README.md` currency** — compare its Status section against `05`/`06`. If stale,
+   note it now and fix it in Phase C (inside the next PR), not as a separate PR.
 
-### Step 3 — Refresh the milestones roadmap from GitHub (read)
-Using `gh`, read the live milestones and issues and reconcile
-[knowledge/06-milestones-roadmap.md](knowledge/06-milestones-roadmap.md) to match:
+### Phase B — Implement
+
+Pick the next issue from the build order in `06`. Use `02`/`03` as the spec and `05` for the
+existing APIs to build on. Ship focused unit tests with every piece. Before Phase C:
+`npm test` and `npm run lint` must both pass.
+
+### Phase C — Pre-PR sync (automatic; this replaces the old on-request `RKB`)
+
+**Run this on the feature branch, before opening any PR. Do not wait to be asked.**
+
+1. **Version bump** (only if the PR closes an issue — see "Version bump & release" below):
+   ```bash
+   npm version minor --no-git-tag-version
+   ```
+2. **Rewrite `05`** to describe the tree **as it will exist once this PR merges** (the
+   branch's own tree). Set the `PENDING-PR-BRANCH:` marker to the feature branch name and
+   leave `BOOKMARK-COMMIT:` at the `main` commit the branch is based on — the Phase A
+   procedure uses these to fast-path validation after the merge.
+3. **Reconcile `06`**: mark the issue done-pending-merge, re-derive what's next, and
+   **re-examine the roadmap itself** — every increment of progress teaches something about
+   the issues ahead. Are open issue titles/descriptions still the best statement of the
+   work? Is the milestone slicing (next one or two minors, next major) still right? Write
+   any resulting GitHub edits (issue edits/closes/moves, milestone re-scoping, new issues)
+   as a **"Roadmap proposals"** list — into `06` and into the PR body — but do **not**
+   execute them yet (gate 3). Proposing nothing after real progress should be rare.
+4. **Update `07`** with any new symbols, module names, or terms this PR introduces.
+5. **Update `README.md`** — the public face must showcase the current state: version,
+   status/progress table, usage that actually works, roadmap summary. Keep it honest about
+   what is and isn't implemented yet.
+6. Commit all of the above **in the same PR branch** as the code.
+
+### Phase D — Open the PR
 
 ```bash
-gh api repos/Sirivasv/bmssp-js/milestones --jq '.[] | {number,title,state,description,open_issues,closed_issues}'
-gh issue list --repo Sirivasv/bmssp-js --state open --limit 100 --json number,title,milestone,labels
+git push -u origin <feature-branch>
+gh pr create --title "<type>(#<issue>): <summary>" --body "..."
 ```
 
-On session start this is **read-only reconciliation**: update the `06` markdown so it reflects
-the current GitHub state. Do **not** push changes to GitHub during normal session start.
+PR body must contain: `Closes #<issue>`, a summary of the change, test/lint status, and the
+**Roadmap proposals** section from Phase C (or "none"). Then hand off to the user for review.
+One PR = the whole increment; if review feedback requires changes, push to the same branch.
 
-### Step 4 — Ready to work
-Pick up the issue/milestone in focus (see `06`) and use `02`/`03` as the implementation spec.
-When a session's work **closes an issue**, follow the **Version bump & release** routine below
-(bump inside the PR; tag + release only after the user confirms the merge).
+### Phase E — After the user confirms the merge
+
+1. Run the **release routine** below (tag + GitHub Release → npm + Docker Hub).
+2. Walk the **Roadmap proposals** with the user and execute each approved GitHub edit
+   (`gh issue edit/close/create`, milestone edits) — one confirmation per edit.
+3. Session can end here; the next session's Phase A will find everything consistent.
 
 ---
 
 ## ⟳ On-demand command: `revitalize_knowledge_base` (alias `RKB`)
 
-When the user types **`RKB`** or **`revitalize_knowledge_base`** at any point in a session,
-perform a **full two-way refresh**:
-
-1. **`05` codebase-map** — first sync `main` exactly as in session-start Step 2
-   (`git checkout main && git pull origin main`), then re-inspect the repo regardless of the
-   bookmark, rewrite `05`, and reset the bookmark commit to current HEAD.
-2. **`06` milestones-roadmap — two-way sync with GitHub.** Beyond reading, you should
-   **use `gh` to make GitHub match the roadmap**, treating the freshly-updated `.claude/`
-   knowledge base (post-task learnings from `05`/`07` and the code) as the source of truth:
-   - **Reconcile existing open issues** (created by you or the user). As new learnings land,
-     issues may need their **titles/descriptions edited**, be **closed** (already done, obsolete,
-     or superseded), be **re-scoped/split/merged**, or be **moved to a different milestone**.
-   - **Reconcile the milestones themselves.** Reason about **(a) the current package version,
-     (b) the next one or two minor-version milestones, and (c) the next major-version
-     milestone** — and adjust as learnings dictate: the **number of remaining future minor
-     versions**, each milestone's **scope and issue set**, and the same for the **next major
-     version** (titles, descriptions, which issues belong where, adding/removing issues).
-   - Propose the concrete `gh` edits (issue closes/edits, milestone edits, new issues). **Confirm
-     with the user before any create/edit/close — these are outward-facing writes.**
-3. **`07` glossary** — update [knowledge/07-glossary.md](knowledge/07-glossary.md) to add any
-   new symbols/terms introduced by code or roadmap changes since the last refresh.
-
-> **Not gated on the `RKB` keyword:** the roadmap-reshaping powers of item 2 — adjusting the
-> **number, scope, and issue sets of the upcoming minor-version milestones** and the **next
-> major-version milestone** (and the issues within them) — may be exercised **at any point in
-> a working session** when new learnings warrant it, not only when the user types `RKB`.
-> The same gate applies: propose the concrete edits and **confirm with the user before any
-> outward-facing GitHub write**.
-
-> **You co-own the roadmap.** Do not wait to be told to fold post-session learnings into it —
-> the user expects that **every RKB after real progress produces concrete edit proposals**,
-> because every increment of progress teaches something about the issues ahead. On each `RKB`,
-> actively re-derive: are existing issue titles/descriptions still the best statement of the
-> work? Is the issue layout of the **current and future minor versions** still the right
-> slicing? Does the **next major version** still have the right scope? Then put the specific
-> edits in front of the user — **asking per edit** (issues / versions / milestones), since the
-> confirmation gate is per outward-facing write, not per batch. An RKB that proposes nothing
-> after a session that shipped code should be the rare exception, not the default.
-
-`RKB` = the manual superset of the session-start routine, plus the GitHub write-back for `06`.
-It also **re-checks the release state** (`git tag` / `gh release list` vs. `package.json`) so a
-version that was bumped-but-not-yet-released is surfaced.
+`RKB` is no longer required around PRs — Phase C runs automatically. It remains available
+for **out-of-band refreshes** (e.g. after external PRs merged, or when things feel out of
+sync). When the user types **`RKB`**: run Phase A steps 2–6, then Phase C steps 2–5 directly
+on `main`'s state (no `PENDING-PR-BRANCH` marker; re-stamp `05`'s bookmark to HEAD), present
+any Roadmap proposals, and execute only user-approved GitHub edits.
 
 ---
 
 ## 🚀 Version bump & release (when a working session closes an issue)
 
 The repo ships via **tag → GitHub Release → CI/CD**. Publishing a GitHub Release
-(`release: published`) fires `.github/workflows/publish.yml`, which **publishes the package to
-npm** (`npm publish --provenance --access public`) **and builds + pushes the multi-arch Docker
-image** to Docker Hub. Tags are the **bare version with no `v` prefix** (`0.15.0`, not
-`v0.15.0`) and must match `package.json`. (Separately: pushes/PRs to `main` run lint + test via
-`npm-build.yml`, and `docs/**` changes deploy Pages via `static.yml` — those need no action.)
+(`release: published`) fires `.github/workflows/publish.yml`, which **publishes to npm**
+(`npm publish --provenance --access public`) **and pushes the multi-arch Docker image** to
+Docker Hub. Tags are the **bare version, no `v` prefix** (`0.19.0`, not `v0.19.0`) and must
+match `package.json`. (Pushes/PRs to `main` run lint + test via `npm-build.yml`; `docs/**`
+changes deploy Pages via `static.yml` — no action needed for those.)
 
-> **This is an outward-facing publish (npm + Docker Hub). The release half is GATED on explicit
-> user confirmation that the PR merged. Never create a tag or GitHub Release autonomously.**
+> **Outward-facing publish — gate 3 applies. Never create a tag or Release autonomously.**
 
-### Phase 1 — bump the version *inside the PR that closes the issue*
-Do this as part of the same PR that closes the issue, so `package.json` **and**
-`package-lock.json` (both the root `version` and the `packages[""]` entry) move together. Use
-npm so all stay in sync — **do not hand-edit** the version fields:
+**Phase 1 — bump inside the PR** (part of Phase C, step 1). Use npm so `package.json` and
+`package-lock.json` (root `version` **and** the `packages[""]` entry) move together — never
+hand-edit:
 
 ```bash
-# repo root, on the feature branch, before committing the PR:
-npm version minor --no-git-tag-version   # e.g. 0.15.0 → 0.16.0; edits package.json + package-lock.json, no git tag/commit
+npm version minor --no-git-tag-version   # e.g. 0.18.0 → 0.19.0
 ```
 
-Convention: every historical release is a **minor** bump (`0.N.0`), one per closed issue while
-pre-1.0 — use `minor` unless the user directs otherwise (e.g. the final `1.0.0` milestone close
-is a `major` bump). Commit the bump with the rest of the PR's changes.
+Convention: one **minor** bump (`0.N.0`) per closed issue while pre-1.0, unless the user
+directs otherwise (the `1.0.0` milestone close is the `major` bump).
 
-### Phase 2 — tag + release *after the user confirms the PR is merged*
-Only once the user confirms the PR is merged (issue closed), from an up-to-date `main`:
+**Phase 2 — tag + release, only after the user confirms the merge:**
 
 ```bash
-git checkout main && git pull origin main               # pull the merged bump commit
-git fetch --tags --force                                # sync local tags with GitHub (local can be stale)
-VERSION=$(node -p "require('./package.json').version")  # e.g. 0.16.0
-git tag "$VERSION" && git push origin "$VERSION"        # tag == version, no "v" prefix
+git checkout main && git pull origin main
+git fetch --tags --force
+VERSION=$(node -p "require('./package.json').version")
+git tag "$VERSION" && git push origin "$VERSION"
 gh release create "$VERSION" --title "$VERSION" --target main --generate-notes
 ```
 
-Publishing the release triggers `publish.yml` → npm + Docker Hub. After creating it, confirm the
-CD started (`gh run list --workflow=publish.yml` / `gh release view "$VERSION"`) and report the
-result to the user.
+Then confirm CD fired (`gh run list --workflow=publish.yml`) and report the result.
 
 ---
 
@@ -155,21 +184,23 @@ result to the user.
 
 | File | Lifecycle |
 |------|-----------|
-| `CLAUDE.md` (this file) | Entrypoint / routine. Stable. |
-| `knowledge/01–03` | **Fixed** — paper facts, algorithms, data structures. Never change. |
-| `knowledge/04-external-enhancement.md` | **Fixed** — one-time consolidated intuition. Don't change. |
-| `knowledge/05-codebase-map.md` | **Dynamic** — validated at session start vs. bookmark commit; refreshed on `RKB`. |
-| `knowledge/06-milestones-roadmap.md` | **Dynamic** — read-reconciled from GitHub at session start; two-way synced on `RKB`. |
-| `knowledge/07-glossary.md` | **Dynamic** — updated on `RKB`. |
-| `knowledge/README.md` | KB index / reading order. |
+| `CLAUDE.md` (this file) | Entrypoint / lifecycle. Stable; no dynamic facts. |
+| `knowledge/01–03` | **Fixed** — verified paper transcription (facts, algorithms, structures). Change only to fix a factual error against the paper. |
+| `knowledge/04` | **Fixed** — one-time consolidated intuition. Don't change. |
+| `knowledge/05-codebase-map.md` | **Dynamic** — validated in Phase A; rewritten in Phase C of every PR. |
+| `knowledge/06-milestones-roadmap.md` | **Dynamic** — read-reconciled in Phase A; updated + proposals in Phase C; GitHub writes in Phase E. |
+| `knowledge/07-glossary.md` | **Dynamic** — updated in Phase C. |
+| `knowledge/README.md` | KB index, reading order, per-task reading map. |
+| `README.md` (repo root) | **Public face** — kept current in Phase C of every PR. |
 
-## Project quick facts
+## Project quick facts (stable only — dynamic facts live in `05`/`06`)
 
-- **Package:** `bmssp` on npm (currently `0.15.0`). Author: Saul Ivan Rivas Vega. License: MPL-2.0.
-- **Entry:** `index.mjs` re-exports `BMSSP` (`src/bmssp.mjs`) and `dijkstra` (`src/dijkstra.mjs`).
-- **Runtime:** ESM only, `.mjs`. **Test:** `npm test` (Jest, `--experimental-vm-modules`).
-  **Lint/format:** `npm run lint` / `npm run format`.
+- **Package:** `bmssp` on npm. Author: Saul Ivan Rivas Vega. License: MPL-2.0.
+  Current version: see `package.json` / `05`.
+- **Entry:** `index.mjs` re-exports `BMSSP` (`src/bmssp.mjs`) and `dijkstra`
+  (`src/dijkstra.mjs`). Algorithm-internal modules are deliberately **not** re-exported.
+- **Runtime:** ESM only, `.mjs`. **Test:** `npm test` (Jest). **Lint/format:**
+  `npm run lint` / `npm run format`. **Benchmarks:** `npm run bench`.
 - **Graph input:** array of `[from, to, weight]` edges; numeric node IDs; non-negative weights.
-- **Oracle:** `src/dijkstra.mjs` — BMSSP output must match it exactly (see `test/main.test.mjs`).
-- **Status:** Scaffolding + reference Dijkstra done; the real BMSSP algorithm (issues #40–#45,
-  milestone `1.0.0`) is not yet implemented.
+- **Oracle:** `src/dijkstra.mjs` — BMSSP output must match it exactly.
+- **Implementation status, module inventory, next issue:** see `05` and `06`.
