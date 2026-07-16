@@ -117,7 +117,14 @@ methodology — lives in [benchmarks/HEAD-TO-HEAD.md](benchmarks/HEAD-TO-HEAD.md
 ([#170](https://github.com/Sirivasv/bmssp-js/issues/170) tracks harness integration).
 
 The test suite's core contract: for every node, BMSSP's distances must equal the Dijkstra
-oracle's — including on `test/roadNet-CA.txt`, a real road network from SNAP.
+oracle's — including on `test/roadNet-CA.txt`, a real road network from SNAP. A seeded
+property/fuzz suite (`test/fuzz.test.mjs`) hammers that contract across eight graph shapes
+(sparse/dense random, grids, chains, stars, DAGs, disconnected forests, multigraphs),
+extreme weight regimes (all-zero, mixed zero/huge, exact floats), and direct multi-source
+bounded calls checked against per-source oracles. It runs in `npm test` by default; crank
+the volume with the `FUZZ_ROUNDS` multiplier (e.g. `FUZZ_ROUNDS=25 npm test -- test/fuzz.test.mjs`
+checks several thousand graphs in a few seconds). Failures always report the seed that
+produced them.
 
 ## Roadmap
 
