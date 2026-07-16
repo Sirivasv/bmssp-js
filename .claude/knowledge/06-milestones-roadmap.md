@@ -1,7 +1,7 @@
 # 06 — Milestones Roadmap
 
-<!-- SYNCED-FROM-GITHUB: 2026-07-16 (PR #178 merged, #40 closed, 0.18.0 tagged + released) -->
-<!-- Current package version: 0.18.0 (tagged + released) -->
+<!-- SYNCED-FROM-GITHUB: 2026-07-16 (Phase C of the #44 PR, feat/44-find-pivots) -->
+<!-- Current package version: 0.19.0 (bumped in the #44 PR; tag + release pending merge) -->
 
 Maps GitHub **milestones** and **issues** (Sirivasv/bmssp-js) to the paper's building blocks,
 with a dependency-aware build order. This is the "intent" side of the knowledge base (what to
@@ -37,22 +37,31 @@ it runs the same Phase C reconciliation directly on `main`.
 
 ## 📋 Roadmap proposals (pending user approval)
 
-_None right now. Phase C writes proposed GitHub edits here (and in the PR body); Phase E
-executes the approved ones — one confirmation each — and clears them from this list._
+Written in Phase C of the #44 PR (2026-07-16); execute in Phase E, one confirmation each.
+
+1. **Edit #43 (main BMSSP recursion):** append the shipped FindPivots API to its wiring
+   contract — `findPivots(B, S, dHat, adjacency, k) → { pivots, W }` (`P, W ← FindPivots(B, S)`
+   maps to `const { pivots, W } = findPivots(B, S, dHat, adjacency, k)`). All three legs of
+   #43 (baseCase, BlockList, findPivots) now have concrete signatures in the issue body.
+2. **Edit #163 (deterministic tie-breaking):** add the third tie manifestation, found while
+   implementing #44 — vertices on a **tight (zero-weight) cycle** all receive parents in the
+   one-parent forest, so none of them is a root and none can be a pivot; harmless for
+   termination but worth revisiting when Assumption 2.1 tie-breaking is formalized.
 
 ---
 
 ## Current state (as synced)
 
-- **Package version:** `0.18.0` (pre-1.0; the algorithm is not yet functional end-to-end).
-  The `0.18.0` tag + GitHub Release are published (npm + Docker Hub CD fired).
+- **Package version:** `0.19.0`, bumped in the in-flight #44 PR (pre-1.0; the algorithm is
+  not yet functional end-to-end). Tag + GitHub Release happen after the merge (Phase E).
+  Last published release: `0.18.0`.
 - **Active milestone:** **`1.0.0` — "Have a first functional version of the whole algorithm."**
-  - GitHub progress: **9 closed / 2 open** issues (PR #178 merged, so #40 now counts closed).
-  - The 2 open issues (#44, #43) are the remaining algorithm pieces from §02–§03.
-- **Just merged:** **#40 — BaseCase(B, S), Algorithm 2 — PR #178 is now on `main`** (commit
-  `9a753b0`). See `05-codebase-map.md` for the shipped `src/baseCase.mjs` API. **#44
-  (FindPivots) is next** — fully specced in its GitHub issue body (RKB 2026-07-16) — and
-  then #43 wires everything together.
+  - GitHub progress once the #44 PR merges: **10 closed / 1 open**.
+  - The one open issue, **#43 (main recursion), is the last 1.0.0 piece**.
+- **In flight:** **#44 — FindPivots(B, S), Algorithm 1 — done in the `feat/44-find-pivots`
+  PR** (this branch). See `05-codebase-map.md` for the shipped `src/findPivots.mjs` API.
+  **#43 is next and last** — its issue body carries the wiring contract; all three legs
+  (baseCase #40, BlockList #42, findPivots #44) are now on `main` or in this PR.
 
 ## Milestone `1.0.0` — issues → paper
 
@@ -62,8 +71,8 @@ executes the approved ones — one confirmation each — and clears them from th
 | **41** | Implement a priority heap | Binary min-heap for the base case (Alg 2). §03-A | help wanted · good first issue | — | ✅ merged (PR #177) |
 | **40** | Implement the base case of the bmssp algorithm | `BaseCase(B, S)` bounded mini-Dijkstra. **Alg 2**, §02 | help wanted | #41 | ✅ merged (PR #178) |
 | **42** | Implement Lema 3.3 data structure | Block-based partial-sort list `D`. **Lemma 3.3**, §03-B | help wanted | — | ✅ merged (PR #175) |
-| **44** | Implement the findingPivots function | `FindPivots(B, S)` frontier shrink. **Alg 1**, §02 | help wanted | #45 (helpful) | ⬜ open |
-| **43** | Implement main bmssp algorithm | `BMSSP(l, B, S)` recursion + `k,t`. **Alg 3**, §02 | help wanted | #40, #42, #44 | ⬜ open |
+| **44** | Implement the findingPivots function | `FindPivots(B, S)` frontier shrink. **Alg 1**, §02 | help wanted | #45 (helpful) | ✅ done (this PR) |
+| **43** | Implement main bmssp algorithm | `BMSSP(l, B, S)` recursion + `k,t`. **Alg 3**, §02 | help wanted | #40, #42, #44 | ⬜ open — next & last |
 
 ### Closed (context)
 `#36` main `calculateShortestPaths` (currently delegates to Dijkstra — placeholder) ·
@@ -75,9 +84,9 @@ executes the approved ones — one confirmation each — and clears them from th
 Leaves first; two independent tracks converge on the main recursion:
 
 ```
-Track A (base case):     #45 adjacency map ─┬─▶ #41 heap ─▶ #40 BaseCase ─┐   (#45 ✅, #41 ✅)
-Track B (recursion core):    (✅ done)       └─▶ #44 FindPivots ───────────┼─▶ #43 BMSSP main
-                                                #42 BlockList (✅ done) ───┘
+Track A (base case):     #45 adjacency map ─┬─▶ #41 heap ─▶ #40 BaseCase ─┐   (all ✅ —
+Track B (recursion core):    (✅ done)       └─▶ #44 FindPivots (✅) ──────┼─▶ #43 BMSSP main
+                                                #42 BlockList (✅ done) ───┘    only #43 left)
 ```
 
 1. ~~**#45** adjacency map~~ — ✅ **done (PR #160):** `this.adjacency: Map<nodeId, [to,w][]>`
@@ -89,8 +98,9 @@ Track B (recursion core):    (✅ done)       └─▶ #44 FindPivots ───
 4. ~~**#40** BaseCase~~ — ✅ **done (PR #178):** `src/baseCase.mjs`
    `baseCase(B, S, dHat, adjacency, k)` + 13 tests (incl. seeded oracle stress); version
    0.18.0 released. The level-0 leg of #43 is ready.
-5. **#44** FindPivots — needs relaxation + adjacency (#45 ✅). Test both branches (`|W|>k|S|`
-   and forest roots).
+5. ~~**#44** FindPivots~~ — ✅ **done (this PR):** `src/findPivots.mjs`
+   `findPivots(B, S, dHat, adjacency, k) → { pivots, W }` + 12 tests (both branches, tie/DAG
+   determinism, two seeded oracle stress tests); version 0.19.0 bumped.
 6. **#43** BMSSP main — wires #40+#42+#44 with `k`/`t`; replaces the Dijkstra delegation in
    `calculateShortestPaths`. **Definition of done:** BMSSP computes distances via the paper's
    method and the "BMSSP vs Dijkstra" test still passes for every node.
@@ -115,7 +125,7 @@ Clamp `k`,`t` to `≥ 1` for tiny graphs; correctness must not depend on the asy
 
 ### `1.0.0` (milestone #1) — first end-to-end functional BMSSP
 Issues #40–#45. #45 done (PR #160), #42 done (PR #175), #41 done (PR #177), #40 done
-(PR #178); #44 and #43 open. See the tables above.
+(PR #178), #44 done (this PR); only #43 open. See the tables above.
 
 ### `1.1.0` (milestone #2) — correctness hardening
 | # | Issue | Labels |

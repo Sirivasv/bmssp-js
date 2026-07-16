@@ -1,6 +1,6 @@
 # 07 — Glossary
 
-<!-- Updated on: 2026-07-16 (lifecycle note; terms last extended in the #40 PR) -->
+<!-- Updated on: 2026-07-16 (terms last extended in the #44 PR: findPivots) -->
 
 > **Lifecycle: dynamic — updated in Phase C of every PR.** When a PR introduces new symbols
 > or terms (module names, data-structure fields, paper notation newly used in code), add
@@ -103,6 +103,17 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
   in the same call: the paper's `≤` relaxation admits equal-sum re-relaxations (e.g.
   zero-weight cycles) that would loop forever, and with non-negative weights a settled
   vertex cannot strictly improve, so skipping it is loss-free.
+- **`findPivots(B, S, dHat, adjacency, k)`** (#44) — `src/findPivots.mjs`, Algorithm 1:
+  `k` rounds of Bellman-Ford out of the complete frontier `S`, relaxing the shared `dHat`
+  (`d̂[·]`) **in place**; `< B` gates membership in `W` only (the d̂ write is unconditional).
+  Returns `{ pivots, W }` (= the paper's `P, W`), with `|pivots| ≤ |W|/k`. Internal (not
+  re-exported from `index.mjs`).
+- **Early exit** (#44) — `findPivots`' first branch: as soon as `|W| > k·|S|` after a round,
+  return `pivots = S` — the frontier is already small relative to `W`.
+- **One-parent rule** (#44) — building the tight-edge forest `F`, each vertex accepts at
+  most one parent (the first tight edge in W-iteration order). Keeps tree sizes well-defined
+  when equal-length paths make `F` a DAG (tie caveat, #163). Corollary: vertices on a tight
+  (zero-weight) cycle all have parents, so none roots a tree and none can be a pivot.
 - **Benchmark harness** — `benchmarks/` (run via `npm run bench`): seeded graph
   **generators** + a `SCENARIOS` registry (sparse-random / dense-random / grid / chain /
   star), `timeMany` timing, and two benchmarks (adjacency-vs-scan, per-shape Dijkstra). Will
