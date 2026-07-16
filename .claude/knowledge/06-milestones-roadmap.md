@@ -1,7 +1,7 @@
 # 06 — Milestones Roadmap
 
-<!-- SYNCED-FROM-GITHUB: 2026-07-16 (Phase E after PR #181 merged; #43 closed, milestone
-     1.0.0 closed, 1.0.0 tagged + released) -->
+<!-- SYNCED-FROM-GITHUB: 2026-07-16 (post-1.0.0 reflection session: head-to-head measured,
+     #182 created + #170 baseline comment posted with explicit user pre-authorization) -->
 <!-- Current package version: 1.0.0 (tagged + released) -->
 
 Maps GitHub **milestones** and **issues** (Sirivasv/bmssp-js) to the paper's building blocks,
@@ -43,6 +43,9 @@ executes the approved ones — one confirmation each — and clears them from th
 _(All five #43-PR proposals — close milestone 1.0.0, tie findings into #163, baseline +
 scope into #170, re-scope #161, partial-coverage note into #162 — were approved and
 executed on GitHub in Phase E, 2026-07-16.)_
+_(2026-07-16 reflection session, user pre-authorized roadmap edits in-conversation: created
+**#182** (performance cliffs: star fanout + topLevel transition, milestone 1.2.0) and
+posted the measured head-to-head baseline + scope suggestion as a comment on **#170**.)_
 
 ---
 
@@ -58,6 +61,12 @@ executed on GitHub in Phase E, 2026-07-16.)_
   See `05-codebase-map.md` for the shipped API and the degenerate-tie guards.
 - **Next milestone:** **`1.1.0` — correctness hardening** (6 open issues). Recommended next
   issue: **#161** (fuzz suite — cheapest way to protect everything else), then #162, #163.
+- **2026-07-16 reflection session (post-release):** measured the BMSSP-vs-Dijkstra
+  head-to-head, algorithm time only → `benchmarks/HEAD-TO-HEAD.md`. Headlines: Dijkstra
+  wins wall-clock everywhere but the sparse ratio narrows with n (1.57× at 2M);
+  **comparison counts cross over at ~n = 1M sparse** (0.91× at 2M) — the paper's claim,
+  measured. Two pathologies found → new issue **#182** (milestone 1.2.0). Docs PR:
+  `docs/head-to-head-vs-dijkstra` (no version bump; closes no issue).
 
 ## Milestone `1.0.0` — issues → paper (CLOSED — all done)
 
@@ -102,9 +111,14 @@ Recommended order (cheapest protection first, then the deep work):
 | 168 | Adjacency and relaxation micro-optimizations | enhancement · help wanted |
 | 169 | Optional shortest-path reconstruction (`Pred[]` → paths) | enhancement · help wanted |
 | 170 | BMSSP-vs-Dijkstra benchmark comparison | enhancement · help wanted |
+| 182 | Investigate BMSSP performance cliffs: high-fanout (star) graphs and recursion-level transitions | enhancement · help wanted |
 
-_Note:_ the seeded **benchmark harness already exists** (`benchmarks/`, `npm run bench`);
-#170 is unblocked by #43 and carries a first baseline (recorded on the issue).
+_Note:_ the seeded **benchmark harness already exists** (`benchmarks/`, `npm run bench`),
+and the measured head-to-head lives in `benchmarks/HEAD-TO-HEAD.md`. #170 is now scoped to
+harness integration (algorithm-only `bmssp` column + optional comparison-count mode; full
+baseline recorded as a comment on the issue, 2026-07-16). #182 (new, 2026-07-16) carries
+the two measured pathologies: star-graph blowup (67.8× at n = 500k) and the `topLevel`
+3→4 transition cliff (5× at n = 4M); likely overlaps #167/#168.
 
 ## Milestone `2.0.0` (milestone #4) — API-breaking generalization
 

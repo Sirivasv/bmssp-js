@@ -2,8 +2,9 @@
 
 Deterministic, dependency-free micro-benchmarks for `bmssp-js`. They exist to
 (1) justify the adjacency map added in issue #45, and (2) stand up the harness
-that will drive the eventual **BMSSP vs. Dijkstra** comparison across graph
-shapes — the "when to use which" question.
+that drives the **BMSSP vs. Dijkstra** comparison across graph shapes — the
+"when to use which" question. The measured 1.0.0 head-to-head (wall-clock *and*
+comparison counts) lives in [`HEAD-TO-HEAD.md`](./HEAD-TO-HEAD.md).
 
 ## Running
 
@@ -26,6 +27,7 @@ warm-up run and the median of several iterations.
 | `adjacency.bench.mjs` | Adjacency map (#45) vs. linear edge scan |
 | `scenarios.bench.mjs` | Construct + Dijkstra timings per graph shape |
 | `run.mjs` | Runs everything, prints the report |
+| `HEAD-TO-HEAD.md` | Measured BMSSP-vs-Dijkstra results (1.0.0), methodology + tables |
 
 ---
 
@@ -53,11 +55,11 @@ whole algorithm. #45 is a prerequisite, not an optimization.
 ## Result 2 — graph-shape scenarios (Dijkstra baseline)
 
 `scenarios.bench.mjs` times construction (which now includes building the #45
-map) and one single-source Dijkstra run per shape. **Today
-`calculateShortestPaths` delegates to the Dijkstra oracle**, so this is a pure
-Dijkstra baseline — deliberately so. When the real BMSSP recursion lands
-(#40–#44) the same harness gains a second column and this table becomes the
-head-to-head.
+map) and one single-source Dijkstra run per shape — the Dijkstra baseline
+column of the head-to-head. The real BMSSP recursion landed in `1.0.0` (#43);
+integrating an algorithm-only `bmssp` column (and an optional comparison-count
+mode) into this harness is tracked in #170. The measured results so far are in
+[`HEAD-TO-HEAD.md`](./HEAD-TO-HEAD.md).
 
 The five shapes are chosen to stress the axes that separate the two algorithms:
 
@@ -71,30 +73,28 @@ The five shapes are chosen to stress the axes that separate the two algorithms:
 
 ---
 
-## When to use which (current guidance)
+## When to use which (measured guidance, 1.0.0)
 
-BMSSP's advantage is **asymptotic and narrow**. Its bound is
-`O(m · log^(2/3) n)` vs. Dijkstra's `O(m + n · log n)`, so it can only win where
-the `n · log n` sorting term actually dominates and `n` is enormous. Concretely:
+BMSSP's advantage is **asymptotic and narrow**: `O(m · log^(2/3) n)` vs.
+Dijkstra's `O(m + n · log n)`. With the full algorithm now functional, the
+question is measured rather than asserted — see
+[`HEAD-TO-HEAD.md`](./HEAD-TO-HEAD.md) for methodology and tables:
 
-- **Use Dijkstra (default, today):** essentially always in practice. It wins on
-  every graph size you can hold in memory in JS, on dense graphs (the `m` term
-  dominates and there is little sorting to save), on small/medium graphs, and
-  wherever you also want vertices emitted in sorted distance order. `bmssp-js`
-  itself uses Dijkstra as the oracle precisely because it is correct and fast.
-- **Where BMSSP is designed to win (theory):** very large, **sparse** directed
-  graphs (`m = O(n)`, the `sparse-random`/`grid` shapes) where the sorting
-  barrier — the `n · log n` term — is the bottleneck and you only need
-  distances, not their order. The crossover `n` is astronomically large;
-  independent studies find real speedups far smaller than theory and often
-  negative at practical sizes.
+- **Use Dijkstra for wall-clock speed:** it wins on every shape and size
+  measured so far (algorithm-only timing, ~1.6–2× faster on large sparse
+  graphs, more on dense/chain/star). `bmssp-js` itself uses Dijkstra as the
+  oracle precisely because it is correct and fast.
+- **BMSSP's asymptotics are real and visible:** on sparse graphs the wall-clock
+  gap narrows steadily with n (2.5× at 50k nodes → 1.57× at 2M), and in the
+  paper's own metric — comparisons between path lengths — **BMSSP does fewer
+  comparisons than Dijkstra from about n = 1M**, improving with size. The
+  sorting barrier is measurably broken; the remaining loss is constant factors.
 - **Shapes that blunt BMSSP's edge:** `dense-random` (relaxation-bound, nothing
-  to save), `chain` (depth, not sorting, is the cost — frontier tricks don't
-  help), and `star` (one node dominates degree; the frontier never gets wide).
+  to save), `chain` (depth, not sorting, is the cost), and `star` (extreme
+  fanout — currently a real performance defect, tracked in #182).
 
 **Bottom line for this repo:** BMSSP is implemented here for **correctness and
-readability** — a faithful, tested rendering of the 2025 result — not to beat
-Dijkstra on wall-clock time. Pick Dijkstra for real workloads; reach for BMSSP
-to study the algorithm or when you have a provably huge sparse instance and only
-need distances. These benchmarks make that trade-off measurable rather than
-asserted, and will show the real crossover (if any) once #43 is done.
+readability** — a faithful, tested rendering of the 2025 result. Pick Dijkstra
+for real workloads; reach for BMSSP to study the algorithm. The measured
+crossover in comparison counts (#170 tracks putting it in the harness) is the
+honest demonstration of the paper's claim.
