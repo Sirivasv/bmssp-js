@@ -1,67 +1,42 @@
 # Test Suite
 
-This directory contains the comprehensive test suite for the BMSSP (Bidirectional Multi-Source Shortest Path) JavaScript implementation.
+Jest tests for the BMSSP (**B**ounded **M**ulti-**S**ource **S**hortest **P**ath)
+implementation. The core contract everywhere: **for every node, BMSSP's distance must
+equal the Dijkstra oracle's** (`src/dijkstra.mjs`).
 
-## Overview
+## Principles
 
-The test suite includes:
-- Unit tests for core algorithm functions
-- Code coverage reports
+- **Everything is seeded.** No test uses unseeded randomness; every generated graph comes
+  from a fixed seed or a derived one that is printed in the failure message, so any red
+  run is reproducible by pinning that seed.
+- **No data files.** Graphs are generated on the fly by the seeded builders in
+  [`../benchmarks/generators.mjs`](../benchmarks/generators.mjs) (plus a few local
+  generators in `fuzz.test.mjs`). The suite runs in a few seconds.
 
-## Test Structure
+## Files
 
-### Unit Tests
-- **Location**: `main.test.mjs`
-- **Framework**: Jest
-- **Coverage**: Core algorithm functions, utility methods, error handling
+| File | Covers |
+| --- | --- |
+| `main.test.mjs` | `BMSSP` class contracts (constructor, `nodeIDs`, adjacency, `shortestPaths`, error handling) + full-map BMSSP-vs-Dijkstra equality on a seeded 10k-node sparse graph |
+| `bmssp.test.mjs` | Algorithm 3 recursion: parameter derivation, hand-built graphs, degenerate ties, the Lemma 3.1 bounded-call contract, seeded stress |
+| `fuzz.test.mjs` | High-volume property/fuzz suite (#161): 8 graph shapes × extreme weight regimes × multi-source bounded calls vs. per-source oracles, plus seeded scale runs (150k-node sparse, 300×300 grid, opt-in 2M) |
+| `findPivots.test.mjs` | Algorithm 1 (`FindPivots`) contracts incl. seeded oracle stress |
+| `baseCase.test.mjs` | Algorithm 2 (`BaseCase`) bounded mini-Dijkstra contracts |
+| `blockList.test.mjs` | Lemma 3.3 block-based partial-sort structure `D` |
+| `heap.test.mjs` | Indexed binary min-heap used by `BaseCase` |
 
-## Datasets
+## Running
 
-### California Road Network
-- **File**: `roadNet-CA.txt`
-- **Source**: [Stanford Network Analysis Project (SNAP)](https://snap.stanford.edu/data/roadNet-CA.html)
-- **Type**: Directed graph (each unordered pair of nodes is saved once)
-- **Statistics**:
-  - Nodes: 1,965,206
-  - Edges: 5,533,214
-- **Format**: Tab-separated values
-  - Column 1: FromNodeId
-  - Column 2: ToNodeId
-- **Description**: Large-scale road network from California state, ideal for testing shortest path algorithms on realistic transportation graphs.
+```bash
+npm test                                        # full suite + coverage (~3 s)
+FUZZ_ROUNDS=25 npm test -- test/fuzz.test.mjs   # multiply every fuzz round count
+FUZZ_XL=1 npm test -- test/fuzz.test.mjs        # add the 2M-node scale round (~30 s)
+```
 
-## Test Categories
+## Contributing to tests
 
-### 1. Core Algorithm Tests
-- BMSSP algorithm correctness
-- Bidirectional search functionality
-- Multi-source initialization
-- Path reconstruction
-
-### 2. Edge Cases
-- Empty graphs
-- Single node graphs
-- Disconnected components
-- Negative weights (if supported)
-
-### 3. Performance Tests
-- Large dataset processing
-- Memory efficiency
-- Scalability with different graph sizes
-
-## Benchmarking
-
-Performance benchmarks compare against standard Dijkstra's algorithm
-
-Metrics to be tracked:
-- Execution time
-- Memory consumption
-- Accuracy of results
-
-## Contributing to Tests
-
-When adding new tests:
-1. Follow existing naming conventions
-2. Include both positive and negative test cases
-3. Add performance tests for new algorithms
-4. Update documentation for new datasets
-5. Ensure tests pass linting requirements
+1. Seed everything; put the seed in the failure message.
+2. Include both positive and negative cases.
+3. New graph shapes belong in `benchmarks/generators.mjs` if benchmarks can reuse them,
+   or as local generators in `fuzz.test.mjs` if not.
+4. Ensure `npm run lint` passes.
