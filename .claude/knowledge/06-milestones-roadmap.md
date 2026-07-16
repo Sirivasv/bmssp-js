@@ -1,7 +1,7 @@
 # 06 — Milestones Roadmap
 
-<!-- SYNCED-FROM-GITHUB: 2026-07-16 (session-start reconciliation; PR #177 merged, #41 closed) -->
-<!-- Current package version: 0.17.0 (tagged + released) -->
+<!-- SYNCED-FROM-GITHUB: 2026-07-16 (RKB after #40 implementation; PR #178 open, bump to 0.18.0 riding in it) -->
+<!-- Current released version: 0.17.0; 0.18.0 bumped in open PR #178 (tag+release after merge) -->
 
 Maps GitHub **milestones** and **issues** (Sirivasv/bmssp-js) to the paper's building blocks,
 with a dependency-aware build order. This is the "intent" side of the knowledge base (what to
@@ -128,6 +128,14 @@ open. See the tables above.
 
 _Note:_ the seeded **benchmark harness already landed early** with #45 (`benchmarks/`,
 `npm run bench`); #170 just adds the BMSSP column once #43 is done.
+
+_RKB 2026-07-16 (post #40) — issue bodies updated on GitHub:_ #44 rewritten as a full
+FindPivots spec (signature mirroring `baseCase`, early exit, tight-edge forest, tie caveat,
+test plan); #43 gained the concrete wiring contract (baseCase/BlockList APIs, `k`/`t`
+derivation, workload guard, definition of done); #163 gained the two tie manifestations
+found in #40 (settled-vertex guard vs zero-weight cycles; forest-DAG ambiguity in
+FindPivots); #169 noted that `Pred[]` must be wired into all three relaxation sites.
+Milestone slicing unchanged — 1.0.0 (#44 → #43 after #40 merges) still the right shape.
 
 _RKB 2026-07-15 (post #42/#41) — issue bodies updated on GitHub:_ #167 widened to both
 BlockList shortcuts (bound index **and** sort-based median selection); #168 widened with the
