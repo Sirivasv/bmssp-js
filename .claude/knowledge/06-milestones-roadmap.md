@@ -1,8 +1,8 @@
 # 06 — Milestones Roadmap
 
-<!-- SYNCED-FROM-GITHUB: 2026-07-16 (post-1.0.0 reflection session: head-to-head measured,
-     #182 created + #170 baseline comment posted with explicit user pre-authorization) -->
-<!-- Current package version: 1.0.0 (tagged + released) -->
+<!-- SYNCED-FROM-GITHUB: 2026-07-16 (Phase A of the #161 session: GitHub matched this file
+     exactly; Phase C update inside the test/161-property-fuzz-suite PR) -->
+<!-- Current package version: 1.0.1 (bumped in the #161 PR; 1.0.0 is the latest release) -->
 
 Maps GitHub **milestones** and **issues** (Sirivasv/bmssp-js) to the paper's building blocks,
 with a dependency-aware build order. This is the "intent" side of the knowledge base (what to
@@ -38,29 +38,39 @@ it runs the same Phase C reconciliation directly on `main`.
 
 ## 📋 Roadmap proposals (pending user approval)
 
-_None right now. Phase C writes proposed GitHub edits here (and in the PR body); Phase E
-executes the approved ones — one confirmation each — and clears them from this list._
-_(All five #43-PR proposals — close milestone 1.0.0, tie findings into #163, baseline +
-scope into #170, re-scope #161, partial-coverage note into #162 — were approved and
-executed on GitHub in Phase E, 2026-07-16.)_
-_(2026-07-16 reflection session, user pre-authorized roadmap edits in-conversation: created
-**#182** (performance cliffs: star fanout + topLevel transition, milestone 1.2.0) and
-posted the measured head-to-head baseline + scope suggestion as a comment on **#170**.)_
+From the #161 PR (test/161-property-fuzz-suite), 2026-07-16:
+
+1. **Comment on #163** documenting the fourth tie manifestation, fuzz-found at seed
+   163066: through the stall escape hatch, a bounded **partial** execution can return a
+   vertex whose true distance **equals** the returned `B'` — Lemma 3.1's strict
+   `d(v) < B'` only holds under Assumption 2.1. The honest internal contract under ties
+   is `d(v) ≤ B'` (completeness below `B'` stays strict). A principled tie-break (#163's
+   goal) would restore the strict form.
+2. **Comment on #162** noting partial coverage from #161: the fuzz suite now generates
+   disconnected forests (2–6 components) and checks unreachable-stays-Infinity across
+   random sources and shapes every run. #162's remaining value is small deterministic
+   hand-built edge cases (isolated source, single-node components, empty adjacency) —
+   or closing it as covered if that residue isn't worth an issue.
+
+_(Earlier batches — the five #43-PR proposals and the two reflection-session edits
+(#182 created, #170 baseline comment) — were all approved and executed on GitHub in
+Phase E, 2026-07-16.)_
 
 ---
 
 ## Current state (as synced)
 
-- **Package version:** `1.0.0` — **tagged + released** (2026-07-16; publish.yml fired →
-  npm + Docker Hub). The major bump for closing the `1.0.0` milestone.
+- **Package version:** `1.0.1` — bumped in the in-flight #161 PR (**patch** per the
+  post-1.0 cadence below). Latest release: `1.0.0` (2026-07-16, npm + Docker Hub).
 - **Milestone `1.0.0`:** **closed on GitHub** — all 11 issues done. The algorithm is
   functional end-to-end.
-- **Just merged:** **#43 — `BMSSP(l, B, S)` main recursion (Algorithm 3) — PR #181**
-  (squash commit `909a606`). `calculateShortestPaths` runs the paper's method end-to-end
-  (no Dijkstra delegation); the "BMSSP vs Dijkstra" test passes on the full road network.
-  See `05-codebase-map.md` for the shipped API and the degenerate-tie guards.
-- **Next milestone:** **`1.1.0` — correctness hardening** (6 open issues). Recommended next
-  issue: **#161** (fuzz suite — cheapest way to protect everything else), then #162, #163.
+- **In flight:** **#161 — property/fuzz suite — PR branch `test/161-property-fuzz-suite`**
+  (done pending merge). `test/fuzz.test.mjs`: 8 graph shapes × extreme weight regimes ×
+  multi-source bounded `bmssp()` fuzzing vs. per-source oracles, seeds reported on
+  failure, `FUZZ_ROUNDS` multiplier. Found + documented the fourth tie deviation
+  (boundary-tied return, see proposals above).
+- **Milestone `1.1.0` — correctness hardening** (in progress). After #161: **#162**
+  (edge-case tests — partially covered by the fuzz suite, see proposals), then #163.
 - **2026-07-16 reflection session (post-release):** measured the BMSSP-vs-Dijkstra
   head-to-head, algorithm time only → `benchmarks/HEAD-TO-HEAD.md`. Headlines: Dijkstra
   wins wall-clock everywhere but the sparse ratio narrows with n (1.57× at 2M);
@@ -94,11 +104,11 @@ posted the measured head-to-head baseline + scope suggestion as a comment on **#
 
 Recommended order (cheapest protection first, then the deep work):
 
-| Order | # | Issue | Labels | Notes after #43 |
+| Order | # | Issue | Labels | Notes |
 |---|---|---|---|---|
-| 1 | 161 | Property/fuzz tests: BMSSP vs Dijkstra on random graphs | enhancement · help wanted | Extend the seeded stress already in `test/bmssp.test.mjs` (re-scope noted on the issue) |
-| 2 | 162 | Edge-case tests: disconnected graphs and unreachable nodes | enhancement · help wanted | Partially covered by #43 tests (noted on the issue) |
-| 3 | 163 | Deterministic tie-breaking for equal-length paths (Assumption 2.1) | enhancement · help wanted | Three concrete manifestations found in #43 (documented on the issue) |
+| 1 | 161 | Property/fuzz tests: BMSSP vs Dijkstra on random graphs | enhancement · help wanted | ✅ done pending merge (this PR, 1.0.1) |
+| 2 | 162 | Edge-case tests: disconnected graphs and unreachable nodes | enhancement · help wanted | Largely covered by #43 + #161 fuzz (disconnected forests); see proposals |
+| 3 | 163 | Deterministic tie-breaking for equal-length paths (Assumption 2.1) | enhancement · help wanted | Four concrete manifestations now: three from #43, boundary-tied return from #161 |
 | 4 | 165 | Input validation for the BMSSP constructor | good first issue · help wanted | — |
 | 5 | 164 | Optional constant-degree transform (in/out-degree ≤ 2) | enhancement · help wanted | — |
 | 6 | 166 | JSDoc / API docs for the new modules | documentation · good first issue | `bmssp()` / `deriveParameters()` ship with JSDoc already |
@@ -138,10 +148,12 @@ returning `{ bound, vertices }` sensibly) rather than new algorithm work.
 
 Closing an issue bumps the package version and, after the PR merges, ships a release:
 
-1. **In the PR that closes the issue** — `npm version minor --no-git-tag-version` (keeps
-   `package.json` + `package-lock.json` in sync; historical cadence is a **minor** `0.N.0`
-   bump per issue). **The #43 PR used `npm version major`** — the `1.0.0` milestone close is
-   the major bump, per convention.
+1. **In the PR that closes the issue** — `npm version patch --no-git-tag-version` (keeps
+   `package.json` + `package-lock.json` in sync). **Post-1.0 cadence (user-confirmed
+   2026-07-16, first applied in the #161 PR):** a **patch** bump per closed issue; the PR
+   closing a milestone's **last** issue bumps **minor** (or **major** for `2.0.0`) so
+   released versions land exactly on the milestone names (`1.1.0`, `1.2.0`, `2.0.0`).
+   (Pre-1.0 history: one minor per issue; the #43 PR's `major` closed milestone `1.0.0`.)
 2. **After the user confirms the merge** — tag `main` with the bare version (no `v` prefix)
    and `gh release create` it; publishing the release fires `publish.yml` → **npm + Docker
    Hub**.

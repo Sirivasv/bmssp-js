@@ -1,7 +1,7 @@
 # 07 — Glossary
 
-<!-- Updated on: 2026-07-16 (terms last extended in the docs/head-to-head-vs-dijkstra PR:
-     measured head-to-head terms) -->
+<!-- Updated on: 2026-07-16 (terms last extended in the #161 PR: fuzz-suite terms +
+     the boundary-tied-return tie caveat) -->
 
 > **Lifecycle: dynamic — updated in Phase C of every PR.** When a PR introduces new symbols
 > or terms (module names, data-structure fields, paper notation newly used in code), add
@@ -141,6 +141,21 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
 - **Boundary-tied re-queue** (#43) — an `Si` member left at `d̂ == Bi < B` after the child
   returns re-enters `D` via a regular `insert` (the paper's `[Bi', Bi)` band would silently
   drop it). Tie caveat, #163.
+- **Boundary-tied return** (#161) — under ties, a bounded **partial** `bmssp()` execution
+  can return a vertex with `d(v) == B'` (via the stall escape hatch); Lemma 3.1's strict
+  `d(v) < B'` holds only under Assumption 2.1. Internal contract under ties: returned
+  vertices satisfy `d(v) ≤ B'`, completeness below `B'` stays strict. Tie caveat, #163;
+  fuzz-found at seed 163066.
+- **Fuzz suite** (#161) — `test/fuzz.test.mjs`: high-volume seeded property tests. Full-map
+  oracle equality across 8 graph shapes and 4 extreme weight regimes, plus direct
+  multi-source bounded `bmssp(topLevel, B, S)` checks against per-source Dijkstra oracles
+  (`trueDist(v) = min_s(d0[s] + dist_s(v))`). Failure messages carry the round's seed.
+- **`FUZZ_ROUNDS`** (#161) — environment variable multiplying every fuzz round count
+  (default 1). `FUZZ_ROUNDS=25 npm test -- test/fuzz.test.mjs` runs several thousand
+  graphs in ~5 s.
+- **Dyadic-float regime** (#161) — fuzz weight regime using multiples of `1/256` (dyadic
+  rationals) of bounded magnitude: every path sum is exact in float64, so float-weight
+  testing keeps bit-exact oracle equality instead of needing tolerances.
 - **Benchmark harness** — `benchmarks/` (run via `npm run bench`): seeded graph
   **generators** + a `SCENARIOS` registry (sparse-random / dense-random / grid / chain /
   star), `timeMany` timing, and two benchmarks (adjacency-vs-scan, per-shape Dijkstra). Will

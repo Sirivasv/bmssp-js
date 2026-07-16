@@ -1,13 +1,11 @@
 # 05 — Codebase Map (current state)
 
-<!-- BOOKMARK-COMMIT: 909a606ba7b455e6d20211d02cfbaa4778648333 -->
-<!-- PENDING-PR-BRANCH: docs/head-to-head-vs-dijkstra -->
-<!-- Last validated: 2026-07-16, reflection session after the 1.0.0 release. This map
-     describes the tree of the docs/head-to-head-vs-dijkstra branch (docs-only PR: the
-     measured BMSSP-vs-Dijkstra head-to-head in benchmarks/HEAD-TO-HEAD.md + README/KB
-     refresh; no code behavior change, no version bump — closes no issue). The branch also
-     carries the earlier Phase E bookkeeping commit c54ad76 that branch protection kept
-     off origin/main. -->
+<!-- BOOKMARK-COMMIT: 29de94bba02bf5ce6d342ace5a179660ead0a547 -->
+<!-- PENDING-PR-BRANCH: test/161-property-fuzz-suite -->
+<!-- Last validated: 2026-07-16, inside the #161 PR (high-volume property/fuzz suite,
+     version 1.0.0 → 1.0.1). This map describes the tree of the
+     test/161-property-fuzz-suite branch: new test/fuzz.test.mjs (15 tests), no src/
+     changes. Also carries the session-start marker flip after PR #183 merged. -->
 
 Snapshot of what exists in `bmssp-js` today, so you know what to build on vs. what's missing.
 
@@ -65,7 +63,8 @@ src/
   findPivots.mjs          # #44: FindPivots(B, S) — Algorithm 1 frontier shrink
 test/
   main.test.mjs           # Jest tests: constructor, nodeIDs, adjacency, shortestPaths, BMSSP-vs-Dijkstra (roadNet-CA)
-  bmssp.test.mjs          # NEW (#43): 15 recursion tests — params, hand graphs, ties, Lemma 3.1 contract, seeded stress
+  bmssp.test.mjs          # #43: 15 recursion tests — params, hand graphs, ties, Lemma 3.1 contract, seeded stress
+  fuzz.test.mjs           # NEW (#161): 15 high-volume fuzz tests — shapes × weight regimes × multi-source; FUZZ_ROUNDS env multiplier
   blockList.test.mjs      # #42: 18 BlockList tests incl. a seeded random stress test
   heap.test.mjs           # #41: 16 MinHeap tests incl. a seeded stress test vs. a naive queue
   baseCase.test.mjs       # #40: 13 BaseCase tests incl. seeded oracle-comparison stress
@@ -136,6 +135,13 @@ zero-weight edges) occur; all are covered by tests in `test/bmssp.test.mjs`:
    each batch member is settled with an uncapped `baseCase` run bounded by `Bi` — correct,
    just not sublinear. Boundary-tied `Si` members (`d̂ == Bi < B`) re-enter `D` via a regular
    insert rather than being dropped.
+4. **Boundary-tied return (fuzz-found in #161, seed 163066):** through the escape hatch, a
+   bounded **partial** execution can return a vertex whose true distance **equals** the
+   returned `B'` (the paper's Lemma 3.1 states strict `d(v) < B'`, but that strictness
+   assumes Assumption 2.1). Returning it is required — it is complete and the parent must
+   relax out of it; dropping it would re-queue the same batch forever. Callers of
+   `bmssp(l, B, S)` must treat the returned-vertex contract as `d(v) ≤ B'` under ties
+   (the completeness direction stays strict: every `v` with `d(v) < B'` is returned).
 
 **Performance (measured 2026-07-16, Apple Silicon, node v26.5.0 — full data + methodology
 in `benchmarks/HEAD-TO-HEAD.md`):** algorithm-only wall-clock (construction excluded,
@@ -254,7 +260,18 @@ implementation is tested against — and, since #43, no longer part of the BMSSP
 - `test/blockList.test.mjs` (18), `test/heap.test.mjs` (16), `test/baseCase.test.mjs` (13),
   `test/findPivots.test.mjs` (12): per-module contracts incl. seeded stress — see the
   module sections above.
-- Current suite: **86 tests, all passing**, 100% statement coverage.
+- `test/fuzz.test.mjs` (15, NEW in #161): the high-volume property/fuzz suite. Full-map
+  oracle equality across 8 shapes (the 5 benchmark generators reused, plus local random-DAG,
+  disconnected-forest and uniform-multigraph generators; 2 sources per graph; a
+  thousands-of-nodes round), 4 extreme weight regimes (all-zero, zero-or-huge, tiny-int
+  0–2, dyadic floats — multiples of 1/256 so every path sum is exact in float64 and oracle
+  equality stays bit-exact), and direct multi-source `bmssp(topLevel, B, S)` fuzzing:
+  random source sets (1–4) with initial distances, ground truth = per-source Dijkstra
+  oracles (`trueDist(v) = min_s(d0[s] + dist_s(v))`), checking the Lemma 3.1 contract for
+  bounded (incl. boundary-tie `B` choices) and unbounded calls. Every failure message
+  carries the round's seed for reproduction. **`FUZZ_ROUNDS=<x>`** multiplies all round
+  counts (default 1 ≈ 0.5 s; 25 ≈ 5 s, several thousand graphs).
+- Current suite: **101 tests, all passing**, 100% statement coverage.
 
 Graph data: `roadNet-CA.txt` is a large real directed road network; edge weights are assigned
 a random integer in `[1, 1e8]` at load time (so weights differ per run, but BMSSP and Dijkstra
@@ -279,7 +296,8 @@ comparison-count mode); the raw baseline is also on #170 as a comment.
 | Binary min-heap module | `src/heap.mjs` | #41 | ✅ done (PR #177) |
 | Base case (bounded Dijkstra) | `src/baseCase.mjs` | #40 | ✅ done (PR #178) |
 | FindPivots | `src/findPivots.mjs` | #44 | ✅ done (PR #180) |
-| Main `BMSSP(l, B, S)` recursion + `k,t` derivation | `src/bmssp.mjs` | #43 | ✅ done (this PR) — **1.0.0 milestone complete** |
+| Main `BMSSP(l, B, S)` recursion + `k,t` derivation | `src/bmssp.mjs` | #43 | ✅ done (PR #181) — **1.0.0 milestone complete** |
+| Property/fuzz suite vs. the oracle | `test/fuzz.test.mjs` | #161 | ✅ done (this PR, 1.0.1) |
 
-**The 1.0.0 milestone is done once this PR merges.** Next work comes from milestone `1.1.0`
-(correctness hardening) — see [06-milestones-roadmap.md](06-milestones-roadmap.md).
+Milestone `1.1.0` (correctness hardening) is in progress: #161 lands with this PR; next up
+are #162, #163 — see [06-milestones-roadmap.md](06-milestones-roadmap.md).

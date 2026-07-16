@@ -93,9 +93,10 @@ existing APIs to build on. Ship focused unit tests with every piece. Before Phas
 
 **Run this on the feature branch, before opening any PR. Do not wait to be asked.**
 
-1. **Version bump** (only if the PR closes an issue — see "Version bump & release" below):
+1. **Version bump** (only if the PR closes an issue — see "Version bump & release" below
+   for which of patch/minor/major applies):
    ```bash
-   npm version minor --no-git-tag-version
+   npm version patch --no-git-tag-version
    ```
 2. **Rewrite `05`** to describe the tree **as it will exist once this PR merges** (the
    branch's own tree). Set the `PENDING-PR-BRANCH:` marker to the feature branch name and
@@ -160,11 +161,13 @@ changes deploy Pages via `static.yml` — no action needed for those.)
 hand-edit:
 
 ```bash
-npm version minor --no-git-tag-version   # e.g. 0.18.0 → 0.19.0
+npm version patch --no-git-tag-version   # e.g. 1.0.0 → 1.0.1
 ```
 
-Convention: one **minor** bump (`0.N.0`) per closed issue while pre-1.0, unless the user
-directs otherwise (the `1.0.0` milestone close is the `major` bump).
+Convention (post-1.0, user-confirmed 2026-07-16): one **patch** bump per closed issue; the
+PR that closes a milestone's **last** issue bumps **minor** instead (`major` for the
+`2.0.0` milestone), so released versions land exactly on the milestone names. Deviate only
+when the user directs otherwise.
 
 **Phase 2 — tag + release, only after the user confirms the merge:**
 
