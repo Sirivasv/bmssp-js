@@ -1,7 +1,7 @@
 # 06 — Milestones Roadmap
 
-<!-- SYNCED-FROM-GITHUB: 2026-07-15 (session-start reconciliation; PR #175 merged, #42 closed) -->
-<!-- Current package version: 0.16.0 (tagged + released) -->
+<!-- SYNCED-FROM-GITHUB: 2026-07-16 (RKB after #40 implementation; PR #178 open, bump to 0.18.0 riding in it) -->
+<!-- Current released version: 0.17.0; 0.18.0 bumped in open PR #178 (tag+release after merge) -->
 
 Maps GitHub **milestones** and **issues** (Sirivasv/bmssp-js) to the paper's building blocks,
 with a dependency-aware build order. This is the "intent" side of the knowledge base (what to
@@ -36,22 +36,23 @@ build next); `05-codebase-map.md` is the "reality" side (what exists now).
 
 ## Current state (as synced)
 
-- **Package version:** `0.16.0` (pre-1.0; the algorithm is not yet functional end-to-end).
-  The `0.16.0` tag + GitHub Release are published (npm + Docker Hub CD fired).
+- **Package version:** `0.17.0` (pre-1.0; the algorithm is not yet functional end-to-end).
+  The `0.17.0` tag + GitHub Release are published (npm + Docker Hub CD fired).
 - **Active milestone:** **`1.0.0` — "Have a first functional version of the whole algorithm."**
-  - GitHub progress: **7 closed / 4 open** issues (PR #175 merged, so #42 now counts closed).
-  - The 4 open issues (#40, #41, #43, #44) are the remaining algorithm pieces from §02–§03.
-- **Just merged:** **#42 — Lemma 3.3 BlockList — PR #175 is now on `main`** (commit `3cca82a`).
-  See `05-codebase-map.md` for the shipped `src/blockList.mjs` API (`insert` / `batchPrepend` /
-  `pull`) and its documented shortcuts (array bound index → #167).
+  - GitHub progress: **8 closed / 3 open** issues (PR #177 merged, so #41 now counts closed).
+  - The 3 open issues (#40, #43, #44) are the remaining algorithm pieces from §02–§03.
+- **Just merged:** **#41 — indexed binary MinHeap — PR #177 is now on `main`** (commit
+  `7e36afc`). See `05-codebase-map.md` for the shipped `src/heap.mjs` API
+  (`insert` / `extractMin` / `decreaseKey` / `has` / `peekMin`). With #41 done, **#40
+  (BaseCase) is fully unblocked** — both its dependencies (#41 heap, #45 adjacency) are in.
 
 ## Milestone `1.0.0` — issues → paper
 
 | # | Title | What it is (paper) | Labels | Depends on | Status |
 |---|---|---|---|---|---|
 | **45** | Add a map of arrays for edges of each node | Adjacency map so edge lookups aren't O(m). §05 | help wanted · good first issue | — | ✅ merged (PR #160) |
-| **41** | Implement a priority heap | Binary min-heap for the base case (Alg 2). §03-A | help wanted · good first issue | — | ⬜ open |
-| **40** | Implement the base case of the bmssp algorithm | `BaseCase(B, S)` bounded mini-Dijkstra. **Alg 2**, §02 | help wanted | #41 | ⬜ open |
+| **41** | Implement a priority heap | Binary min-heap for the base case (Alg 2). §03-A | help wanted · good first issue | — | ✅ merged (PR #177) |
+| **40** | Implement the base case of the bmssp algorithm | `BaseCase(B, S)` bounded mini-Dijkstra. **Alg 2**, §02 | help wanted | #41 | 🔶 PR open |
 | **42** | Implement Lema 3.3 data structure | Block-based partial-sort list `D`. **Lemma 3.3**, §03-B | help wanted | — | ✅ merged (PR #175) |
 | **44** | Implement the findingPivots function | `FindPivots(B, S)` frontier shrink. **Alg 1**, §02 | help wanted | #45 (helpful) | ⬜ open |
 | **43** | Implement main bmssp algorithm | `BMSSP(l, B, S)` recursion + `k,t`. **Alg 3**, §02 | help wanted | #40, #42, #44 | ⬜ open |
@@ -66,7 +67,7 @@ build next); `05-codebase-map.md` is the "reality" side (what exists now).
 Leaves first; two independent tracks converge on the main recursion:
 
 ```
-Track A (base case):     #45 adjacency map ─┬─▶ #41 heap ─▶ #40 BaseCase ─┐   (#45 ✅ done)
+Track A (base case):     #45 adjacency map ─┬─▶ #41 heap ─▶ #40 BaseCase ─┐   (#45 ✅, #41 ✅)
 Track B (recursion core):    (✅ done)       └─▶ #44 FindPivots ───────────┼─▶ #43 BMSSP main
                                                 #42 BlockList (✅ done) ───┘
 ```
@@ -75,9 +76,10 @@ Track B (recursion core):    (✅ done)       └─▶ #44 FindPivots ───
    + `getEdges()`, built in the constructor. Unblocks #40 and #44.
 2. ~~**#42** block-list `D`~~ — ✅ **done (PR #175):** `src/blockList.mjs` + 18 tests
    (§03-B contracts incl. seeded stress). Bound index is a sorted array for now (#167).
-3. **#41** binary min-heap — 🔶 **PR open:** `src/heap.mjs` indexed `MinHeap`
-   (insert/extractMin/decreaseKey/has) + 16 tests; bump to 0.17.0. Unblocks #40 once merged.
-4. **#40** BaseCase — needs #41 (+ #45 ✅). Test vs. a plain bounded Dijkstra from `x`.
+3. ~~**#41** binary min-heap~~ — ✅ **done (PR #177):** `src/heap.mjs` indexed `MinHeap`
+   (insert/extractMin/decreaseKey/has) + 16 tests; version 0.17.0 released. Unblocks #40.
+4. **#40** BaseCase — 🔶 **PR open:** `src/baseCase.mjs` `baseCase(B, S, dHat, adjacency, k)`
+   + 13 tests (incl. seeded oracle stress); bump to 0.18.0. Unblocks the level-0 leg of #43.
 5. **#44** FindPivots — needs relaxation + adjacency (#45 ✅). Test both branches (`|W|>k|S|`
    and forest roots).
 6. **#43** BMSSP main — wires #40+#42+#44 with `k`/`t`; replaces the Dijkstra delegation in
@@ -103,8 +105,8 @@ Clamp `k`,`t` to `≥ 1` for tiny graphs; correctness must not depend on the asy
 > GitHub going forward.
 
 ### `1.0.0` (milestone #1) — first end-to-end functional BMSSP
-Issues #40–#45. #45 done (PR #160), #42 done (PR #175); #40, #41, #43, #44 open. See the
-tables above.
+Issues #40–#45. #45 done (PR #160), #42 done (PR #175), #41 done (PR #177); #40, #43, #44
+open. See the tables above.
 
 ### `1.1.0` (milestone #2) — correctness hardening
 | # | Issue | Labels |
@@ -126,6 +128,14 @@ tables above.
 
 _Note:_ the seeded **benchmark harness already landed early** with #45 (`benchmarks/`,
 `npm run bench`); #170 just adds the BMSSP column once #43 is done.
+
+_RKB 2026-07-16 (post #40) — issue bodies updated on GitHub:_ #44 rewritten as a full
+FindPivots spec (signature mirroring `baseCase`, early exit, tight-edge forest, tie caveat,
+test plan); #43 gained the concrete wiring contract (baseCase/BlockList APIs, `k`/`t`
+derivation, workload guard, definition of done); #163 gained the two tie manifestations
+found in #40 (settled-vertex guard vs zero-weight cycles; forest-DAG ambiguity in
+FindPivots); #169 noted that `Pred[]` must be wired into all three relaxation sites.
+Milestone slicing unchanged — 1.0.0 (#44 → #43 after #40 merges) still the right shape.
 
 _RKB 2026-07-15 (post #42/#41) — issue bodies updated on GitHub:_ #167 widened to both
 BlockList shortcuts (bound index **and** sort-based median selection); #168 widened with the

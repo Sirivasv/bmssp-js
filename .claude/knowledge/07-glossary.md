@@ -1,6 +1,6 @@
 # 07 — Glossary
 
-<!-- Updated on: RKB 2026-07-15 (added #42 BlockList and #41 MinHeap code terms) -->
+<!-- Updated on: 2026-07-16, in the #40 PR (added the baseCase code terms) -->
 
 > **Lifecycle: dynamic — updated on `RKB`.** This glossary is refreshed on the on-demand
 > `revitalize_knowledge_base` (`RKB`) command (see `../CLAUDE.md`). When code or the roadmap
@@ -95,6 +95,14 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
 - **Indexed vs. lazy heap** — `MinHeap` is the paper-literal *indexed* variant (true
   `DecreaseKey`); `src/dijkstra.mjs` internally uses the *lazy* variant (push duplicates,
   skip stale pops). Both are correct; §03-A discusses the trade-off.
+- **`baseCase(B, S, dHat, adjacency, k)`** (#40) — `src/baseCase.mjs`, Algorithm 2:
+  bounded mini-Dijkstra from the singleton complete source in `S`, settling at most `k+1`
+  vertices, relaxing the shared `dHat` (`d̂[·]`) **in place**. Returns `{ bound, vertices }`
+  (= the paper's `B', U`). Internal (not re-exported from `index.mjs`).
+- **Settled-vertex guard** (#40) — `baseCase` never re-inserts a vertex it already settled
+  in the same call: the paper's `≤` relaxation admits equal-sum re-relaxations (e.g.
+  zero-weight cycles) that would loop forever, and with non-negative weights a settled
+  vertex cannot strictly improve, so skipping it is loss-free.
 - **Benchmark harness** — `benchmarks/` (run via `npm run bench`): seeded graph
   **generators** + a `SCENARIOS` registry (sparse-random / dense-random / grid / chain /
   star), `timeMany` timing, and two benchmarks (adjacency-vs-scan, per-shape Dijkstra). Will

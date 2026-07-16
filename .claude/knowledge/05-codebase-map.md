@@ -1,13 +1,13 @@
 # 05 — Codebase Map (current state)
 
-<!-- BOOKMARK-COMMIT: 3cca82a35595f97a9c7b2420af55772ae95eed8a -->
+<!-- BOOKMARK-COMMIT: 7e36afc63828ccefea4db037c0d506d28ae3100a -->
 <!-- BOOKMARK-BRANCH: main -->
-<!-- Last validated after pulling main. PR #175 (feat(#42) Lemma 3.3 BlockList) is MERGED:
-     adds src/blockList.mjs + test/blockList.test.mjs and bumps the version to 0.16.0
-     (tagged + released; publish.yml fired). #42 is closed — remaining 1.0.0 issues are
-     #40, #41, #43, #44.
-     Pending: PR for #41 (feat: src/heap.mjs indexed MinHeap + tests, bump to 0.17.0) is
-     OPEN — re-stamp the bookmark once merged. -->
+<!-- Last validated 2026-07-16 after pulling main. PR #177 (feat(#41) indexed MinHeap) is
+     MERGED: src/heap.mjs + test/heap.test.mjs are on main and the version is 0.17.0
+     (tagged + released 2026-07-15; publish.yml fired). #41 is closed — remaining 1.0.0
+     issues are #40, #43, #44.
+     Pending: PR for #40 (feat: src/baseCase.mjs BaseCase(B, S) + tests, bump to 0.18.0)
+     is OPEN — re-stamp the bookmark once merged. -->
 <!-- Update both the comment and the body when HEAD moves. -->
 
 Snapshot of what exists in `bmssp-js` today, so you know what to build on vs. what's missing.
@@ -46,10 +46,12 @@ src/
   dijkstra.mjs            # reference Dijkstra (array binary-heap) — DONE, used as oracle
   blockList.mjs           # NEW (#42, PR #175): Lemma 3.3 block-based partial-sort structure D
   heap.mjs                # NEW (#41): indexed binary min-heap (MinHeap) for BaseCase (Alg 2)
+  baseCase.mjs            # NEW (#40): BaseCase(B, S) — Algorithm 2 bounded mini-Dijkstra
 test/
   main.test.mjs           # Jest tests: constructor, nodeIDs, adjacency map, shortestPaths, BMSSP-vs-Dijkstra
   blockList.test.mjs      # NEW (#42): 18 BlockList tests incl. a seeded random stress test
   heap.test.mjs           # NEW (#41): 16 MinHeap tests incl. a seeded stress test vs. a naive queue
+  baseCase.test.mjs       # NEW (#40): 13 BaseCase tests incl. seeded oracle-comparison stress
   roadNet-CA.txt          # real road-network edge list (SNAP roadNet-CA), weights randomized at load
   README.md
 benchmarks/               # NEW (#45 PR): dependency-free benchmark harness, `npm run bench`
@@ -143,6 +145,26 @@ variant `src/dijkstra.mjs` uses internally. An extracted key may be re-inserted 
 16 tests in `test/heap.test.mjs` (contracts, ordering, decreaseKey, the BaseCase
 insert-or-decrease relaxation pattern, seeded stress vs. a naive linear-scan queue).
 
+## `src/baseCase.mjs` — `BaseCase(B, S)`, Algorithm 2 (#40)
+
+```js
+baseCase(B, S, dHat, adjacency, k)  // → { bound, vertices }
+// B         : strict distance upper bound (Infinity OK)
+// S         : singleton Set holding the complete source x (throws otherwise)
+// dHat      : Map<nodeId, number> — the global d̂[·]; RELAXED IN PLACE
+// adjacency : Map<nodeId, [to, weight][]> — the class's this.adjacency
+// k         : settle cap >= 1 (floored); throws otherwise
+export { baseCase };     // NOT re-exported from index.mjs — internal to the algorithm
+```
+
+Bounded mini-Dijkstra from `x` on the `MinHeap`, stopping after settling `k+1` vertices.
+Full success (heap exhausted at ≤ k settled) → `{ bound: B, vertices: U0 }`; partial (cap
+hit) → `bound` = max settled `d̂`, `vertices` = the strictly-closer ones. Relaxation uses
+the paper's `≤` + `< B` test, with one guard: a vertex already settled **in this call** is
+never re-inserted into the heap (an equal-sum relaxation — e.g. a zero-weight cycle — would
+otherwise loop forever; with non-negative weights a settled vertex cannot strictly improve,
+so nothing is lost). Callers wire it as `Bi', Ui ← BaseCase(Bi, Si)` at level 0 of #43.
+
 ## `src/dijkstra.mjs` — the oracle (already done)
 
 `dijkstra(graph, nodeIDs, source) → Map<nodeId, distance>`. Standard array binary min-heap
@@ -161,7 +183,12 @@ implementation is tested against. Reuse its heap style / adjacency-list building
 - **Key one:** "BMSSP vs Dijkstra" — for a fixed source, `myBMSSP.shortestPaths` must equal
   `dijkstra(...)` for every node. **Any real BMSSP implementation must keep this passing.**
 - Current suite: **12 tests in `main.test.mjs` + 18 in `blockList.test.mjs` + 16 in
-  `heap.test.mjs`, all passing.**
+  `heap.test.mjs` + 13 in `baseCase.test.mjs`, all passing (59).**
+- **BaseCase (#40):** validation (k, singleton S, complete source), full-success vs. finite/
+  infinite B, partial k+1-cap boundary reporting (incl. ties excluded by the strict filter),
+  zero-weight-cycle termination, and two seeded stress tests checking the Algorithm 2
+  contract against the Dijkstra oracle (exact distances, completeness below B', d̂ never
+  underestimates).
 - **BlockList (#42):** init validation, `value < B` enforcement, drain-pull returns bound `B`,
   batch-sorted pulls of the M smallest, separator invariant, smallest-value-wins dedupe
   (insert and batchPrepend, vs. stored and within-batch), split correctness, re-insert after
@@ -185,8 +212,8 @@ lands. `benchmarks/README.md` holds the "when to use which" guidance.
 |---|---|---|---|
 | Per-node edge adjacency map | `BMSSP` constructor | #45 | ✅ done (PR #160) |
 | Lemma 3.3 block-list `D` | `src/blockList.mjs` | #42 | ✅ done (PR #175) |
-| Binary min-heap module | `src/heap.mjs` | #41 | 🔶 PR open (this branch) |
-| Base case (bounded Dijkstra) | `src/baseCase.mjs` / method | #40 | ⬜ open |
+| Binary min-heap module | `src/heap.mjs` | #41 | ✅ done (PR #177) |
+| Base case (bounded Dijkstra) | `src/baseCase.mjs` | #40 | 🔶 PR open (this branch) |
 | FindPivots | `src/findPivots.mjs` / method | #44 | ⬜ open |
 | Main `BMSSP(l, B, S)` recursion + `k,t` derivation | `src/bmssp.mjs` | #43 | ⬜ open |
 
