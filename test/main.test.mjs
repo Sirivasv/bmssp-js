@@ -105,7 +105,7 @@ describe("BMSSP initialize calculateShortestPaths", () => {
     const startNode = [...myBMSSP.nodeIDs][0];
     myBMSSP.calculateShortestPaths(startNode);
     expect(myBMSSP.shortestPaths.get(startNode)).toBe(0);
-  });
+  }, 120000); // A real BMSSP run over the full road network takes a few seconds
   test("throws an error if the start node is not in the graph", () => {
     const invalidStartNode = -1; // Assuming -1 is not a valid node ID in the graph
     expect(() => {
@@ -135,5 +135,5 @@ describe("BMSSP vs Dijkstra shortest paths", () => {
     for (const [nodeId, distance] of myBMSSP.shortestPaths) {
       expect(dijkstraPaths.get(nodeId)).toBe(distance);
     }
-  });
+  }, 120000); // A real BMSSP run + a Dijkstra oracle run over the full road network
 });

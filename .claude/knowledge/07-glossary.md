@@ -1,6 +1,6 @@
 # 07 — Glossary
 
-<!-- Updated on: 2026-07-16 (terms last extended in the #44 PR: findPivots) -->
+<!-- Updated on: 2026-07-16 (terms last extended in the #43 PR: main bmssp recursion) -->
 
 > **Lifecycle: dynamic — updated in Phase C of every PR.** When a PR introduces new symbols
 > or terms (module names, data-structure fields, paper notation newly used in code), add
@@ -114,6 +114,32 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
   most one parent (the first tight edge in W-iteration order). Keeps tree sizes well-defined
   when equal-length paths make `F` a DAG (tie caveat, #163). Corollary: vertices on a tight
   (zero-weight) cycle all have parents, so none roots a tree and none can be a pivot.
+- **`bmssp(l, B, S)`** (#43) — method on the `BMSSP` class, Algorithm 3: the main bounded
+  multi-source recursion. Level 0 delegates to `baseCase`; level ≥ 1 wires `findPivots` →
+  `BlockList` → recursive `bmssp(l-1, Bi, Si)` calls with band-routed relaxation. Returns
+  `{ bound, vertices }` (= the paper's `B', U`). `calculateShortestPaths(start)` runs
+  `bmssp(topLevel, Infinity, {start})` after setting `d̂[start] = 0`.
+- **`deriveParameters()`** (#43) — class method (called by the constructor) that derives and
+  stores `this.k`, `this.t`, `this.topLevel` from `n = nodeIDs.size`, each clamped to ≥ 1:
+  `k = ⌊(log₂n)^(1/3)⌋`, `t = ⌊(log₂n)^(2/3)⌋`, `topLevel = ⌈log₂n / t⌉`. The clamp keeps
+  tiny graphs out of degenerate regimes; `k·2^(topLevel·t) ≥ n` makes the top call a
+  successful execution.
+- **Workload guard / cap** (#43) — Algorithm 3's `|U| < k·2^(l·t)` loop condition: trips on
+  partial executions (`bound < B`); can never trip below `n` at the top level.
+- **Completed-vertex guard** (#43) — `bmssp()` never re-queues a vertex already in the
+  current call's `U` on an equal-sum relaxation (the level-≥1 mirror of `baseCase`'s
+  settled-vertex guard; prevents zero-weight ping-pong loops).
+- **Out-of-scope pivot gate** (#43) — a pivot arriving with `d̂ ≥ B` (possible when a pull
+  returns a key tied with its separator) is skipped when seeding `D`; the ancestor whose
+  band covers its distance handles it. Tie caveat, #163.
+- **Stall escape hatch** (#43) — when a child `bmssp`/`baseCase` call returns zero vertices
+  (everything it settled tied exactly at its boundary — zero-weight paths, #163), each batch
+  member is settled with an uncapped `baseCase` run (`k = n`) bounded by `Bi` so the loop
+  always makes progress. Correct, just not sublinear; only reachable on Assumption 2.1
+  violations.
+- **Boundary-tied re-queue** (#43) — an `Si` member left at `d̂ == Bi < B` after the child
+  returns re-enters `D` via a regular `insert` (the paper's `[Bi', Bi)` band would silently
+  drop it). Tie caveat, #163.
 - **Benchmark harness** — `benchmarks/` (run via `npm run bench`): seeded graph
   **generators** + a `SCENARIOS` registry (sparse-random / dense-random / grid / chain /
   star), `timeMany` timing, and two benchmarks (adjacency-vs-scan, per-shape Dijkstra). Will
