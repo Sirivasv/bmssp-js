@@ -1,9 +1,9 @@
 # 06 — Milestones Roadmap
 
-<!-- SYNCED-FROM-GITHUB: 2026-07-17 (roadNet-CA removal session: PR #185 merged, history
-     purge + re-sign executed the same day, Phase E proposal on #24 executed) -->
-<!-- Current package version: 1.0.1 (released 2026-07-16; the roadNet-CA removal PR closed
-     no issue, so no bump) -->
+<!-- SYNCED-FROM-GITHUB: 2026-07-17 (#162 session: milestones 1.1.0/1.2.0/2.0.0 open with
+     5/5/3 open issues; #162 done-pending-merge in this PR) -->
+<!-- Current package version: 1.0.1 (released 2026-07-16; the #162 PR ships no bump under
+     the semver convention — see "Release mechanics" and PR #186) -->
 
 Maps GitHub **milestones** and **issues** (Sirivasv/bmssp-js) to the paper's building blocks,
 with a dependency-aware build order. This is the "intent" side of the knowledge base (what to
@@ -39,8 +39,17 @@ it runs the same Phase C reconciliation directly on `main`.
 
 ## 📋 Roadmap proposals (pending user approval)
 
-_None right now. Phase C writes proposed GitHub edits here (and in the PR body); Phase E
-executes the approved ones — one confirmation each — and clears them from this list._
+From the #162 PR (Phase C, 2026-07-17):
+
+1. **Comment on #165 (input validation):** the #162 edge-case work locked in the current
+   empty-graph behavior — `new BMSSP([])` constructs silently and only
+   `calculateShortestPaths()` throws (`"Start node not found in the graph"`,
+   `test/edgeCases.test.mjs`). Propose adding a note to #165 so the validation design
+   explicitly decides whether an empty edge list should throw at construction or stay
+   allowed (and, if allowed, that the test's locked-in behavior is the contract).
+
+_Phase C writes proposed GitHub edits here (and in the PR body); Phase E executes the
+approved ones — one confirmation each — and clears them from this list._
 _(The #185-PR proposal — removal note on closed **#24** — was approved and executed
 2026-07-17. Earlier: both #161-PR proposals executed 2026-07-16 on **#163**/**#162**.)_
 
@@ -62,8 +71,11 @@ _(The #185-PR proposal — removal note on closed **#24** — was approved and e
   and dates preserved), `main` + all 21 tags force-pushed with ruleset 7764713
   temporarily disabled. **All commit SHAs before 2026-07-17 changed**; old SHAs in
   closed PRs/issues no longer resolve. Repo-local git config now signs future commits.
-- **Milestone `1.1.0` — correctness hardening** (in progress). After #161: **#162**
-  (edge-case tests — partially covered by the fuzz suite, see proposals), then #163.
+- **Milestone `1.1.0` — correctness hardening** (in progress). **#162 done-pending-merge**
+  (this PR: `test/edgeCases.test.mjs`, 9 deterministic disconnection fixtures, no bump).
+  Next: **#163** (tie-breaking), then #165.
+- **Semver release convention (user-directed 2026-07-17, PR #186):** bumps only on bug
+  fix (patch) or milestone-closing PR (minor/major) — see "Release mechanics" below.
 - **2026-07-16 reflection session (post-release):** measured the BMSSP-vs-Dijkstra
   head-to-head, algorithm time only → `benchmarks/HEAD-TO-HEAD.md`. Headlines: Dijkstra
   wins wall-clock everywhere but the sparse ratio narrows with n (1.57× at 2M);
@@ -100,7 +112,7 @@ Recommended order (cheapest protection first, then the deep work):
 | Order | # | Issue | Labels | Notes |
 |---|---|---|---|---|
 | 1 | 161 | Property/fuzz tests: BMSSP vs Dijkstra on random graphs | enhancement · help wanted | ✅ merged (PR #184, 1.0.1) |
-| 2 | 162 | Edge-case tests: disconnected graphs and unreachable nodes | enhancement · help wanted | Largely covered by #43 + #161 fuzz (disconnected forests); see proposals |
+| 2 | 162 | Edge-case tests: disconnected graphs and unreachable nodes | enhancement · help wanted | ✅ done-pending-merge (this PR, no bump): deterministic fixtures in `test/edgeCases.test.mjs`; randomized side already in #161 fuzz |
 | 3 | 163 | Deterministic tie-breaking for equal-length paths (Assumption 2.1) | enhancement · help wanted | Four concrete manifestations now: three from #43, boundary-tied return from #161 |
 | 4 | 165 | Input validation for the BMSSP constructor | good first issue · help wanted | — |
 | 5 | 164 | Optional constant-degree transform (in/out-degree ≤ 2) | enhancement · help wanted | — |
