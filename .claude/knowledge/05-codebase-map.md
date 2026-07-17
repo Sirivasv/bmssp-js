@@ -1,12 +1,13 @@
 # 05 — Codebase Map (current state)
 
-<!-- BOOKMARK-COMMIT: b59f8860c3e900acdd26374e16cc4c16852e83f4 -->
-<!-- PENDING-PR-BRANCH: chore/remove-roadnet-ca -->
-<!-- Last validated: 2026-07-16, inside the roadNet-CA removal PR (no issue, no version
-     bump). This map describes the tree of the chore/remove-roadnet-ca branch:
-     test/roadNet-CA.txt deleted, main.test.mjs rewritten on a seeded 10k sparse graph,
-     fuzz.test.mjs gains seeded scale runs (+FUZZ_XL). No src/ changes. Also carries the
-     session-start marker flip after PR #184 (#161 fuzz suite) merged. -->
+<!-- BOOKMARK-COMMIT: a8675496483c564edfd055ba8d1d94a3761c9592 -->
+<!-- PENDING-PR-BRANCH: (none) -->
+<!-- Last validated: 2026-07-17, right after the history purge + re-sign: PR #185
+     (roadNet-CA removal) merged, then git-filter-repo purged the 87 MB blob from all
+     history and every commit was re-signed (SSH key, committer normalized to the owner)
+     and force-pushed — all SHAs changed. NOTE: HEAD is expected to be exactly ONE
+     docs-only commit past this bookmark (the commit that wrote these markers, made on
+     the rewritten main); if so, treat this map as current. -->
 
 Snapshot of what exists in `bmssp-js` today, so you know what to build on vs. what's missing.
 
@@ -249,9 +250,10 @@ implementation is tested against — and, since #43, no longer part of the BMSSP
 - `test/main.test.mjs` (12): constructor/nodeIDs/adjacency/shortestPaths contracts, plus the
   **key one** — "BMSSP vs Dijkstra" on a **seeded 10k-node sparse graph** (`sparseRandom(10_000,
   3, 1601)`, already `topLevel` 3): for a fixed source, `myBMSSP.shortestPaths` must equal
-  `dijkstra(...)` for every node. (Until 2026-07-16 this ran on `roadNet-CA.txt`, an 87 MB
-  SNAP road network with unseeded random weights — removed: irreproducible failures, ~71 s
-  of every run, coverage superseded by the seeded fuzz + scale suite.)
+  `dijkstra(...)` for every node. (Until 2026-07-17 this ran on `roadNet-CA.txt`, an 87 MB
+  SNAP road network with unseeded random weights — removed in PR #185 and purged from git
+  history: irreproducible failures, ~71 s of every run, coverage superseded by the seeded
+  fuzz + scale suite.)
 - `test/bmssp.test.mjs` (15, NEW in #43): parameter derivation (clamps, paper formulas,
   `k·2^(topLevel·t) ≥ n` guard), end-to-end hand-built graphs (README example, multi-hop vs
   direct, unreachable ⇒ Infinity, self-loop, source switch), degenerate ties (zero-weight
@@ -262,7 +264,7 @@ implementation is tested against — and, since #43, no longer part of the BMSSP
 - `test/blockList.test.mjs` (18), `test/heap.test.mjs` (16), `test/baseCase.test.mjs` (13),
   `test/findPivots.test.mjs` (12): per-module contracts incl. seeded stress — see the
   module sections above.
-- `test/fuzz.test.mjs` (18, #161 + scale runs added 2026-07-16): the high-volume
+- `test/fuzz.test.mjs` (18, #161 + scale runs added 2026-07-17): the high-volume
   property/fuzz suite. Full-map oracle equality across 8 shapes (the 5 benchmark generators
   reused, plus local random-DAG, disconnected-forest and uniform-multigraph generators; 2
   sources per graph; a thousands-of-nodes round), 4 extreme weight regimes (all-zero,

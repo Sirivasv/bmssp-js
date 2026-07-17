@@ -1,8 +1,8 @@
 # 06 — Milestones Roadmap
 
-<!-- SYNCED-FROM-GITHUB: 2026-07-16 (Phase A of the roadNet-CA removal session: GitHub
-     matched this file; Phase C update inside the chore/remove-roadnet-ca PR) -->
-<!-- Current package version: 1.0.1 (released 2026-07-16; the roadNet-CA removal PR closes
+<!-- SYNCED-FROM-GITHUB: 2026-07-17 (roadNet-CA removal session: PR #185 merged, history
+     purge + re-sign executed the same day, Phase E proposal on #24 executed) -->
+<!-- Current package version: 1.0.1 (released 2026-07-16; the roadNet-CA removal PR closed
      no issue, so no bump) -->
 
 Maps GitHub **milestones** and **issues** (Sirivasv/bmssp-js) to the paper's building blocks,
@@ -39,34 +39,10 @@ it runs the same Phase C reconciliation directly on `main`.
 
 ## 📋 Roadmap proposals (pending user approval)
 
-From the roadNet-CA removal PR (chore/remove-roadnet-ca), 2026-07-16:
-
-1. **Comment on closed #24** (datasets research, roadNet-CA) noting the dataset was
-   removed on 2026-07-16 and why: unseeded random weights made failures irreproducible,
-   the two tests cost ~71 s of every `npm test` run, and the seeded fuzz + scale suite
-   (#161 + this PR) supersedes its coverage — the file also accounted for ~95% of clone
-   size, purged from history after the merge.
-
-_(Both #161-PR proposals were approved and executed in Phase E on 2026-07-16: the fourth
-tie manifestation posted on **#163**, and the partial-coverage note posted on **#162**,
-which stays open re-scoped to deterministic hand-built edge cases.)_
-
-## ⚠️ Pending post-merge operation (2026-07-16) — git history purge
-
-After the `chore/remove-roadnet-ca` PR merges, the user has **already directed** (this
-session) a history rewrite to purge the 87 MB `test/roadNet-CA.txt` blob (~95% of the
-17.7 MiB pack; clones drop to <1 MiB):
-
-1. Requires `git-filter-repo` (install if missing) and branch protection on `main`
-   temporarily lifted (force-push).
-2. `git filter-repo --path test/roadNet-CA.txt --invert-paths` on a fresh clone —
-   rewrites **all SHAs** (the blob dates to the first commit) and migrates tags.
-3. Force-push `main` + all tags; verify the GitHub Releases (0.19.0…1.0.1) still attach
-   to their re-pointed tags; **do not** let this retrigger `publish.yml` (it only fires
-   on `release: published` — tag pushes are safe).
-4. `05`'s `BOOKMARK-COMMIT` will then be unresolvable — next session re-stamps it to the
-   rewritten HEAD (the bookmark procedure's step 3 covers this).
-5. Confirm with the user immediately before every force-push. Remove this section once done.
+_None right now. Phase C writes proposed GitHub edits here (and in the PR body); Phase E
+executes the approved ones — one confirmation each — and clears them from this list._
+_(The #185-PR proposal — removal note on closed **#24** — was approved and executed
+2026-07-17. Earlier: both #161-PR proposals executed 2026-07-16 on **#163**/**#162**.)_
 
 ---
 
@@ -76,12 +52,16 @@ session) a history rewrite to purge the 87 MB `test/roadNet-CA.txt` blob (~95% o
 - **Milestone `1.0.0`:** **closed on GitHub** — all 11 issues done. The algorithm is
   functional end-to-end.
 - **#161 property/fuzz suite:** merged (PR #184) and released as `1.0.1`.
-- **In flight:** **roadNet-CA removal — PR branch `chore/remove-roadnet-ca`** (no issue,
-  no version bump; user-directed 2026-07-16). Deletes `test/roadNet-CA.txt` (87 MB,
-  unseeded weights, ~71 s of every test run), rewrites `main.test.mjs` on a seeded 10k
-  sparse graph, adds seeded scale runs to `fuzz.test.mjs` (150k sparse + 300×300 grid
-  default, `FUZZ_XL=1` → 2M nodes). Suite: ~75 s → ~3 s. **A history purge follows the
-  merge — see the pending-operation section above.**
+- **roadNet-CA removal (user-directed, 2026-07-17):** **PR #185 merged** (no issue, no
+  version bump). Deleted `test/roadNet-CA.txt` (87 MB, unseeded weights, ~71 s of every
+  test run), rewrote `main.test.mjs` on a seeded 10k sparse graph, added seeded scale
+  runs to `fuzz.test.mjs` (150k sparse + 300×300 grid default, `FUZZ_XL=1` → 2M nodes).
+  Suite: ~75 s → ~3 s. **Same day, post-merge: full history purge + re-sign** —
+  `git-filter-repo` removed the blob from all history (pack 17.7 MiB → ~0.5 MiB), every
+  commit re-signed with the owner's SSH key (committer normalized to the owner; authors
+  and dates preserved), `main` + all 21 tags force-pushed with ruleset 7764713
+  temporarily disabled. **All commit SHAs before 2026-07-17 changed**; old SHAs in
+  closed PRs/issues no longer resolve. Repo-local git config now signs future commits.
 - **Milestone `1.1.0` — correctness hardening** (in progress). After #161: **#162**
   (edge-case tests — partially covered by the fuzz suite, see proposals), then #163.
 - **2026-07-16 reflection session (post-release):** measured the BMSSP-vs-Dijkstra
