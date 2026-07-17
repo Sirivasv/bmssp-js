@@ -137,19 +137,25 @@ returning `{ bound, vertices }` sensibly) rather than new algorithm work.
 
 ---
 
-## Release mechanics (version bump per closed issue)
+## Release mechanics (semver: bump only on bug fix or milestone close)
 
-Closing an issue bumps the package version and, after the PR merges, ships a release:
+Not every merged PR ships a release — not even every issue-closing PR. **Semver cadence
+(user-confirmed 2026-07-17, superseding the 2026-07-16 patch-per-issue cadence):**
 
-1. **In the PR that closes the issue** — `npm version patch --no-git-tag-version` (keeps
-   `package.json` + `package-lock.json` in sync). **Post-1.0 cadence (user-confirmed
-   2026-07-16, first applied in the #161 PR):** a **patch** bump per closed issue; the PR
-   closing a milestone's **last** issue bumps **minor** (or **major** for `2.0.0`) so
-   released versions land exactly on the milestone names (`1.1.0`, `1.2.0`, `2.0.0`).
-   (Pre-1.0 history: one minor per issue; the #43 PR's `major` closed milestone `1.0.0`.)
-2. **After the user confirms the merge** — tag `main` with the bare version (no `v` prefix)
-   and `gh release create` it; publishing the release fires `publish.yml` → **npm + Docker
-   Hub**.
+1. **Bug-fix PR** (corrects wrong shipped behavior) → **patch** bump inside the PR
+   (`npm version patch --no-git-tag-version` keeps `package.json` + `package-lock.json`
+   in sync), release after the merge.
+2. **PR closing a milestone's last open issue** → **minor** bump (**major** for `2.0.0`),
+   so released versions land exactly on the milestone names (`1.1.0`, `1.2.0`, `2.0.0`).
+3. **Everything else** — issue-closing or not (tests, docs, tooling, refactors,
+   mid-milestone features) → **no bump, no release**; the work reaches npm with the
+   milestone-closing release.
+4. **After the user confirms the merge** (cases 1–2 only) — tag `main` with the bare
+   version (no `v` prefix) and `gh release create` it; publishing the release fires
+   `publish.yml` → **npm + Docker Hub**.
+
+(History: pre-1.0 bumped one minor per issue; the #43 PR's `major` closed milestone
+`1.0.0`; `1.0.1` shipped under the short-lived patch-per-issue cadence.)
 
 Full procedure + exact commands live in **`../CLAUDE.md` → "Version bump & release"**. The
 release step is an outward-facing publish and is **gated on explicit user confirmation**.
