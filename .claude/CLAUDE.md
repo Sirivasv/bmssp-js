@@ -23,8 +23,9 @@ if/else so nothing depends on inference.
    - Symbol/term lookup → [knowledge/07-glossary.md](knowledge/07-glossary.md)
    If you spot a dynamic fact anywhere else (including this file), treat it as a bug: move
    it to the right dynamic file and replace it with a pointer.
-2. **One PR per issue, and that PR carries everything**: code + tests + version bump +
-   refreshed `05`/`06`/`07` + `README.md` updates. Never open a second "sync the docs" PR —
+2. **One PR per issue, and that PR carries everything**: code + tests + version bump (only
+   when one is warranted — see "Version bump & release" below) + refreshed `05`/`06`/`07` +
+   `README.md` updates. Never open a second "sync the docs" PR —
    the pre-PR sync (Phase C below) exists precisely to prevent that.
 3. **Two hard gates — never bypass:**
    - **GitHub writes beyond the PR itself** (creating/editing/closing issues or milestones):
@@ -93,10 +94,11 @@ existing APIs to build on. Ship focused unit tests with every piece. Before Phas
 
 **Run this on the feature branch, before opening any PR. Do not wait to be asked.**
 
-1. **Version bump** (only if the PR closes an issue — see "Version bump & release" below
-   for which of patch/minor/major applies):
+1. **Version bump** (only if the PR warrants a release — see "Version bump & release"
+   below: bug fix → `patch`; milestone-closing PR → `minor`/`major`. Most PRs, including
+   most issue-closing PRs, bump **nothing**):
    ```bash
-   npm version patch --no-git-tag-version
+   npm version <patch|minor|major> --no-git-tag-version
    ```
 2. **Rewrite `05`** to describe the tree **as it will exist once this PR merges** (the
    branch's own tree). Set the `PENDING-PR-BRANCH:` marker to the feature branch name and
@@ -145,7 +147,7 @@ any Roadmap proposals, and execute only user-approved GitHub edits.
 
 ---
 
-## 🚀 Version bump & release (when a working session closes an issue)
+## 🚀 Version bump & release (only when a PR warrants one — see the convention below)
 
 The repo ships via **tag → GitHub Release → CI/CD**. Publishing a GitHub Release
 (`release: published`) fires `.github/workflows/publish.yml`, which **publishes to npm**
@@ -161,13 +163,23 @@ changes deploy Pages via `static.yml` — no action needed for those.)
 hand-edit:
 
 ```bash
-npm version patch --no-git-tag-version   # e.g. 1.0.0 → 1.0.1
+npm version <patch|minor|major> --no-git-tag-version   # e.g. patch: 1.0.1 → 1.0.2
 ```
 
-Convention (post-1.0, user-confirmed 2026-07-16): one **patch** bump per closed issue; the
-PR that closes a milestone's **last** issue bumps **minor** instead (`major` for the
-`2.0.0` milestone), so released versions land exactly on the milestone names. Deviate only
-when the user directs otherwise.
+Convention (semver — <https://semver.org/> — user-confirmed 2026-07-17, superseding the
+2026-07-16 "patch per closed issue" cadence). A PR bumps the version **only** in exactly
+two cases:
+
+- **It fixes a bug** in shipped behavior → **patch** (semver: backward-compatible bug fix).
+- **It closes a milestone's last open issue** → **minor** (**major** for the `2.0.0`
+  milestone), so released versions land exactly on the milestone names (`1.1.0`, `1.2.0`,
+  `2.0.0`).
+
+**Every other PR bumps nothing and ships no release** — including PRs that close an issue
+(tests, docs, tooling, internal refactors) and mid-milestone feature PRs, whose work
+reaches npm with the milestone-closing minor/major release. Every bump goes through
+Phase 2 below (a bumped-but-untagged version is a bug that Phase A step 5 surfaces).
+Deviate only when the user directs otherwise.
 
 **Phase 2 — tag + release, only after the user confirms the merge:**
 
