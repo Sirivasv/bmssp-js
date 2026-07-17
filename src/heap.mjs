@@ -14,11 +14,29 @@
  * duplicate-and-skip variant used inside src/dijkstra.mjs.
  */
 class MinHeap {
-  constructor() {
+  /**
+   * @param {(a: *, b: *) => number} [compare] - Value comparator (negative
+   *   when a < b). Defaults to numeric order, in which case values must be
+   *   numbers; with a custom comparator values are opaque (#163 passes
+   *   composite [length, hops, id] keys).
+   */
+  constructor(compare) {
     // entries[i] = [key, value], heap-ordered by value
     this.entries = [];
     // key -> index of that key in entries, for O(1) membership / lookup
     this.position = new Map();
+    this.numericValues = compare === undefined;
+    this.compare = compare ?? ((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  }
+
+  // Internal: reject non-number values, but only in default numeric mode
+  checkValue(value) {
+    if (
+      this.numericValues &&
+      (typeof value !== "number" || Number.isNaN(value))
+    ) {
+      throw new Error("value must be a number");
+    }
   }
 
   // Number of pairs currently stored
@@ -65,9 +83,7 @@ class MinHeap {
    * @throws {Error} If the key is already stored, or value is not a number
    */
   insert(key, value) {
-    if (typeof value !== "number" || Number.isNaN(value)) {
-      throw new Error("value must be a number");
-    }
+    this.checkValue(value);
     if (this.position.has(key)) {
       throw new Error("key already in heap — use decreaseKey");
     }
@@ -85,14 +101,12 @@ class MinHeap {
    * @throws {Error} If the key is not stored, or value is not a number
    */
   decreaseKey(key, value) {
-    if (typeof value !== "number" || Number.isNaN(value)) {
-      throw new Error("value must be a number");
-    }
+    this.checkValue(value);
     const index = this.position.get(key);
     if (index === undefined) {
       throw new Error("key not in heap — use insert");
     }
-    if (this.entries[index][1] <= value) return;
+    if (this.compare(this.entries[index][1], value) <= 0) return;
     this.entries[index][1] = value;
     this.siftUp(index);
   }
@@ -132,7 +146,7 @@ class MinHeap {
     let i = index;
     while (i > 0) {
       const parent = (i - 1) >> 1;
-      if (this.entries[parent][1] <= this.entries[i][1]) break;
+      if (this.compare(this.entries[parent][1], this.entries[i][1]) <= 0) break;
       this.swap(parent, i);
       i = parent;
     }
@@ -147,13 +161,13 @@ class MinHeap {
       let smallest = i;
       if (
         left < this.entries.length &&
-        this.entries[left][1] < this.entries[smallest][1]
+        this.compare(this.entries[left][1], this.entries[smallest][1]) < 0
       ) {
         smallest = left;
       }
       if (
         right < this.entries.length &&
-        this.entries[right][1] < this.entries[smallest][1]
+        this.compare(this.entries[right][1], this.entries[smallest][1]) < 0
       ) {
         smallest = right;
       }

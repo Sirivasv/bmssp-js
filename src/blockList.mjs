@@ -22,15 +22,19 @@ class BlockList {
   /**
    * Initialize the structure (Lemma 3.3 Initialize).
    * @param {number} M - Block size / pull batch size, >= 1. At recursion level l this is 2^((l-1)·t).
-   * @param {number} B - Strict upper bound on every value ever stored (Infinity is allowed)
+   * @param {*} B - Strict upper bound on every value ever stored (Infinity is allowed)
+   * @param {(a: *, b: *) => number} [compare] - Value comparator (negative
+   *   when a < b). Defaults to numeric order; #163 passes composite
+   *   [length, hops, id] keys with their lexicographic comparator.
    * @throws {Error} If M is not a number >= 1
    */
-  constructor(M, B) {
+  constructor(M, B, compare) {
     if (typeof M !== "number" || Number.isNaN(M) || M < 1) {
       throw new Error("M must be a number >= 1");
     }
     this.M = Math.floor(M);
     this.B = B;
+    this.compare = compare ?? ((a, b) => (a < b ? -1 : a > b ? 1 : 0));
     // d1 starts as a single empty block with upper bound B
     this.d1 = [this.makeBlock(B)];
     this.d0 = [];
@@ -61,12 +65,12 @@ class BlockList {
    * @throws {Error} If value >= B
    */
   insert(key, value) {
-    if (!(value < this.B)) {
+    if (!(this.compare(value, this.B) < 0)) {
       throw new Error("value must be < B");
     }
     const holder = this.locator.get(key);
     if (holder !== undefined) {
-      if (holder.entries.get(key) <= value) return;
+      if (this.compare(holder.entries.get(key), value) <= 0) return;
       this.removeKey(key, holder);
     }
     // Binary-search d1 for the first block whose bound covers the value
@@ -74,7 +78,7 @@ class BlockList {
     let hi = this.d1.length - 1;
     while (lo < hi) {
       const mid = (lo + hi) >> 1;
-      if (this.d1[mid].bound >= value) {
+      if (this.compare(this.d1[mid].bound, value) >= 0) {
         hi = mid;
       } else {
         lo = mid + 1;
@@ -96,7 +100,7 @@ class BlockList {
   // simpler — acceptable for this correctness-first implementation.)
   splitBlock(index) {
     const block = this.d1[index];
-    const sorted = [...block.entries].sort((a, b) => a[1] - b[1]);
+    const sorted = [...block.entries].sort((a, b) => this.compare(a[1], b[1]));
     const half = sorted.length >> 1;
     const lower = this.makeBlock(sorted[half - 1][1]);
     for (let i = 0; i < half; i += 1) {
@@ -121,11 +125,11 @@ class BlockList {
     // Dedupe the batch, keeping the smallest value per key
     const best = new Map();
     for (const [key, value] of pairs) {
-      if (!(value < this.B)) {
+      if (!(this.compare(value, this.B) < 0)) {
         throw new Error("value must be < B");
       }
       const seen = best.get(key);
-      if (seen === undefined || value < seen) {
+      if (seen === undefined || this.compare(value, seen) < 0) {
         best.set(key, value);
       }
     }
@@ -134,7 +138,7 @@ class BlockList {
     for (const [key, value] of best) {
       const holder = this.locator.get(key);
       if (holder !== undefined) {
-        if (holder.entries.get(key) <= value) continue;
+        if (this.compare(holder.entries.get(key), value) <= 0) continue;
         this.removeKey(key, holder);
       }
       fresh.push([key, value]);
@@ -145,7 +149,7 @@ class BlockList {
     if (fresh.length <= this.M) {
       chunks = [fresh];
     } else {
-      fresh.sort((a, b) => a[1] - b[1]);
+      fresh.sort((a, b) => this.compare(a[1], b[1]));
       const chunkSize = Math.ceil(this.M / 2);
       chunks = [];
       for (let i = 0; i < fresh.length; i += chunkSize) {
@@ -155,11 +159,13 @@ class BlockList {
     // Prepend in reverse chunk order so the smallest chunk lands at the front
     for (let c = chunks.length - 1; c >= 0; c -= 1) {
       const chunk = chunks[c];
-      const block = this.makeBlock(-Infinity);
+      // Seed the block bound with the first value, then max-update — avoids
+      // needing a -Infinity sentinel that a custom comparator can't order
+      const block = this.makeBlock(chunk[0][1]);
       for (const [key, value] of chunk) {
         block.entries.set(key, value);
         this.locator.set(key, block);
-        if (value > block.bound) block.bound = value;
+        if (this.compare(value, block.bound) > 0) block.bound = value;
         this.count += 1;
       }
       this.d0.unshift(block);
@@ -198,21 +204,24 @@ class BlockList {
       }
     }
     // Take the M smallest candidates out of the structure
-    candidates.sort((a, b) => a[1] - b[1]);
+    candidates.sort((a, b) => this.compare(a[1], b[1]));
     const keys = new Set();
     for (let i = 0; i < this.M; i += 1) {
       const [key, , block] = candidates[i];
       keys.add(key);
       this.removeKey(key, block);
     }
-    // Separator = smallest value still stored. Thanks to the inter-block
-    // ordering it lives in the first non-empty block of d0 or d1.
-    let bound = Infinity;
+    // Separator = smallest value still stored (non-null here: this branch
+    // only runs when more than M values were present). Thanks to the
+    // inter-block ordering it lives in the first non-empty block of d0/d1.
+    // Under a strict total order (#163's composite keys) this separator is
+    // strictly above every pulled value — no boundary ties.
+    let bound = null;
     for (const seq of [this.d0, this.d1]) {
       const block = seq.find((b) => b.entries.size > 0);
       if (block) {
         for (const value of block.entries.values()) {
-          if (value < bound) bound = value;
+          if (bound === null || this.compare(value, bound) < 0) bound = value;
         }
       }
     }

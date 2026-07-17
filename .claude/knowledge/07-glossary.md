@@ -19,7 +19,7 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
 | `d(v)` | **true** shortest distance from `s` to `v`. |
 | `d̂[v]` | current distance **estimate** (`≥ d(v)`, starts ∞, only decreases). In code: `shortestPaths` map. |
 | `w(u,v)`, `w_uv` | weight of edge `(u,v)`; non-negative. |
-| `Pred[v]` | predecessor of `v` on the current best path (forms a tree). |
+| `Pred[v]` | predecessor of `v` on the current best path (forms a tree). In code: the canonical `preds` map (#163), deterministic smallest optimal parent. |
 | `B` | upper distance **bound** for a (sub)problem; only vertices with `d < B` are in scope. |
 | `B'` | the **returned** boundary of a call, `B' ≤ B`. Says how much real progress was made. |
 | `S` | the **frontier** / source set of a (sub)problem. `|S| ≤ 2^(l·t)`. |
@@ -27,7 +27,7 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
 | `U'` | (analysis) all `v` with `d(v) < B` whose shortest path visits `S`. Success ⇒ `U = U'`. |
 | `P` | **pivots**: the ⊆ `S` roots of big shortest-path trees; `|P| ≤ |W|/k`. From FindPivots. |
 | `W` | vertices completed/collected by FindPivots' `k` Bellman-Ford rounds; `|W| = O(k·|S|)`. |
-| `F` | forest of "tight" edges (`d̂[v] == d̂[u]+w(u,v)`) inside `W`; used to find pivot roots. |
+| `F` | forest of "tight" edges (`d̂[v] == d̂[u]+w(u,v)`) inside `W`; used to find pivot roots. In code since #163: the canonical `preds` pointers restricted to `W`. |
 | `D` | the Lemma 3.3 **block-based list** (Insert / BatchPrepend / Pull). §03-B. |
 | `k` | `⌊log^(1/3) n⌋`. Bellman-Ford step count in FindPivots; base-case batch cap (`k+1`). |
 | `t` | `⌊log^(2/3) n⌋`. Governs branching/level sizing. |
@@ -98,28 +98,33 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
   skip stale pops). Both are correct; §03-A discusses the trade-off.
 - **`baseCase(B, S, dHat, adjacency, k)`** (#40) — `src/baseCase.mjs`, Algorithm 2:
   bounded mini-Dijkstra from the singleton complete source in `S`, settling at most `k+1`
-  vertices, relaxing the shared `dHat` (`d̂[·]`) **in place**. Returns `{ bound, vertices }`
-  (= the paper's `B', U`). Internal (not re-exported from `index.mjs`).
-- **Settled-vertex guard** (#40) — `baseCase` never re-inserts a vertex it already settled
-  in the same call: the paper's `≤` relaxation admits equal-sum re-relaxations (e.g.
-  zero-weight cycles) that would loop forever, and with non-negative weights a settled
-  vertex cannot strictly improve, so skipping it is loss-free.
-- **`findPivots(B, S, dHat, adjacency, k)`** (#44) — `src/findPivots.mjs`, Algorithm 1:
-  `k` rounds of Bellman-Ford out of the complete frontier `S`, relaxing the shared `dHat`
-  (`d̂[·]`) **in place**; `< B` gates membership in `W` only (the d̂ write is unconditional).
-  Returns `{ pivots, W }` (= the paper's `P, W`), with `|pivots| ≤ |W|/k`. Internal (not
-  re-exported from `index.mjs`).
+  vertices, relaxing the shared `dHat` (`d̂[·]`) **in place** (canonically, with an optional
+  `ties` bundle since #163). Returns `{ bound, boundKey, vertices }` (= the paper's `B'`,
+  its composite key, `U`). Internal (not re-exported from `index.mjs`).
+- **Settled filter** (#40, re-scoped by #163) — `baseCase` never re-inserts a vertex it
+  already settled in the same call. Pre-#163 this guarded against equal-sum ping-pong
+  loops; since #163 strict canonical relaxation makes improvements on settled vertices
+  impossible, and the filter only skips exact-equality re-enqueue signals (see
+  "Re-enqueue signal"), keeping zero-weight plateaus quiescent.
+- **`findPivots(B, S, dHat, adjacency, k, ties?)`** (#44) — `src/findPivots.mjs`,
+  Algorithm 1: `k` strictly-layered rounds of canonical Bellman-Ford out of the complete
+  frontier `S`, relaxing the shared `dHat` (`d̂[·]`) **in place**; `< B` (composite) gates
+  membership in `W` only (the d̂ write is unconditional). Returns `{ pivots, W }` (= the
+  paper's `P, W`), with `|pivots| ≤ |W|/k`; the forest is the canonical `preds` pointers.
+  Internal (not re-exported from `index.mjs`).
 - **Early exit** (#44) — `findPivots`' first branch: as soon as `|W| > k·|S|` after a round,
   return `pivots = S` — the frontier is already small relative to `W`.
-- **One-parent rule** (#44) — building the tight-edge forest `F`, each vertex accepts at
-  most one parent (the first tight edge in W-iteration order). Keeps tree sizes well-defined
-  when equal-length paths make `F` a DAG (tie caveat, #163). Corollary: vertices on a tight
-  (zero-weight) cycle all have parents, so none roots a tree and none can be a pivot.
+- **One-parent rule** (#44, superseded by #163) — pre-#163, each vertex accepted the first
+  tight edge in W-iteration order as its parent to keep tree sizes well-defined when ties
+  made `F` a DAG. Since #163 the forest **is** the canonical `preds` pointers: exactly one
+  deterministic parent per vertex of `W \ S`, no DAG possible, and tight cycles cannot
+  exist (zero-weight edges strictly increase hops). `S` members are roots by definition.
 - **`bmssp(l, B, S)`** (#43) — method on the `BMSSP` class, Algorithm 3: the main bounded
   multi-source recursion. Level 0 delegates to `baseCase`; level ≥ 1 wires `findPivots` →
   `BlockList` → recursive `bmssp(l-1, Bi, Si)` calls with band-routed relaxation. Returns
-  `{ bound, vertices }` (= the paper's `B', U`). `calculateShortestPaths(start)` runs
-  `bmssp(topLevel, Infinity, {start})` after setting `d̂[start] = 0`.
+  `{ bound, boundKey, vertices }` (= the paper's `B'`, its composite key, `U`); scalar `B`
+  in → scalar `bound` out. `calculateShortestPaths(start)` runs
+  `bmssp(topLevel, Infinity, {start})` after setting `d̂[start] = 0`, `hops[start] = 0`.
 - **`deriveParameters()`** (#43) — class method (called by the constructor) that derives and
   stores `this.k`, `this.t`, `this.topLevel` from `n = nodeIDs.size`, each clamped to ≥ 1:
   `k = ⌊(log₂n)^(1/3)⌋`, `t = ⌊(log₂n)^(2/3)⌋`, `topLevel = ⌈log₂n / t⌉`. The clamp keeps
@@ -127,25 +132,37 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
   successful execution.
 - **Workload guard / cap** (#43) — Algorithm 3's `|U| < k·2^(l·t)` loop condition: trips on
   partial executions (`bound < B`); can never trip below `n` at the top level.
-- **Completed-vertex guard** (#43) — `bmssp()` never re-queues a vertex already in the
-  current call's `U` on an equal-sum relaxation (the level-≥1 mirror of `baseCase`'s
-  settled-vertex guard; prevents zero-weight ping-pong loops).
-- **Out-of-scope pivot gate** (#43) — a pivot arriving with `d̂ ≥ B` (possible when a pull
-  returns a key tied with its separator) is skipped when seeding `D`; the ancestor whose
-  band covers its distance handles it. Tie caveat, #163.
-- **Stall escape hatch** (#43) — when a child `bmssp`/`baseCase` call returns zero vertices
-  (everything it settled tied exactly at its boundary — zero-weight paths, #163), each batch
-  member is settled with an uncapped `baseCase` run (`k = n`) bounded by `Bi` so the loop
-  always makes progress. Correct, just not sublinear; only reachable on Assumption 2.1
-  violations.
-- **Boundary-tied re-queue** (#43) — an `Si` member left at `d̂ == Bi < B` after the child
-  returns re-enters `D` via a regular `insert` (the paper's `[Bi', Bi)` band would silently
-  drop it). Tie caveat, #163.
-- **Boundary-tied return** (#161) — under ties, a bounded **partial** `bmssp()` execution
-  can return a vertex with `d(v) == B'` (via the stall escape hatch); Lemma 3.1's strict
-  `d(v) < B'` holds only under Assumption 2.1. Internal contract under ties: returned
-  vertices satisfy `d(v) ≤ B'`, completeness below `B'` stays strict. Tie caveat, #163;
-  fuzz-found at seed 163066.
+- **Pre-#163 tie guards (historical)** — four deviations from the paper's literal text
+  that handled Assumption 2.1 violations before #163 removed them by construction:
+  the *completed-vertex guard* (no equal-sum re-queue of `U` members), the *out-of-scope
+  pivot gate* (pivots tied with `B` skipped at seeding), the *stall escape hatch*
+  (uncapped `baseCase` runs when a child returned zero vertices), and the *boundary-tied
+  re-queue / return* (`d̂ == Bi` batch members re-inserted; partial executions returning
+  `d(v) == B'`, fuzz-found at seed 163066). All are impossible under composite keys; the
+  scalar-projection caveat `d(v) ≤ bound` for returned vertices remains the documented
+  external contract (`boundKey` carries the strict form).
+- **Composite key** (#163) — `[length, hops, id]` compared lexicographically
+  (`src/tieBreak.mjs`): `length` = path length, `hops` = edge count (the paper's
+  "#vertices" tie-break — zero-weight extensions strictly increase it), `id` = pred id in
+  relaxation / own id in frontier order (O(1) stand-in for the paper's vertex-sequence
+  comparison). Realizes Assumption 2.1: all frontier comparisons strict.
+- **Canonical label / relaxation** (#163) — `relaxEdge(u, v, w, dHat, ties, bound?)`
+  updates `d̂`/`hops`/`preds` together iff the candidate path key beats the stored one;
+  the fixed point is the lexicographic minimum over all paths, so labels, predecessor
+  pointers and completed sets are invariant under edge/iteration order (tested in
+  `test/tieBreak.test.mjs` against an O(n²) lexicographic Dijkstra oracle).
+- **Re-enqueue signal** (#163) — `relaxEdge`'s `improved: false` result: the candidate
+  exactly matches `v`'s stored label, meaning `u` is the recorded label-setter and `v` was
+  labeled by a deeper call without being completed. The caller re-enqueues `v` unless it
+  is already settled/completed — the paper's `≤` relaxation made canonical, firing from
+  exactly one predecessor.
+- **`ties`** (#163) — the `{ hops, preds }` bundle (`makeTies`) that accompanies `dHat`
+  through `baseCase`/`findPivots`/`relaxEdge`; the `BMSSP` class owns one as `this.ties`
+  (`this.hops`, `this.preds`), cleared by `initializeShortestPaths()`. Missing entries
+  read as hop-0 / no-pred, so externally seeded sources need no setup.
+- **`boundKey`** (#163) — the composite boundary in `baseCase`/`bmssp` results: every
+  returned vertex's order key is strictly below it. The scalar `bound` is its projection
+  (a returned vertex may tie `bound`'s length, never exceed it).
 - **Fuzz suite** (#161) — `test/fuzz.test.mjs`: high-volume seeded property tests. Full-map
   oracle equality across 8 graph shapes and 4 extreme weight regimes, plus direct
   multi-source bounded `bmssp(topLevel, B, S)` checks against per-source Dijkstra oracles
