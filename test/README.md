@@ -20,6 +20,7 @@ equal the Dijkstra oracle's** (`src/dijkstra.mjs`).
 | `main.test.mjs` | `BMSSP` class contracts (constructor, `nodeIDs`, adjacency, `shortestPaths`, error handling) + full-map BMSSP-vs-Dijkstra equality on a seeded 10k-node sparse graph |
 | `bmssp.test.mjs` | Algorithm 3 recursion: parameter derivation, hand-built graphs, degenerate ties, the Lemma 3.1 bounded-call contract, seeded stress |
 | `fuzz.test.mjs` | High-volume property/fuzz suite (#161): 8 graph shapes × extreme weight regimes × multi-source bounded calls vs. per-source oracles, plus seeded scale runs (150k-node sparse, 300×300 grid, opt-in 2M) |
+| `edgeCases.test.mjs` | Deterministic disconnection fixtures (#162): isolated/sink/self-loop-only sources, single-node and multi-chain components, wrong-direction bridges, tiny-vs-giant components, source switching across components — each vs. a hand-computed map and the oracle |
 | `findPivots.test.mjs` | Algorithm 1 (`FindPivots`) contracts incl. seeded oracle stress |
 | `baseCase.test.mjs` | Algorithm 2 (`BaseCase`) bounded mini-Dijkstra contracts |
 | `blockList.test.mjs` | Lemma 3.3 block-based partial-sort structure `D` |

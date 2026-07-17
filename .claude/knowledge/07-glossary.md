@@ -150,6 +150,11 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
   oracle equality across 8 graph shapes and 4 extreme weight regimes, plus direct
   multi-source bounded `bmssp(topLevel, B, S)` checks against per-source Dijkstra oracles
   (`trueDist(v) = min_s(d0[s] + dist_s(v))`). Failure messages carry the round's seed.
+- **Edge-case suite** (#162) — `test/edgeCases.test.mjs`: deterministic hand-built
+  disconnection fixtures with hand-verifiable expected maps — isolated/sink/self-loop-only
+  sources, single-node and many-chain components, wrong-direction bridge edges, tiny
+  component beside a giant chain, and source switching across components on one instance.
+  Complements the randomized disconnected-forest coverage in the fuzz suite (#161).
 - **`FUZZ_ROUNDS`** (#161) — environment variable multiplying every fuzz round count
   (default 1). `FUZZ_ROUNDS=25 npm test -- test/fuzz.test.mjs` runs several thousand
   graphs in ~5 s.

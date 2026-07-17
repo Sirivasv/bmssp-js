@@ -1,13 +1,14 @@
 # 05 — Codebase Map (current state)
 
-<!-- BOOKMARK-COMMIT: a8675496483c564edfd055ba8d1d94a3761c9592 -->
-<!-- PENDING-PR-BRANCH: (none) -->
-<!-- Last validated: 2026-07-17, right after the history purge + re-sign: PR #185
-     (roadNet-CA removal) merged, then git-filter-repo purged the 87 MB blob from all
-     history and every commit was re-signed (SSH key, committer normalized to the owner)
-     and force-pushed — all SHAs changed. NOTE: HEAD is expected to be exactly ONE
-     docs-only commit past this bookmark (the commit that wrote these markers, made on
-     the rewritten main); if so, treat this map as current. -->
+<!-- BOOKMARK-COMMIT: 52686ff15802109bb096c8ec85d89bb0b4e84e79 -->
+<!-- PENDING-PR-BRANCH: test/162-edge-case-disconnected -->
+<!-- Last validated: 2026-07-17 (Phase C of the #162 PR). Describes the tree as it will
+     exist once that PR merges: adds test/edgeCases.test.mjs (9 deterministic
+     disconnection fixtures), no src/ changes, no version bump (semver convention —
+     see 06 "Release mechanics"). NOTE: the docs-only PR #186 (semver release
+     convention, branch docs/semver-release-convention) may merge around the same
+     time; it touches only .claude/CLAUDE.md and .claude/knowledge/06 and does not
+     affect this map. -->
 
 Snapshot of what exists in `bmssp-js` today, so you know what to build on vs. what's missing.
 
@@ -67,6 +68,7 @@ test/
   main.test.mjs           # Jest tests: constructor, nodeIDs, adjacency, shortestPaths, BMSSP-vs-Dijkstra (seeded 10k sparse)
   bmssp.test.mjs          # #43: 15 recursion tests — params, hand graphs, ties, Lemma 3.1 contract, seeded stress
   fuzz.test.mjs           # #161: 18 high-volume fuzz tests — shapes × weight regimes × multi-source × seeded scale; FUZZ_ROUNDS / FUZZ_XL env vars
+  edgeCases.test.mjs      # #162: 9 deterministic disconnection fixtures — isolated/sink sources, many components, source switching
   blockList.test.mjs      # #42: 18 BlockList tests incl. a seeded random stress test
   heap.test.mjs           # #41: 16 MinHeap tests incl. a seeded stress test vs. a naive queue
   baseCase.test.mjs       # #40: 13 BaseCase tests incl. seeded oracle-comparison stress
@@ -264,6 +266,14 @@ implementation is tested against — and, since #43, no longer part of the BMSSP
 - `test/blockList.test.mjs` (18), `test/heap.test.mjs` (16), `test/baseCase.test.mjs` (13),
   `test/findPivots.test.mjs` (12): per-module contracts incl. seeded stress — see the
   module sections above.
+- `test/edgeCases.test.mjs` (9, #162): deterministic hand-built disconnection fixtures,
+  each checked against a hand-computed full distance map **and** the Dijkstra oracle
+  (Infinity entries included): self-loop-only source, sink source (adjacency keeps an
+  empty list), empty graph rejects any start, five single-node components, ten 3-node
+  chain components, a bridge edge pointing into the source's component, a 2-node island
+  beside a 100-node chain (source on each side), and A→B→A source switching on one
+  instance to prove state resets. Complements the randomized disconnected-forest rounds
+  in `fuzz.test.mjs`.
 - `test/fuzz.test.mjs` (18, #161 + scale runs added 2026-07-17): the high-volume
   property/fuzz suite. Full-map oracle equality across 8 shapes (the 5 benchmark generators
   reused, plus local random-DAG, disconnected-forest and uniform-multigraph generators; 2
@@ -277,8 +287,9 @@ implementation is tested against — and, since #43, no longer part of the BMSSP
   **opt-in `FUZZ_XL=1` sparse n = 2M round** (~30 s, `test.skip` otherwise). Every failure
   message carries the round's seed for reproduction. **`FUZZ_ROUNDS=<x>`** multiplies all
   round counts (default 1 ≈ 0.5 s; 25 ≈ 5 s, several thousand graphs).
-- Current suite: **104 tests — 103 passing + 1 XL skipped by default**, 100% statement
-  coverage, ~3 s wall-clock. No graph data files: every test graph is generated from a seed.
+- Current suite: **113 tests — 112 passing + 1 XL skipped by default**, 100% statement
+  coverage, ~3 s wall-clock. No graph data files: every generated test graph comes from a
+  seed; the #162 fixtures are hand-built and fully deterministic.
 
 ## Benchmarks (`benchmarks/`, `npm run bench`)
 
@@ -300,7 +311,8 @@ comparison-count mode); the raw baseline is also on #170 as a comment.
 | Base case (bounded Dijkstra) | `src/baseCase.mjs` | #40 | ✅ done (PR #178) |
 | FindPivots | `src/findPivots.mjs` | #44 | ✅ done (PR #180) |
 | Main `BMSSP(l, B, S)` recursion + `k,t` derivation | `src/bmssp.mjs` | #43 | ✅ done (PR #181) — **1.0.0 milestone complete** |
-| Property/fuzz suite vs. the oracle | `test/fuzz.test.mjs` | #161 | ✅ done (this PR, 1.0.1) |
+| Property/fuzz suite vs. the oracle | `test/fuzz.test.mjs` | #161 | ✅ done (PR #184, 1.0.1) |
+| Deterministic disconnection edge cases | `test/edgeCases.test.mjs` | #162 | ✅ done (this PR, no bump) |
 
-Milestone `1.1.0` (correctness hardening) is in progress: #161 lands with this PR; next up
-are #162, #163 — see [06-milestones-roadmap.md](06-milestones-roadmap.md).
+Milestone `1.1.0` (correctness hardening) is in progress: #162 lands with this PR; next up
+are #163, #165 — see [06-milestones-roadmap.md](06-milestones-roadmap.md).
