@@ -1,6 +1,13 @@
 import { baseCase } from "./baseCase.mjs";
 import { findPivots } from "./findPivots.mjs";
 import { BlockList } from "./blockList.mjs";
+import {
+  compareKeys,
+  toBound,
+  makeTies,
+  orderKey,
+  relaxEdge,
+} from "./tieBreak.mjs";
 
 class BMSSP {
   constructor(inputGraph) {
@@ -14,6 +21,13 @@ class BMSSP {
     // Lets the algorithm fetch a node's edges in O(1) instead of scanning
     // the whole edge list on every lookup.
     this.adjacency = new Map();
+    // Canonical tie-break labels (#163): hops = edge count of the canonical
+    // shortest path, preds = its predecessor pointer. Updated in lockstep
+    // with shortestPaths by relaxEdge; together they realize the paper's
+    // Assumption 2.1 (distinct path lengths) via [length, hops, id] keys.
+    this.hops = new Map();
+    this.preds = new Map();
+    this.ties = makeTies(this.hops, this.preds);
 
     for (let edge of inputGraph) {
       // Create a deep copy of each edge array
@@ -57,11 +71,14 @@ class BMSSP {
     return this.adjacency.get(nodeId) ?? [];
   }
 
-  // Method to initialize the shortest paths map
+  // Method to initialize the shortest paths map (and the #163 tie-break
+  // labels that travel with it)
   initializeShortestPaths() {
     for (let nodeId of this.nodeIDs) {
       this.shortestPaths.set(nodeId, Infinity);
     }
+    this.hops.clear();
+    this.preds.clear();
   }
 
   /**
@@ -93,45 +110,79 @@ class BMSSP {
    *   path through some complete vertex of S.
    *
    * Distance estimates live in this.shortestPaths (the paper's d̂[·]) and
-   * are relaxed in place at every level.
+   * are relaxed in place at every level, together with the canonical hops
+   * and preds labels (#163). All internal ordering uses the composite
+   * [length, hops, id] keys of src/tieBreak.mjs, which realize the paper's
+   * Assumption 2.1: pull separators are strict, no key ever ties a bound,
+   * and the pre-#163 degenerate-tie guards (out-of-scope pivots,
+   * boundary-tied batch members, the empty-child stall escape hatch) are
+   * unnecessary by construction.
    *
-   * Two outcomes (Lemma 3.1):
-   * - Successful execution: the block list emptied — bound === B and
-   *   vertices holds every v with d(v) < B reachable through S.
-   * - Partial execution: the k·2^(l·t) workload guard tripped — bound < B
-   *   and vertices holds exactly the v with d(v) < bound.
+   * Two outcomes (Lemma 3.1, strict under the composite order):
+   * - Successful execution: the block list emptied — boundKey === B's key
+   *   and vertices holds every v with key(v) < B reachable through S.
+   * - Partial execution: the k·2^(l·t) workload guard tripped —
+   *   boundKey < B's key and vertices holds exactly the v with
+   *   key(v) < boundKey. In the scalar projection a returned vertex may tie
+   *   the returned bound's length (never exceed it).
    *   Every returned vertex is complete either way.
    *
    * @param {number} l - Recursion level; 0 delegates to baseCase
-   * @param {number} B - Strict upper bound on the distances in scope (Infinity is allowed)
+   * @param {number|[number, number, *]} B - Strict upper bound on the keys
+   *   in scope: a number (Infinity is allowed) or a composite bound
    * @param {Set<*>} S - Non-empty set of complete frontier sources
-   * @returns {{ bound: number, vertices: Set<*> }} The boundary B' <= B and
-   *   the set U of vertices completed below it
+   * @returns {{ bound: number|[number, number, *], boundKey: [number, number, *], vertices: Set<*> }}
+   *   The boundary B' <= B (same kind as the B passed in: scalar callers
+   *   get a scalar), its composite key, and the set U of vertices
+   *   completed below it
    */
   bmssp(l, B, S) {
     const dHat = this.shortestPaths;
+    const ties = this.ties;
+    const boundKey = toBound(B);
+    const scalarB = typeof B === "number";
+    // Project the composite result back to the caller's kind: a successful
+    // execution echoes B itself, a partial one reports the separator (whose
+    // length is strictly below a scalar B by construction)
+    const finish = (finalKey, vertices) => ({
+      bound: scalarB
+        ? compareKeys(finalKey, boundKey) === 0
+          ? B
+          : finalKey[0]
+        : finalKey,
+      boundKey: finalKey,
+      vertices,
+    });
+
     if (l === 0) {
-      return baseCase(B, S, dHat, this.adjacency, this.k);
+      const result = baseCase(boundKey, S, dHat, this.adjacency, this.k, ties);
+      return finish(result.boundKey, result.vertices);
     }
 
     // Shrink the frontier: only the pivots are worth recursing on, and W
     // is a batch of already-completed vertices folded in at the end
-    const { pivots, W } = findPivots(B, S, dHat, this.adjacency, this.k);
+    const { pivots, W } = findPivots(
+      boundKey,
+      S,
+      dHat,
+      this.adjacency,
+      this.k,
+      ties,
+    );
 
-    // Seed the Lemma 3.3 block list with the pivots. lastBound tracks the
-    // paper's Bi': B when P is empty, min d̂ over P before the first pull,
-    // then the boundary returned by the latest recursive call.
-    // A pivot with d̂ >= B is out of scope at this level (only possible
-    // when equal path lengths violate Assumption 2.1 and a pull returned
-    // a key tied with its separator): skip it — the ancestor whose band
-    // covers its distance is responsible for it.
-    const D = new BlockList(2 ** ((l - 1) * this.t), B);
-    let lastBound = B;
+    // Seed the Lemma 3.3 block list with the pivots. lastBoundKey tracks
+    // the paper's Bi': B when P is empty, min key over P before the first
+    // pull, then the boundary returned by the latest recursive call.
+    // The scope filter is for direct multi-source callers who may pass
+    // sources at or above B — internal calls can't produce one, because
+    // every pull separator is strict under the composite order.
+    const D = new BlockList(2 ** ((l - 1) * this.t), boundKey, compareKeys);
+    let lastBoundKey = boundKey;
     for (const x of pivots) {
-      const dx = dHat.get(x);
-      if (dx < B) {
-        D.insert(x, dx);
-        if (dx < lastBound) lastBound = dx;
+      const key = orderKey(x, dHat, ties);
+      if (compareKeys(key, boundKey) < 0) {
+        D.insert(x, key);
+        if (compareKeys(key, lastBoundKey) < 0) lastBoundKey = key;
       }
     }
 
@@ -140,86 +191,64 @@ class BMSSP {
 
     while (U.size < workloadCap && !D.isEmpty()) {
       // Bi, Si <- D.Pull(): the next-closest small batch and its separator
-      const { keys: Si, bound: Bi } = D.pull();
-      let { bound: BiPrime, vertices: Ui } = this.bmssp(l - 1, Bi, Si);
+      const { keys: Si, bound: BiKey } = D.pull();
+      const child = this.bmssp(l - 1, BiKey, Si);
+      const BiPrimeKey = child.boundKey;
+      const Ui = child.vertices;
 
-      if (Ui.size === 0) {
-        // Degenerate tie stall: the child settled only vertices tied
-        // exactly at its boundary (possible only through zero-weight
-        // paths, which violate the paper's Assumption 2.1 — see #163),
-        // so its strict d̂ < B' filter returned nothing and this batch
-        // would be re-pulled forever. Escape hatch: settle everything
-        // below Bi reachable through the batch with an uncapped bounded
-        // Dijkstra per member — correct, just not sublinear.
-        Ui = new Set();
-        for (const x of Si) {
-          const { vertices } = baseCase(
-            Bi,
-            new Set([x]),
-            dHat,
-            this.adjacency,
-            Math.max(1, this.nodeIDs.size),
-          );
-          for (const v of vertices) Ui.add(v);
-        }
-        BiPrime = Bi;
-      }
-
-      lastBound = BiPrime;
+      lastBoundKey = BiPrimeKey;
       for (const v of Ui) U.add(v);
 
-      // Relax out of the newly-completed Ui, routing improved neighbors
-      // by distance band: [Bi, B) re-enters the block list, [Bi', Bi) is
-      // staged for a batch prepend (closer than the current batch's floor)
+      // Relax out of the newly-completed Ui, routing improved neighbors by
+      // key band: [Bi, B) re-enters the block list, [Bi', Bi) is staged for
+      // a batch prepend (closer than the current batch's floor). An exact
+      // canonical equality re-enqueues a vertex that a deeper call labeled
+      // without completing (the paper's `≤` relaxation, deterministic here:
+      // only the recorded label-setter triggers it); vertices already
+      // completed at this level are filtered so re-enqueues stay finite.
       const K = [];
       for (const u of Ui) {
-        const du = dHat.get(u);
         for (const [v, weight] of this.adjacency.get(u) ?? []) {
-          const candidate = du + weight;
-          // Paper relaxation: d̂[u] + w(u,v) <= d̂[v] always updates d̂
-          if (candidate <= (dHat.get(v) ?? Infinity)) {
-            dHat.set(v, candidate);
-            // A vertex already completed at this level cannot strictly
-            // improve (non-negative weights), so an equal-sum relaxation
-            // — which the <= allows, e.g. via a zero-weight cycle — must
-            // not be re-queued (mirrors the baseCase settled guard)
-            if (U.has(v)) continue;
-            if (candidate >= Bi && candidate < B) {
-              D.insert(v, candidate);
-            } else if (candidate >= BiPrime && candidate < Bi) {
-              K.push([v, candidate]);
-            }
+          const relaxed = relaxEdge(u, v, weight, dHat, ties);
+          if (relaxed === null || U.has(v)) continue;
+          const key = relaxed.key;
+          if (compareKeys(key, BiKey) >= 0 && compareKeys(key, boundKey) < 0) {
+            D.insert(v, key);
+          } else if (
+            compareKeys(key, BiPrimeKey) >= 0 &&
+            compareKeys(key, BiKey) < 0
+          ) {
+            K.push([v, key]);
           }
         }
       }
-      // Batch members the child did not complete (d̂ still in [Bi', Bi))
-      // go back in front of everything else. A member tied exactly at the
-      // separator (d̂ == Bi < B, an Assumption 2.1 violation) is still in
-      // scope at this level and re-enters through a regular insert.
+      // Batch members the child did not complete (key still in [Bi', Bi))
+      // go back in front of everything else
       for (const x of Si) {
         if (U.has(x)) continue;
-        const dx = dHat.get(x);
-        if (dx >= BiPrime && dx < Bi) {
-          K.push([x, dx]);
-        } else if (dx === Bi && Bi < B) {
-          D.insert(x, dx);
+        const key = orderKey(x, dHat, ties);
+        if (compareKeys(key, BiPrimeKey) >= 0 && compareKeys(key, BiKey) < 0) {
+          K.push([x, key]);
         }
       }
       if (K.length > 0) D.batchPrepend(K);
     }
 
     // B' <- min(last Bi', B); fold in the FindPivots batch below it
-    const bound = Math.min(lastBound, B);
+    const finalKey =
+      compareKeys(lastBoundKey, boundKey) < 0 ? lastBoundKey : boundKey;
     for (const x of W) {
-      if (dHat.get(x) < bound) U.add(x);
+      if (compareKeys(orderKey(x, dHat, ties), finalKey) < 0) U.add(x);
     }
-    return { bound, vertices: U };
+    return finish(finalKey, U);
   }
 
   // Method to calculate shortest paths from startNode via the BMSSP
   // recursion (Algorithm 3). The top-level call BMSSP(topLevel, ∞, {start})
   // is always a successful execution, so it completes every reachable
-  // vertex; unreachable ones keep their Infinity estimate.
+  // vertex; unreachable ones keep their Infinity estimate. Distances, hop
+  // counts and predecessor pointers all end at their canonical values —
+  // independent of edge or iteration order (#163).
   calculateShortestPaths(startNode) {
     // To clean the state before calculation
     this.initializeShortestPaths();
@@ -229,8 +258,10 @@ class BMSSP {
       throw new Error("Start node not found in the graph");
     }
 
-    // The source is complete at distance 0; everything else is Infinity
+    // The source is complete at distance 0 with zero hops and no
+    // predecessor; everything else is Infinity
     this.shortestPaths.set(startNode, 0);
+    this.hops.set(startNode, 0);
     this.bmssp(this.topLevel, Infinity, new Set([startNode]));
   }
 }

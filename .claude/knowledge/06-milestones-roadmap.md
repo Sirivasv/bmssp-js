@@ -1,9 +1,10 @@
 # 06 — Milestones Roadmap
 
-<!-- SYNCED-FROM-GITHUB: 2026-07-17 (#162 session: milestones 1.1.0/1.2.0/2.0.0 open with
-     5/5/3 open issues; #162 done-pending-merge in this PR) -->
-<!-- Current package version: 1.0.1 (released 2026-07-16; the #162 PR ships no bump under
-     the semver convention — see "Release mechanics" and PR #186) -->
+<!-- SYNCED-FROM-GITHUB: 2026-07-17 (#163 session: PRs #186 semver convention and #187
+     edge cases merged, #162 closed; milestones 1.1.0/1.2.0/2.0.0 open with 4/5/3 open
+     issues; #163 done-pending-merge in this PR) -->
+<!-- Current package version: 1.0.1 (released 2026-07-16; the #163 PR ships no bump under
+     the semver convention — enhancement, milestone still open) -->
 
 Maps GitHub **milestones** and **issues** (Sirivasv/bmssp-js) to the paper's building blocks,
 with a dependency-aware build order. This is the "intent" side of the knowledge base (what to
@@ -39,19 +40,22 @@ it runs the same Phase C reconciliation directly on `main`.
 
 ## 📋 Roadmap proposals (pending user approval)
 
-From the #162 PR (Phase C, 2026-07-17):
+From the #163 PR (Phase C, 2026-07-17):
 
-1. **Comment on #165 (input validation):** the #162 edge-case work locked in the current
-   empty-graph behavior — `new BMSSP([])` constructs silently and only
-   `calculateShortestPaths()` throws (`"Start node not found in the graph"`,
-   `test/edgeCases.test.mjs`). Propose adding a note to #165 so the validation design
-   explicitly decides whether an empty edge list should throw at construction or stay
-   allowed (and, if allowed, that the test's locked-in behavior is the contract).
+1. **Re-scope #169 (path reconstruction, milestone 1.2.0):** #163 already ships the
+   canonical predecessor map — `BMSSP.preds` holds a deterministic shortest-path tree
+   (smallest optimal parent, verified against a lexicographic oracle). Propose editing
+   #169's description: the remaining work is only exposing a public
+   `reconstructPath(target)` (walk `preds` backwards), not building `Pred[]` itself.
+2. **Comment on #168 (micro-optimizations, milestone 1.2.0):** #163's composite keys cost
+   ~10% on the 2M-node XL round (~30 s → ~33 s) — the hot spots are the per-relaxation
+   array allocations in `relaxEdge` and `compareKeys` calls in the heap/block-list. Worth
+   listing as a concrete optimization target (e.g. packed number encoding or key reuse).
 
 _Phase C writes proposed GitHub edits here (and in the PR body); Phase E executes the
 approved ones — one confirmation each — and clears them from this list._
-_(The #185-PR proposal — removal note on closed **#24** — was approved and executed
-2026-07-17. Earlier: both #161-PR proposals executed 2026-07-16 on **#163**/**#162**.)_
+_(The #187-PR proposal — empty-graph validation note on **#165** — was approved and
+executed 2026-07-17.)_
 
 ---
 
@@ -71,9 +75,12 @@ _(The #185-PR proposal — removal note on closed **#24** — was approved and e
   and dates preserved), `main` + all 21 tags force-pushed with ruleset 7764713
   temporarily disabled. **All commit SHAs before 2026-07-17 changed**; old SHAs in
   closed PRs/issues no longer resolve. Repo-local git config now signs future commits.
-- **Milestone `1.1.0` — correctness hardening** (in progress). **#162 done-pending-merge**
-  (this PR: `test/edgeCases.test.mjs`, 9 deterministic disconnection fixtures, no bump).
-  Next: **#163** (tie-breaking), then #165.
+- **Milestone `1.1.0` — correctness hardening** (in progress). #162 merged (PR #187).
+  **#163 done-pending-merge** (this PR): `src/tieBreak.mjs` composite `[length, hops, id]`
+  keys realize Assumption 2.1 end-to-end — canonical relaxation (d̂/hops/preds in
+  lockstep), strict pull separators, all pre-#163 tie guards removed (incl. the stall
+  escape hatch), strict Lemma 3.1 restored, full edge-order determinism proven by test.
+  No bump. Next: **#165** (input validation), then #164, #166.
 - **Semver release convention (user-directed 2026-07-17, PR #186):** bumps only on bug
   fix (patch) or milestone-closing PR (minor/major) — see "Release mechanics" below.
 - **2026-07-16 reflection session (post-release):** measured the BMSSP-vs-Dijkstra
@@ -112,8 +119,8 @@ Recommended order (cheapest protection first, then the deep work):
 | Order | # | Issue | Labels | Notes |
 |---|---|---|---|---|
 | 1 | 161 | Property/fuzz tests: BMSSP vs Dijkstra on random graphs | enhancement · help wanted | ✅ merged (PR #184, 1.0.1) |
-| 2 | 162 | Edge-case tests: disconnected graphs and unreachable nodes | enhancement · help wanted | ✅ done-pending-merge (this PR, no bump): deterministic fixtures in `test/edgeCases.test.mjs`; randomized side already in #161 fuzz |
-| 3 | 163 | Deterministic tie-breaking for equal-length paths (Assumption 2.1) | enhancement · help wanted | Four concrete manifestations now: three from #43, boundary-tied return from #161 |
+| 2 | 162 | Edge-case tests: disconnected graphs and unreachable nodes | enhancement · help wanted | ✅ merged (PR #187, no bump) |
+| 3 | 163 | Deterministic tie-breaking for equal-length paths (Assumption 2.1) | enhancement · help wanted | ✅ done-pending-merge (this PR, no bump): composite keys in `src/tieBreak.mjs`, all six tie manifestations resolved by construction |
 | 4 | 165 | Input validation for the BMSSP constructor | good first issue · help wanted | — |
 | 5 | 164 | Optional constant-degree transform (in/out-degree ≤ 2) | enhancement · help wanted | — |
 | 6 | 166 | JSDoc / API docs for the new modules | documentation · good first issue | `bmssp()` / `deriveParameters()` ship with JSDoc already |
@@ -179,5 +186,7 @@ release step is an outward-facing publish and is **gated on explicit user confir
 - Any `bmssp(l, B, S)` call's completed vertices+distances must equal
   `{ v : d_dijkstra(v) < B', shortest path visits S }` — `test/bmssp.test.mjs` has the
   pattern ("recursion contract" describe block).
-- Ties (equal path lengths) are the #1 source of subtle bugs — see the degenerate-tie
-  guards in `05-codebase-map.md` and the notes headed for #163.
+- Ties (equal path lengths) were the #1 source of subtle bugs until #163 resolved them
+  with composite `[length, hops, id]` keys — see "Deterministic tie-breaking" in
+  `05-codebase-map.md`. Tie-heavy graphs (0–2 weights) remain the best stress inputs;
+  `test/tieBreak.test.mjs` has the edge-order-permutation and lex-oracle patterns.

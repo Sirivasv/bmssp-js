@@ -2,6 +2,7 @@ import { describe, test, expect } from "@jest/globals";
 import { baseCase } from "../src/baseCase.mjs";
 import { BMSSP } from "../src/bmssp.mjs";
 import { dijkstra } from "../src/dijkstra.mjs";
+import { compareKeys, makeTies, orderKey } from "../src/tieBreak.mjs";
 
 // Small deterministic PRNG so stress-test failures are reproducible
 function mulberry32(seed) {
@@ -139,7 +140,7 @@ describe("baseCase partial (the k + 1 cap is hit)", () => {
     expect(shortestPaths.get(2)).toBe(2);
   });
 
-  test("ties at the boundary are all excluded (strictly-closer filter)", () => {
+  test("boundary ties are broken deterministically by the composite order (#163)", () => {
     const edges = [
       [0, 1, 5],
       [0, 2, 5],
@@ -153,10 +154,13 @@ describe("baseCase partial (the k + 1 cap is hit)", () => {
       adjacency,
       2,
     );
-    // Settled = {0} plus two of the distance-5 leaves; B' = 5, and every
-    // leaf sits exactly on the boundary, so only the source is returned
+    // Settled = {0} plus the two smallest-keyed distance-5 leaves (1, 2);
+    // the boundary is leaf 2's key [5, 1, 2] and the strictly-closer filter
+    // keeps leaf 1 — under scalar ties, smaller ids settle first. (Before
+    // #163 every tied leaf was excluded and only the source came back.)
     expect(result.bound).toBe(5);
-    expect(result.vertices).toEqual(new Set([0]));
+    expect(result.boundKey).toEqual([5, 1, 2]);
+    expect(result.vertices).toEqual(new Set([0, 1]));
   });
 
   test("the k + 1 cap still respects the bound B", () => {
@@ -252,19 +256,26 @@ describe("baseCase vs Dijkstra oracle (seeded)", () => {
       // A bound somewhere inside the distance distribution, and a small cap
       const B = finite[Math.floor(finite.length * 0.6)] + 0.5;
       const k = 1 + Math.floor(rand() * 8);
+      const ties = makeTies();
       const result = baseCase(
         B,
         new Set([0]),
         bmssp.shortestPaths,
         bmssp.adjacency,
         k,
+        ties,
       );
       // B' never exceeds B, and B' = B means full success under the bound
       expect(result.bound).toBeLessThanOrEqual(B);
-      // Every returned vertex is complete (d̂ = true distance) and below B'
+      // Every returned vertex is complete (d̂ = true distance) and strictly
+      // below B' in the composite order (#163) — in the scalar view a
+      // returned vertex may tie the boundary's length, never exceed it
       for (const v of result.vertices) {
         expect(bmssp.shortestPaths.get(v)).toBe(oracle.get(v));
-        expect(oracle.get(v)).toBeLessThan(result.bound);
+        expect(oracle.get(v)).toBeLessThanOrEqual(result.bound);
+        expect(
+          compareKeys(orderKey(v, bmssp.shortestPaths, ties), result.boundKey),
+        ).toBeLessThan(0);
       }
       // Completeness: everything with a true distance below B' is returned
       for (const [v, d] of oracle) {

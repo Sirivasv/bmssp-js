@@ -30,6 +30,7 @@ with every building block shipped, tested, and released individually:
 | `BaseCase(B, S)` — Algorithm 2, bounded mini-Dijkstra ([#40](https://github.com/Sirivasv/bmssp-js/issues/40)) | `src/baseCase.mjs` | ✅ done |
 | `FindPivots(B, S)` — Algorithm 1, frontier shrinking ([#44](https://github.com/Sirivasv/bmssp-js/issues/44)) | `src/findPivots.mjs` | ✅ done |
 | `BMSSP(l, B, S)` — Algorithm 3, the main recursion ([#43](https://github.com/Sirivasv/bmssp-js/issues/43)) | `src/bmssp.mjs` | ✅ done — **1.0.0** |
+| Deterministic tie-breaking — Assumption 2.1 realized ([#163](https://github.com/Sirivasv/bmssp-js/issues/163)) | `src/tieBreak.mjs` | ✅ done |
 
 > **Honest note:** the paper's win is asymptotic, and this repo optimizes for correctness
 > and readability, not raw speed. Measured head-to-head (algorithm time only, graph
@@ -40,8 +41,10 @@ with every building block shipped, tested, and released individually:
 > from about n = 1M on sparse graphs** (0.91× at n = 2M), and the advantage grows with
 > size: the "sorting barrier" is measurably broken; what remains is JS constant factors.
 > Where inputs violate the paper's distinct-path-lengths assumption (e.g. zero-weight
-> edges), documented tie guards keep the results correct
-> ([#163](https://github.com/Sirivasv/bmssp-js/issues/163) tracks a principled tie-break).
+> edges), a principled deterministic tie-break
+> ([#163](https://github.com/Sirivasv/bmssp-js/issues/163)) realizes that assumption in
+> code: paths are ranked by composite `(length, hops, id)` keys, so distances, predecessor
+> pointers and completed sets are identical no matter how the edge list is ordered.
 
 ## How it works (in two ideas)
 
