@@ -1,12 +1,12 @@
 # 05 — Codebase Map (current state)
 
-<!-- BOOKMARK-COMMIT: e25d89795947484726a72ae394ac19d502f86942 -->
-<!-- PENDING-PR-BRANCH: northset/bmssp-js-169 -->
-<!-- Last validated: 2026-07-19 (Phase C of the #169 PR). Describes the tree as it will
-     exist once that PR merges: BMSSP.reconstructPath(target) exposes the canonical
-     predecessor tree already maintained since #163; path-oracle tests and public usage
-     documentation are included. No version bump (mid-milestone enhancement; milestone
-     1.2.0 remains open — semver convention, 06 "Release mechanics"). -->
+<!-- BOOKMARK-COMMIT: 033733f2b2f37b2fc7ab02adab895bc693978253 -->
+<!-- PENDING-PR-BRANCH: northset/m-1052-input-validation -->
+<!-- Last validated: 2026-07-20 (Phase C of the #165 PR). Describes the tree as it will
+     exist once that PR merges: the BMSSP constructor rejects malformed edge arrays,
+     non-numeric node IDs, and invalid weights while preserving empty-graph construction.
+     No version bump (mid-milestone enhancement; milestone 1.1.0 remains open — semver
+     convention, 06 "Release mechanics"). -->
 
 Snapshot of what exists in `bmssp-js` today, so you know what to build on vs. what's missing.
 
@@ -64,7 +64,7 @@ src/
   baseCase.mjs            # #40: BaseCase(B, S) — Algorithm 2 bounded mini-Dijkstra on composite keys
   findPivots.mjs          # #44: FindPivots(B, S) — Algorithm 1 frontier shrink, canonical-pred forest
 test/
-  main.test.mjs           # Jest tests: constructor, nodeIDs, adjacency, shortestPaths, BMSSP-vs-Dijkstra (seeded 10k sparse)
+  main.test.mjs           # Jest tests: constructor validation, nodeIDs, adjacency, shortestPaths, BMSSP-vs-Dijkstra (seeded 10k sparse)
   bmssp.test.mjs          # #43: 15 recursion tests — params, hand graphs, ties, Lemma 3.1 contract, seeded stress
   fuzz.test.mjs           # #161: 18 high-volume fuzz tests — shapes × weight regimes × multi-source × seeded scale; FUZZ_ROUNDS / FUZZ_XL env vars
   edgeCases.test.mjs      # #162: 9 deterministic disconnection fixtures — isolated/sink sources, many components, source switching
@@ -101,7 +101,8 @@ direct `git push origin main` is rejected, including for docs-only bookkeeping c
 
 ```js
 class BMSSP {
-  constructor(inputGraph)          // inputGraph = array of [from, to, weight]
+  constructor(inputGraph)          // validates an array of [from, to, weight]: finite numeric
+                                   // node IDs, finite non-negative weights; [] remains valid
   //   this.graph          : deep-copied edge array
   //   this.nodeIDs        : Set of all node IDs (from both endpoints)
   //   this.shortestPaths  : Map<nodeId, distance>, initialized to Infinity  ← this is d̂[·]
@@ -124,6 +125,12 @@ class BMSSP {
                                    //      a run or when unreachable; throws for unknown target
 }
 ```
+
+**Constructor input validation (#165).** `inputGraph` must be an array; every entry must be
+an exact three-element `[from, to, weight]` array. Node IDs and weights must be finite
+numbers, and weights must be non-negative. Failures identify the offending edge index.
+An empty edge list remains valid and preserves the #162 contract: construction succeeds,
+then `calculateShortestPaths()` rejects any start node because the graph has no nodes.
 
 **`bmssp(l, B, S)` (#43):** level 0 delegates to `baseCase`. At level ≥ 1: `findPivots`
 shrinks the frontier; pivots seed a `BlockList(M = 2^((l-1)·t), B, compareKeys)`; the loop
@@ -295,7 +302,8 @@ implementation is tested against — and, since #43, no longer part of the BMSSP
 
 ## Tests — the contract
 
-- `test/main.test.mjs` (12): constructor/nodeIDs/adjacency/shortestPaths contracts, plus the
+- `test/main.test.mjs` (16): constructor input-validation failures (#165), nodeIDs,
+  adjacency, and shortestPaths contracts, plus the
   **key one** — "BMSSP vs Dijkstra" on a **seeded 10k-node sparse graph** (`sparseRandom(10_000,
   3, 1601)`, already `topLevel` 3): for a fixed source, `myBMSSP.shortestPaths` must equal
   `dijkstra(...)` for every node. (Until 2026-07-17 this ran on `roadNet-CA.txt`, an 87 MB
@@ -348,7 +356,7 @@ implementation is tested against — and, since #43, no longer part of the BMSSP
   **opt-in `FUZZ_XL=1` sparse n = 2M round** (~33 s, `test.skip` otherwise). Every failure
   message carries the round's seed for reproduction. **`FUZZ_ROUNDS=<x>`** multiplies all
   round counts (default 1 ≈ 0.5 s; 25 ≈ 10 s, several thousand graphs).
-- Current suite: **132 tests — 131 passing + 1 XL skipped by default**, 100% statement
+- Current suite: **136 tests — 135 passing + 1 XL skipped by default**, 100% statement
   coverage, ~3 s wall-clock. No graph data files: every generated test graph comes from a
   seed; the #162 fixtures are hand-built and fully deterministic.
 
@@ -375,8 +383,9 @@ comparison-count mode); the raw baseline is also on #170 as a comment.
 | Property/fuzz suite vs. the oracle | `test/fuzz.test.mjs` | #161 | ✅ done (PR #184, 1.0.1) |
 | Deterministic disconnection edge cases | `test/edgeCases.test.mjs` | #162 | ✅ done (PR #187, no bump) |
 | Deterministic tie-breaking (Assumption 2.1) | `src/tieBreak.mjs` + all modules | #163 | ✅ done (PR #188, no bump) |
-| Public shortest-path reconstruction | `BMSSP.reconstructPath()` + `test/pathReconstruction.test.mjs` | #169 | ✅ done-pending-merge (this PR, no bump) |
+| Public shortest-path reconstruction | `BMSSP.reconstructPath()` + `test/pathReconstruction.test.mjs` | #169 | ✅ done (PR #189, no bump) |
+| Constructor input validation | `BMSSP` constructor + `test/main.test.mjs` | #165 | ✅ done-pending-merge (this PR, no bump) |
 
-Milestone `1.1.0` (correctness hardening) remains in progress with #165, #164 and #166
-open. Milestone `1.2.0` is also in progress: #169 lands with this PR; see
+Milestone `1.1.0` (correctness hardening) remains in progress with #164 and #166 open
+after this PR. Milestone `1.2.0` remains in progress with #169 merged; see
 [06-milestones-roadmap.md](06-milestones-roadmap.md).

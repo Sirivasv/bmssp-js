@@ -17,6 +17,30 @@ describe("BMSSP constructor", () => {
   test("initializes the graph correctly", () => {
     expect(myBMSSP.graph).toEqual(mediumSparse);
   });
+
+  test("rejects a non-array input graph", () => {
+    expect(() => new BMSSP("not an edge array")).toThrow(
+      "Input graph must be an array of edges",
+    );
+  });
+
+  test("rejects malformed edges", () => {
+    expect(() => new BMSSP([[0, 1]])).toThrow(
+      "Edge at index 0 must be [from, to, weight]",
+    );
+  });
+
+  test("rejects non-numeric node IDs", () => {
+    expect(() => new BMSSP([["0", 1, 5]])).toThrow(
+      "Edge at index 0 must have numeric node IDs",
+    );
+  });
+
+  test("rejects negative weights", () => {
+    expect(() => new BMSSP([[0, 1, -1]])).toThrow(
+      "Edge at index 0 must have a non-negative numeric weight",
+    );
+  });
 });
 
 describe("BMSSP nodeIDs", () => {

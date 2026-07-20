@@ -32,6 +32,7 @@ with every building block shipped, tested, and released individually:
 | `BMSSP(l, B, S)` — Algorithm 3, the main recursion ([#43](https://github.com/Sirivasv/bmssp-js/issues/43)) | `src/bmssp.mjs` | ✅ done — **1.0.0** |
 | Deterministic tie-breaking — Assumption 2.1 realized ([#163](https://github.com/Sirivasv/bmssp-js/issues/163)) | `src/tieBreak.mjs` | ✅ done |
 | Shortest-path reconstruction ([#169](https://github.com/Sirivasv/bmssp-js/issues/169)) | `BMSSP.reconstructPath()` | ✅ done |
+| Constructor input validation ([#165](https://github.com/Sirivasv/bmssp-js/issues/165)) | `BMSSP` constructor | ✅ done |
 
 > **Honest note:** the paper's win is asymptotic, and this repo optimizes for correctness
 > and readability, not raw speed. Measured head-to-head (algorithm time only, graph
@@ -72,7 +73,8 @@ npm install bmssp
 ## Usage
 
 The package is ESM-only (`.mjs`). Graphs are arrays of `[from, to, weight]` edges with
-numeric node IDs and non-negative weights:
+finite numeric node IDs and finite, non-negative weights. The constructor rejects malformed
+edges with an error that identifies their array index; an empty edge array remains valid:
 
 ```javascript
 import { BMSSP } from "bmssp";

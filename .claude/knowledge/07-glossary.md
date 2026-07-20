@@ -1,7 +1,7 @@
 # 07 — Glossary
 
-<!-- Updated on: 2026-07-19 (terms last extended in the #169 PR: reconstructPath and the
-     independent path oracle used to validate source-to-target node sequences) -->
+<!-- Updated on: 2026-07-20 (terms last extended in the #165 PR: the constructor input
+     contract for graph shape, node IDs, weights, and empty graphs) -->
 
 > **Lifecycle: dynamic — updated in Phase C of every PR.** When a PR introduces new symbols
 > or terms (module names, data-structure fields, paper notation newly used in code), add
@@ -66,6 +66,10 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
 
 ## Code / repo terms
 
+- **Constructor input contract (#165)** — `new BMSSP(inputGraph)` requires an array of exact
+  `[from, to, weight]` arrays. Both node IDs and the weight must be finite numbers, and the
+  weight must be non-negative; failures identify the offending edge index. `[]` remains a
+  valid empty graph, whose `calculateShortestPaths()` call rejects every start node.
 - **`adjacency`** (#45) — `Map<nodeId, Array<[to, weight]>>` field on the `BMSSP` class:
   a node's outgoing edges, so lookups are O(1) instead of scanning the whole edge array.
   Every known node has an entry (empty array for sinks). Built in the constructor.
