@@ -138,8 +138,19 @@ graphs in a few seconds), and set `FUZZ_XL=1` for an additional 2-million-node r
 | `1.2.0` | Performance & ergonomics — exact Lemma 3.3 asymptotics, path reconstruction, BMSSP-vs-Dijkstra benchmarks | planned |
 | `2.0.0` | API generalization — public multi-source/bounded entry point, flexible inputs | planned |
 
+## Contributing (humans and AI agents welcome)
+
 Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and the
 [`help wanted` / `good first issue` labels](https://github.com/Sirivasv/bmssp-js/issues).
+
+This repo is built to be **agent-friendly, model-agnostic**: everything a coding assistant
+needs to contribute is checked in, so you can point **any AI running any model** at the
+project and it can start working **without ever reading the source paper**. Have your agent
+read [`.claude/CLAUDE.md`](.claude/CLAUDE.md) first — it lays out the full working lifecycle
+as literal, follow-along checklists — backed by a self-contained knowledge base under
+[`.claude/knowledge/`](.claude/knowledge/) (a verified transcription of the paper, the
+current codebase map, the roadmap, and a glossary). Prefer to work by hand? The same
+knowledge base reads as plain documentation.
 
 ## Other implementations on GitHub
 
