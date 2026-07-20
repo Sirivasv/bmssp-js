@@ -1,14 +1,12 @@
 # 05 — Codebase Map (current state)
 
-<!-- BOOKMARK-COMMIT: ef5153b54f2cd06883ded48785bae13eb27787ba -->
-<!-- PENDING-PR-BRANCH: feat/163-deterministic-tie-break -->
-<!-- Last validated: 2026-07-17 (Phase C of the #163 PR). Describes the tree as it will
-     exist once that PR merges: new src/tieBreak.mjs (composite [length, hops, id]
-     keys realizing Assumption 2.1), canonical relaxation through baseCase /
-     findPivots / bmssp, comparator support in MinHeap / BlockList, the pre-#163
-     degenerate-tie guards removed, test/tieBreak.test.mjs added. No version bump
-     (enhancement; milestone 1.1.0 still open — semver convention, 06 "Release
-     mechanics"). -->
+<!-- BOOKMARK-COMMIT: e25d89795947484726a72ae394ac19d502f86942 -->
+<!-- PENDING-PR-BRANCH: northset/bmssp-js-169 -->
+<!-- Last validated: 2026-07-19 (Phase C of the #169 PR). Describes the tree as it will
+     exist once that PR merges: BMSSP.reconstructPath(target) exposes the canonical
+     predecessor tree already maintained since #163; path-oracle tests and public usage
+     documentation are included. No version bump (mid-milestone enhancement; milestone
+     1.2.0 remains open — semver convention, 06 "Release mechanics"). -->
 
 Snapshot of what exists in `bmssp-js` today, so you know what to build on vs. what's missing.
 
@@ -71,6 +69,7 @@ test/
   fuzz.test.mjs           # #161: 18 high-volume fuzz tests — shapes × weight regimes × multi-source × seeded scale; FUZZ_ROUNDS / FUZZ_XL env vars
   edgeCases.test.mjs      # #162: 9 deterministic disconnection fixtures — isolated/sink sources, many components, source switching
   tieBreak.test.mjs       # #163: 16 tests — key order, canonical relaxEdge, edge-order determinism, strict Lemma 3.1, lex-oracle hops/preds
+  pathReconstruction.test.mjs # #169: 3 public-API tests — Dijkstra path oracle, unreachable/pre-run/source switching, target validation
   blockList.test.mjs      # #42: 18 BlockList tests incl. a seeded random stress test
   heap.test.mjs           # #41: 16 MinHeap tests incl. a seeded stress test vs. a naive queue
   baseCase.test.mjs       # #40: 13 BaseCase tests incl. seeded oracle-comparison stress
@@ -121,6 +120,8 @@ class BMSSP {
                                    //      scalar bound out (boundKey always composite)
   calculateShortestPaths(startNode)// #43: validates, sets d̂[start] = 0 (hop 0), runs
                                    //      bmssp(topLevel, Infinity, {startNode}) — NO Dijkstra
+  reconstructPath(target)          // #169: source→target path from canonical preds; [] before
+                                   //      a run or when unreachable; throws for unknown target
 }
 ```
 
@@ -322,6 +323,10 @@ implementation is tested against — and, since #43, no longer part of the BMSSP
   equality against an independent O(n²) lexicographic-(length, hops) Dijkstra oracle
   (hops = minimal edge count among shortest paths; preds = smallest optimal parent, chain
   reaching the source acyclically).
+- `test/pathReconstruction.test.mjs` (3, #169): the public `reconstructPath(target)` API
+  checked against an independent Dijkstra path oracle, including competing paths, an
+  unreachable vertex, calls before a run, source switching on one instance, and rejection
+  of a target that is not in the graph.
 - `test/edgeCases.test.mjs` (9, #162): deterministic hand-built disconnection fixtures,
   each checked against a hand-computed full distance map **and** the Dijkstra oracle
   (Infinity entries included): self-loop-only source, sink source (adjacency keeps an
@@ -343,7 +348,7 @@ implementation is tested against — and, since #43, no longer part of the BMSSP
   **opt-in `FUZZ_XL=1` sparse n = 2M round** (~33 s, `test.skip` otherwise). Every failure
   message carries the round's seed for reproduction. **`FUZZ_ROUNDS=<x>`** multiplies all
   round counts (default 1 ≈ 0.5 s; 25 ≈ 10 s, several thousand graphs).
-- Current suite: **129 tests — 128 passing + 1 XL skipped by default**, 100% statement
+- Current suite: **132 tests — 131 passing + 1 XL skipped by default**, 100% statement
   coverage, ~3 s wall-clock. No graph data files: every generated test graph comes from a
   seed; the #162 fixtures are hand-built and fully deterministic.
 
@@ -369,7 +374,9 @@ comparison-count mode); the raw baseline is also on #170 as a comment.
 | Main `BMSSP(l, B, S)` recursion + `k,t` derivation | `src/bmssp.mjs` | #43 | ✅ done (PR #181) — **1.0.0 milestone complete** |
 | Property/fuzz suite vs. the oracle | `test/fuzz.test.mjs` | #161 | ✅ done (PR #184, 1.0.1) |
 | Deterministic disconnection edge cases | `test/edgeCases.test.mjs` | #162 | ✅ done (PR #187, no bump) |
-| Deterministic tie-breaking (Assumption 2.1) | `src/tieBreak.mjs` + all modules | #163 | ✅ done (this PR, no bump) |
+| Deterministic tie-breaking (Assumption 2.1) | `src/tieBreak.mjs` + all modules | #163 | ✅ done (PR #188, no bump) |
+| Public shortest-path reconstruction | `BMSSP.reconstructPath()` + `test/pathReconstruction.test.mjs` | #169 | ✅ done-pending-merge (this PR, no bump) |
 
-Milestone `1.1.0` (correctness hardening) is in progress: #163 lands with this PR; next up
-are #165, #164, #166 — see [06-milestones-roadmap.md](06-milestones-roadmap.md).
+Milestone `1.1.0` (correctness hardening) remains in progress with #165, #164 and #166
+open. Milestone `1.2.0` is also in progress: #169 lands with this PR; see
+[06-milestones-roadmap.md](06-milestones-roadmap.md).

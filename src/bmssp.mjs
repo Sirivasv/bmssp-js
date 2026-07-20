@@ -264,6 +264,30 @@ class BMSSP {
     this.hops.set(startNode, 0);
     this.bmssp(this.topLevel, Infinity, new Set([startNode]));
   }
+
+  /**
+   * Reconstruct the canonical shortest path from the most recent source to
+   * target. Returns an empty array when target is unreachable or no shortest
+   * path run has completed yet.
+   *
+   * @param {number} target - A node in the graph
+   * @returns {number[]} Node IDs from the source through target
+   * @throws {Error} If target is not in the graph
+   */
+  reconstructPath(target) {
+    if (!this.nodeIDs.has(target)) {
+      throw new Error("Target node not found in the graph");
+    }
+    if (this.shortestPaths.get(target) === Infinity) return [];
+
+    const path = [target];
+    let current = target;
+    while (this.preds.has(current)) {
+      current = this.preds.get(current);
+      path.push(current);
+    }
+    return path.reverse();
+  }
 }
 
 export { BMSSP };

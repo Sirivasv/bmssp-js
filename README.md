@@ -31,6 +31,7 @@ with every building block shipped, tested, and released individually:
 | `FindPivots(B, S)` — Algorithm 1, frontier shrinking ([#44](https://github.com/Sirivasv/bmssp-js/issues/44)) | `src/findPivots.mjs` | ✅ done |
 | `BMSSP(l, B, S)` — Algorithm 3, the main recursion ([#43](https://github.com/Sirivasv/bmssp-js/issues/43)) | `src/bmssp.mjs` | ✅ done — **1.0.0** |
 | Deterministic tie-breaking — Assumption 2.1 realized ([#163](https://github.com/Sirivasv/bmssp-js/issues/163)) | `src/tieBreak.mjs` | ✅ done |
+| Shortest-path reconstruction ([#169](https://github.com/Sirivasv/bmssp-js/issues/169)) | `BMSSP.reconstructPath()` | ✅ done |
 
 > **Honest note:** the paper's win is asymptotic, and this repo optimizes for correctness
 > and readability, not raw speed. Measured head-to-head (algorithm time only, graph
@@ -84,7 +85,11 @@ const graph = new BMSSP([
 
 graph.calculateShortestPaths(0);
 console.log(graph.shortestPaths); // Map(3) { 0 => 0, 1 => 50, 2 => 25 }
+console.log(graph.reconstructPath(1)); // [0, 1]
 ```
+
+`reconstructPath(target)` uses the latest `calculateShortestPaths()` run. It returns `[]`
+when the target is unreachable (or before any run) and throws for a node outside the graph.
 
 A reference `dijkstra` implementation is also exported. See the `examples/` directory for
 more.
@@ -135,7 +140,7 @@ graphs in a few seconds), and set `FUZZ_XL=1` for an additional 2-million-node r
 | --- | --- | --- |
 | [`1.0.0`](https://github.com/Sirivasv/bmssp-js/milestones) | First end-to-end functional BMSSP (issues #40–#45) | ✅ done |
 | `1.1.0` | Correctness hardening — fuzz tests, edge cases, tie-breaking, input validation | 🔨 current focus |
-| `1.2.0` | Performance & ergonomics — exact Lemma 3.3 asymptotics, path reconstruction, BMSSP-vs-Dijkstra benchmarks | planned |
+| `1.2.0` | Performance & ergonomics — exact Lemma 3.3 asymptotics, path reconstruction, BMSSP-vs-Dijkstra benchmarks | 🔨 in progress |
 | `2.0.0` | API generalization — public multi-source/bounded entry point, flexible inputs | planned |
 
 Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and the
