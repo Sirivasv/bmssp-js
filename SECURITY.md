@@ -2,9 +2,14 @@
 
 ## Supported Versions
 
+Security fixes are applied to the latest released `1.x` line. Older `0.x` pre-release
+versions are no longer supported — please upgrade to the current release on
+[npm](https://www.npmjs.com/package/bmssp).
+
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.x     | :white_check_mark: |
+| 1.x     | :white_check_mark: |
+| 0.x     | :x:                |
 
 ## Reporting a Vulnerability
 
