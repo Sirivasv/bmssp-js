@@ -1,7 +1,7 @@
 # 07 — Glossary
 
-<!-- Updated on: 2026-07-17 (terms last extended in the roadNet-CA removal PR #185:
-     FUZZ_XL, seeded scale runs; roadNet-CA itself removed and purged from history) -->
+<!-- Updated on: 2026-07-19 (terms last extended in the #169 PR: reconstructPath and the
+     independent path oracle used to validate source-to-target node sequences) -->
 
 > **Lifecycle: dynamic — updated in Phase C of every PR.** When a PR introduces new symbols
 > or terms (module names, data-structure fields, paper notation newly used in code), add
@@ -60,6 +60,9 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
 - **BaseCase / FindPivots / BMSSP** — Algorithm 2 / Algorithm 1 / Algorithm 3. See §02.
 - **BlockList (`D`)** — Lemma 3.3 semi-sorted structure. See §03-B.
 - **Oracle** — the reference `dijkstra()` in `src/dijkstra.mjs`; ground truth for tests.
+- **Path oracle** (#169) — the independent Dijkstra implementation local to
+  `test/pathReconstruction.test.mjs`; it tracks complete node sequences and compares them
+  with `BMSSP.reconstructPath()`, without reading the production `preds` map.
 
 ## Code / repo terms
 
@@ -160,6 +163,10 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
   through `baseCase`/`findPivots`/`relaxEdge`; the `BMSSP` class owns one as `this.ties`
   (`this.hops`, `this.preds`), cleared by `initializeShortestPaths()`. Missing entries
   read as hop-0 / no-pred, so externally seeded sources need no setup.
+- **`reconstructPath(target)`** (#169) — public `BMSSP` method that walks the canonical
+  `preds` chain from `target` to the latest calculation's source, then reverses it into a
+  source-to-target node sequence. Returns `[]` before a calculation or for an unreachable
+  target; throws when `target` is not a known graph node.
 - **`boundKey`** (#163) — the composite boundary in `baseCase`/`bmssp` results: every
   returned vertex's order key is strictly below it. The scalar `bound` is its projection
   (a returned vertex may tie `bound`'s length, never exceed it).
