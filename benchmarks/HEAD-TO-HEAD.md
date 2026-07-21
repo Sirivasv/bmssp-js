@@ -108,11 +108,40 @@ less ordering work per vertex.
 
 ## Reproducing
 
-[#170](https://github.com/Sirivasv/bmssp-js/issues/170) tracks integrating both
-measurements into the `npm run bench` harness (an algorithm-only `bmssp` column in
-`scenarios.bench.mjs` plus an optional comparison-count mode). Until then, the recipe:
-build the `BMSSP` instance untimed; time `calculateShortestPaths(source)` against a
-Dijkstra traversal fed the instance's own `adjacency` Map; for comparison counts, add a
-shared counter to every distance-comparison site in `src/*.mjs` and the Dijkstra variant.
-The raw numbers above are also recorded on
+Both measurements are integrated into the harness since
+[#170](https://github.com/Sirivasv/bmssp-js/issues/170): `npm run bench` reruns the
+algorithm-only head-to-head per shape (outputs verified node-by-node), and
+`npm run bench:counts` reproduces the comparison-count tables. The latest capture lives
+in [`RESULTS.md`](./RESULTS.md); the raw 1.0.0 numbers above are also recorded on
 [#170](https://github.com/Sirivasv/bmssp-js/issues/170#issuecomment-4991749542).
+
+## Addendum — the #182 cliff investigation (2026-07-21)
+
+The two pathologies in the 1.0.0 tables above were profiled
+([#182](https://github.com/Sirivasv/bmssp-js/issues/182)); one was a fixable defect, the
+other is inherent recursion cost. Both are permanent regression sentinels in
+`npm run bench` (`star`, `sparse-random-l4`).
+
+**1. The star blowup was quadratic `BatchPrepend` bookkeeping — fixed.** CPU profiles put
+64% of star-graph self-time in `BlockList.batchPrepend`: it prepended each chunk with
+`d0.unshift`, re-shifting the whole block array per chunk. At recursion level 1 the block
+size is `M = 1`, so a hub fanning out to ~n neighbors staged ~n single-entry chunks —
+~1.25 **billion** element moves at n = 50k, and O(n²) overall, matching the superlinear
+ratios above (67.8× at 500k). The fix (all chunk blocks prepended in one concat) restores
+the documented amortized bound. Measured after: star 500k **61,090 ms → ~3,100 ms
+(67.8× → ~5.5×)**, and the ratio now *falls* with n (6.6× at 50k → 5.5× at 500k) — the
+superlinearity is gone. The residual ~5× is ordinary constant-factor overhead on a shape
+where BMSSP's frontier machinery buys nothing (one hub completes and everything else is
+distance-2). Further constant-factor work: #167 (block-index structure), #168.
+
+**2. The `topLevel` 3→4 cliff is one extra full relax pass — inherent, and much smaller
+than the 4M row suggests.** A clean straddle at the exact step (n = 262,144 → 262,145,
+one vertex apart, same seed) measures 2.71× → 3.37×: a **~+24% step**, not 3×. Per-level
+instrumentation shows BlockList work is virtually identical on both sides; the extra
+level adds one more full pass of edge relaxations out of the children's returned `U` sets
+plus another round of `U`/`W` set bookkeeping — O(m + n) of Map/Set/composite-key work
+per level, which is the recursion's designed cost model. The remaining gap up to the
+recorded 5.00× at n = 4M is memory/GC amplification at 12M edges (visible as GC time in
+profiles), not an algorithmic discontinuity. Known behavior; the per-level constant is
+#168's target. The `topLevel = 4` window at practical sizes is exactly
+n ∈ (2^18, ~376k] — `sparse-random-l4` (n = 300k) sits inside it.

@@ -1,10 +1,11 @@
 # 06 — Milestones Roadmap
 
-<!-- SYNCED-FROM-GITHUB: 2026-07-21 Phase E of the #170 PR (#170 closed by merged PR #198,
-     commit a1a9ef5; 1.2.0 open with 3 open issues #167/#168/#182; 2.0.0 open with 3
-     open issues #171/#172/#173; no release — no bump, package.json 1.1.0 == tag) -->
-<!-- Current package version: 1.1.0 — released 2026-07-21 (tag + GitHub Release with
-     Announcements discussion #197 → npm + Docker Hub via publish.yml); tag matches -->
+<!-- SYNCED-FROM-GITHUB: 2026-07-21 Phase C of the #182 PR (verified live at RKB same day:
+     1.2.0 open with 3 open issues #167/#168/#182 — #182 done-pending-merge in this PR;
+     2.0.0 open with 3 open issues #171/#172/#173) -->
+<!-- Current package version: 1.1.1 (bumped in the #182 PR — bug-fix patch for the
+     quadratic batchPrepend; release fires in Phase E after the user confirms the merge.
+     Last released: 1.1.0, 2026-07-21, Announcements discussion #197) -->
 <!-- Release-discussion convention (user-directed 2026-07-21): every GitHub Release also
      creates a linked discussion — pass --discussion-category "Announcements" to
      gh release create (the UI's "Create a discussion for this release" checkbox) -->
@@ -43,7 +44,21 @@ it runs the same Phase C reconciliation directly on `main`.
 
 ## 📋 Roadmap proposals (pending user approval)
 
-_None pending._
+From the #182 PR (Phase C, 2026-07-21):
+
+1. **Comment on #167** with the investigation's BlockList findings: the quadratic
+   per-chunk `unshift` in `batchPrepend` is fixed in the #182 PR (1.1.1), so #167's
+   remaining scope is exactly its title — the balanced-BST bound index (replacing the
+   plain-array binary search + `splice` in `insert`/`splitBlock`) and linear-time median
+   selection (replacing sort-based splits/chunking). Profiles show these are now ordinary
+   constant factors (~3–5% self-time each on sparse shapes), not cliffs.
+2. **Comment on #168** with the level/relaxation findings: the dominant recursion
+   overhead is the per-level O(m + n) pass — every completed `Ui`'s edges are re-relaxed
+   at each ancestor level with composite-key `relaxEdge` (~8.5% self-time at 300k) plus
+   `U`/`W` Set churn in `bmssp()` itself (~57% self-time at topLevel 4). The `topLevel`
+   3→4 step measures **+24%** at the exact n = 2^18 straddle; the recorded 5× at 4M is
+   that step plus GC pressure. Cheapest wins likely: reduce per-edge allocation in
+   `relaxEdge`, avoid re-scanning completed vertices' edges at upper levels.
 
 _(The #170-PR proposal — comment on **#182** with the harness's small-n reproductions —
 was approved and executed 2026-07-21: star 8.7× at n = 50k, `sparse-random-l4` 3.11× at
@@ -119,11 +134,22 @@ executed 2026-07-17.)_
   `HEAD-TO-HEAD.md` marked as the frozen 1.0.0 record. No bump, no release. The Phase E
   proposal (comment on #182 with the small-n reproductions) was approved and posted the
   same day.
-- **Coverage follow-up (user-directed, 2026-07-21, no issue, no bump):** the harness's
-  mismatch counter extracted to `bench-util.mjs` `countMismatches` (shared by
-  `scenarios.bench.mjs` and `compare-counts.bench.mjs`) and unit-tested on both branches,
-  closing the uncovered defensive lines in `compare-counts.bench.mjs` — both benchmark
-  modules now at 100% statement+branch coverage (suite 159).
+- **Coverage follow-up merged (PR #199, 2026-07-21, commit 4891318; no issue, no bump):**
+  the harness's mismatch counter extracted to `bench-util.mjs` `countMismatches` (shared
+  by `scenarios.bench.mjs` and `compare-counts.bench.mjs`) and unit-tested on both
+  branches, closing the uncovered defensive lines in `compare-counts.bench.mjs` — both
+  benchmark modules now at 100% statement+branch coverage (suite 159).
+- **#182 done-pending-merge (this PR, 2026-07-21):** cliff investigation complete. CPU
+  profiles + prototype-level instrumentation localized the **star blowup** to quadratic
+  per-chunk `d0.unshift` in `BlockList.batchPrepend` (~1.25e9 element moves at n = 50k;
+  64% of self-time) — **fixed** with a single-concat prepend (star 500k: 61 s → ~3.1 s,
+  67.8× → ~5.5×, ratio now falls with n; 2 regression tests added, suite 161). The
+  **`topLevel` 3→4 cliff** was measured at the exact straddle (n = 2^18 → 2^18 + 1, same
+  seed): an inherent **+24% step** (one extra full relax pass + Set churn per level) —
+  documented as known behavior in `HEAD-TO-HEAD.md`'s #182 addendum; the 1.0.0 record's
+  5× at 4M is that step plus GC/memory amplification. **Bug fix → patch bump 1.1.1**
+  (batchPrepend violated its documented Lemma 3.3 amortized bound); release fires in
+  Phase E. Findings feed #167/#168 (Roadmap proposals 1–2).
 - **Semver release convention (user-directed 2026-07-17, PR #186):** bumps only on bug
   fix (patch) or milestone-closing PR (minor/major) — see "Release mechanics" below.
 - **2026-07-16 reflection session (post-release):** measured the BMSSP-vs-Dijkstra
@@ -170,23 +196,20 @@ All six issues done (build order as executed — cheapest protection first, then
 
 ## Milestone `1.2.0` (milestone #3) — performance & ergonomics — CURRENT
 
-Build order: ~~#170~~ (merged, PR #198), then **#182** (use the harness's small-n
-reproductions — see the 2026-07-21 issue comment — to investigate the two measured
-cliffs), then **#167 / #168** (the optimizations the investigation informs).
+Build order: ~~#170~~ (merged, PR #198), ~~#182~~ (done-pending-merge, this PR), then
+**#167 / #168** (the structural/constant-factor work the investigation informs — see
+Roadmap proposals 1–2 for the findings each inherits).
 
 | # | Issue | Labels | Notes |
 |---|---|---|---|
-| 167 | Restore Lemma 3.3's exact asymptotics in BlockList (balanced-BST bound index + linear-time selection) | enhancement · help wanted | — |
-| 168 | Adjacency and relaxation micro-optimizations | enhancement · help wanted | — |
+| 167 | Restore Lemma 3.3's exact asymptotics in BlockList (balanced-BST bound index + linear-time selection) | enhancement · help wanted | remaining scope = bound index + median selection; the batchPrepend quadratic was fixed by #182 (1.1.1) |
+| 168 | Adjacency and relaxation micro-optimizations | enhancement · help wanted | #182 findings: per-level O(m+n) relax pass dominates; relaxEdge allocation + Set churn are the targets |
 | 169 | Optional shortest-path reconstruction (`Pred[]` → paths) | enhancement · help wanted | ✅ merged (PR #189, no bump): public API + independent path oracle |
 | 170 | BMSSP-vs-Dijkstra benchmark comparison | enhancement · help wanted | ✅ merged (PR #198, no bump): head-to-head + count mode in the harness, verified outputs |
-| 182 | Investigate BMSSP performance cliffs: high-fanout (star) graphs and recursion-level transitions | enhancement · help wanted | — |
+| 182 | Investigate BMSSP performance cliffs: high-fanout (star) graphs and recursion-level transitions | enhancement · help wanted | ✅ done-pending-merge (this PR, **patch → 1.1.1**): star = quadratic batchPrepend, fixed (61 s → ~3.1 s at 500k); level step = inherent +24%, documented (HEAD-TO-HEAD addendum) |
 
-_Note:_ #182 carries the two measured pathologies (star blowup: 67.8× at n = 500k in the
-1.0.0 record, already 8.7× at n = 50k in the harness; the `topLevel` 3→4 transition: 5× at
-n = 4M in the record, 3.11× at n = 300k via `sparse-random-l4`); likely overlaps
-#167/#168. Since #170 the harness reruns both as regression sentinels on every
-`npm run bench`, and `npm run bench:counts` reproduces the comparison-count crossover
+_Note:_ both #182 shapes stay as regression sentinels in every `npm run bench` (`star`,
+`sparse-random-l4`), and `npm run bench:counts` reproduces the comparison-count crossover
 (below 1.0 between n = 200k and n = 1M).
 
 ## Milestone `2.0.0` (milestone #4) — API-breaking generalization

@@ -112,11 +112,14 @@ harness reruns it on every `npm run bench` (fresh capture:
   (0.91× at 2M in the record). The sorting barrier is measurably broken; the
   remaining loss is constant factors.
 - **Shapes that blunt BMSSP's edge, per the harness:** `dense-random`
-  (relaxation-bound, ~4.8×), `chain` (depth, not sorting, is the cost —
-  ~8.9× against the prebuilt-adjacency baseline), `star` (extreme fanout,
-  ~8.7× already at 50k — the #182 defect), and the `topLevel` 3→4 window
-  (`sparse-random-l4`: 3.11× at 300k, against the narrowing trend on either
-  side — the #182 level-transition cliff, a regression sentinel).
+  (relaxation-bound, ~4.7×), `chain` (depth, not sorting, is the cost —
+  ~7.4× against the prebuilt-adjacency baseline), `star` (extreme fanout,
+  ~3.8× at 50k — the #182 quadratic-`batchPrepend` blowup is **fixed**, 500k
+  went 61 s → ~3 s and the ratio now falls with n), and the `topLevel` 3→4
+  window (`sparse-random-l4`: ~3× at 300k — a measured **~+24% step** at the
+  exact transition n = 2^18 → 2^18 + 1, inherent one-extra-relax-pass cost;
+  both stay as regression sentinels; see the #182 addendum in
+  [`HEAD-TO-HEAD.md`](./HEAD-TO-HEAD.md)).
 
 **Bottom line for this repo:** BMSSP is implemented here for **correctness and
 readability** — a faithful, tested rendering of the 2025 result. Pick Dijkstra
