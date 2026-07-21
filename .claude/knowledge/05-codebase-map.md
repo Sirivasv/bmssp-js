@@ -1,12 +1,15 @@
 # 05 — Codebase Map (current state)
 
-<!-- BOOKMARK-COMMIT: 033733f2b2f37b2fc7ab02adab895bc693978253 -->
-<!-- PENDING-PR-BRANCH: northset/m-1052-input-validation -->
-<!-- Last validated: 2026-07-20 (Phase C of the #165 PR). Describes the tree as it will
-     exist once that PR merges: the BMSSP constructor rejects malformed edge arrays,
-     non-numeric node IDs, and invalid weights while preserving empty-graph construction.
-     No version bump (mid-milestone enhancement; milestone 1.1.0 remains open — semver
-     convention, 06 "Release mechanics"). -->
+<!-- BOOKMARK-COMMIT: b36c05944cb011e3667da7802032599868dbfc81 -->
+<!-- PENDING-PR-BRANCH: feat/164-constant-degree-transform -->
+<!-- Last validated: 2026-07-21 (Phase C of the #164 PR). Describes the tree as it will
+     exist once that PR merges: adds the opt-in constant-degree transform
+     (src/constantDegree.mjs), re-exported from index.mjs. This same rewrite folds in the
+     Phase A reconciliation missed at the top of main: #165 (constructor input validation)
+     merged as PR #191 (commit 39f7494), and three dependabot workflow bumps (#192/#193/#194,
+     .github/workflows/** only) landed on top — the bookmark now sits at that HEAD (b36c059).
+     No version bump (mid-milestone enhancement; milestone 1.1.0 remains open with #166 —
+     semver convention, 06 "Release mechanics"). -->
 
 Snapshot of what exists in `bmssp-js` today, so you know what to build on vs. what's missing.
 
@@ -54,10 +57,11 @@ feature branch name. Step 2 above then fast-paths the post-merge session start.
 ## Layout
 
 ```
-index.mjs                 # re-exports { BMSSP } and { dijkstra }
+index.mjs                 # re-exports { BMSSP }, { dijkstra } and { constantDegreeTransform }
 src/
   bmssp.mjs               # BMSSP class — full Algorithm 3 recursion (#43); wires the pieces below
   dijkstra.mjs            # reference Dijkstra (array binary-heap) — DONE, used as oracle
+  constantDegree.mjs      # #164: opt-in constant-degree transform (in/out-degree ≤ 2); public, re-exported
   tieBreak.mjs            # #163: composite [length, hops, id] keys — Assumption 2.1 realized (compareKeys/toBound/relaxEdge)
   blockList.mjs           # #42: Lemma 3.3 block-based partial-sort structure D (comparator-aware since #163)
   heap.mjs                # #41: indexed binary min-heap (MinHeap) for BaseCase (comparator-aware since #163)
@@ -69,6 +73,7 @@ test/
   fuzz.test.mjs           # #161: 18 high-volume fuzz tests — shapes × weight regimes × multi-source × seeded scale; FUZZ_ROUNDS / FUZZ_XL env vars
   edgeCases.test.mjs      # #162: 9 deterministic disconnection fixtures — isolated/sink sources, many components, source switching
   tieBreak.test.mjs       # #163: 16 tests — key order, canonical relaxEdge, edge-order determinism, strict Lemma 3.1, lex-oracle hops/preds
+  constantDegree.test.mjs # #164: 11 tests — degree ≤ 2 on hand + seeded shapes (incl. star hub), distance preservation via oracle, BMSSP-on-transform, determinism, empty/validation
   pathReconstruction.test.mjs # #169: 3 public-API tests — Dijkstra path oracle, unreachable/pre-run/source switching, target validation
   blockList.test.mjs      # #42: 18 BlockList tests incl. a seeded random stress test
   heap.test.mjs           # #41: 16 MinHeap tests incl. a seeded stress test vs. a naive queue
@@ -300,6 +305,33 @@ with lazy stale-entry skipping (no `DecreaseKey`). Builds its own adjacency list
 array (independent of the class's `this.adjacency`). This is the **ground truth** the BMSSP
 implementation is tested against — and, since #43, no longer part of the BMSSP code path.
 
+## `src/constantDegree.mjs` — constant-degree transform (#164)
+
+```js
+constantDegreeTransform(graph)   // → { edges, copiesOf, originalOf, sourceCopy, collapse }
+// graph      : [from, to, weight][] — same input contract as the BMSSP constructor
+//              (validated identically; [] is valid → empty transform)
+// edges      : the rewritten graph, in/out-degree ≤ 2, fresh integer copy IDs from 0
+// copiesOf   : Map<originalId, copyId[]> — a vertex's port copies, in allocation order
+// originalOf : Map<copyId, originalId> — the exact inverse of copiesOf
+// sourceCopy(orig) : a canonical copy to start a run from (any works; throws for unknown)
+// collapse(dist)   : fold a transformed distance Map back onto original IDs (min over a
+//                    vertex's copies — all copies share one value, so the min is exact)
+export { constantDegreeTransform };   // PUBLIC — re-exported from index.mjs (unlike the
+                                      // algorithm-internal heap/blockList/baseCase/… modules)
+```
+
+Realizes the paper's Preliminaries assumption (§01): every vertex split into a **zero-weight
+directed cycle** of one **port copy per incident edge endpoint**. The cycle gives each copy
+exactly one in- and one out-cycle-edge, so a copy that also hosts a single original endpoint
+reaches degree 2 on that side and 1 on the other — never more (a lone copy needs no cycle).
+Because the cycle costs nothing to traverse, all copies of a vertex are mutually reachable at
+zero added distance, so each copy's distance equals the original vertex's: **distance-preserving**.
+**Opt-in and correctness-independent** — nothing in `bmssp.mjs`/`baseCase.mjs`/`findPivots.mjs`
+calls it; BMSSP is correct on the untransformed graph. A caller opts in by transforming the
+graph, running from `sourceCopy(source)`, and `collapse()`-ing the result. Output is
+edge-order deterministic (copies allocated in edge order); ~2m copies, ~3m edges — O(m).
+
 ## Tests — the contract
 
 - `test/main.test.mjs` (16): constructor input-validation failures (#165), nodeIDs,
@@ -331,6 +363,16 @@ implementation is tested against — and, since #43, no longer part of the BMSSP
   equality against an independent O(n²) lexicographic-(length, hops) Dijkstra oracle
   (hops = minimal edge count among shortest paths; preds = smallest optimal parent, chain
   reaching the source acyclically).
+- `test/constantDegree.test.mjs` (11, #164): the opt-in `constantDegreeTransform`. Degree
+  bound (in/out ≤ 2) on a hand-built hub and on all five seeded benchmark shapes — the
+  **star** hub (degree ~2(n−1) before) is the key case; per-endpoint copy counts and the
+  copiesOf/originalOf inverse; zero-weight cycle edges (and a single-copy vertex getting no
+  cycle). Distance preservation checked by `collapse`-ing a transformed-graph distance map
+  back onto original IDs and comparing to the **Dijkstra oracle on the original** — from
+  *every* source, across the five shapes plus self-loop/zero-weight fixtures — and separately
+  with **BMSSP itself** run on the transform. Determinism (collapsed distances invariant
+  under edge-list permutation), the empty-graph transform, and constructor-parity input
+  validation round it out.
 - `test/pathReconstruction.test.mjs` (3, #169): the public `reconstructPath(target)` API
   checked against an independent Dijkstra path oracle, including competing paths, an
   unreachable vertex, calls before a run, source switching on one instance, and rejection
@@ -356,8 +398,9 @@ implementation is tested against — and, since #43, no longer part of the BMSSP
   **opt-in `FUZZ_XL=1` sparse n = 2M round** (~33 s, `test.skip` otherwise). Every failure
   message carries the round's seed for reproduction. **`FUZZ_ROUNDS=<x>`** multiplies all
   round counts (default 1 ≈ 0.5 s; 25 ≈ 10 s, several thousand graphs).
-- Current suite: **136 tests — 135 passing + 1 XL skipped by default**, 100% statement
-  coverage, ~3 s wall-clock. No graph data files: every generated test graph comes from a
+- Current suite: **147 tests — 146 passing + 1 XL skipped by default**, 100% statement
+  coverage, ~7 s wall-clock (the #164 distance-preservation sweeps run BMSSP/Dijkstra from
+  every source). No graph data files: every generated test graph comes from a
   seed; the #162 fixtures are hand-built and fully deterministic.
 
 ## Benchmarks (`benchmarks/`, `npm run bench`)
@@ -384,8 +427,9 @@ comparison-count mode); the raw baseline is also on #170 as a comment.
 | Deterministic disconnection edge cases | `test/edgeCases.test.mjs` | #162 | ✅ done (PR #187, no bump) |
 | Deterministic tie-breaking (Assumption 2.1) | `src/tieBreak.mjs` + all modules | #163 | ✅ done (PR #188, no bump) |
 | Public shortest-path reconstruction | `BMSSP.reconstructPath()` + `test/pathReconstruction.test.mjs` | #169 | ✅ done (PR #189, no bump) |
-| Constructor input validation | `BMSSP` constructor + `test/main.test.mjs` | #165 | ✅ done-pending-merge (this PR, no bump) |
+| Constructor input validation | `BMSSP` constructor + `test/main.test.mjs` | #165 | ✅ merged (PR #191, no bump) |
+| Optional constant-degree transform (in/out-degree ≤ 2) | `src/constantDegree.mjs` + `test/constantDegree.test.mjs` | #164 | ✅ done-pending-merge (this PR, no bump) |
 
-Milestone `1.1.0` (correctness hardening) remains in progress with #164 and #166 open
-after this PR. Milestone `1.2.0` remains in progress with #169 merged; see
-[06-milestones-roadmap.md](06-milestones-roadmap.md).
+Milestone `1.1.0` (correctness hardening) remains in progress with **only #166 open**
+after this PR — its closing PR will bump **minor → 1.1.0**. Milestone `1.2.0` remains in
+progress with #169 merged; see [06-milestones-roadmap.md](06-milestones-roadmap.md).
