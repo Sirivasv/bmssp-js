@@ -38,17 +38,21 @@ with every building block shipped, tested, and released individually:
 | Performance-cliff investigation; quadratic `BatchPrepend` fixed ([#182](https://github.com/Sirivasv/bmssp-js/issues/182)) | `src/blockList.mjs` | ✅ done — **1.1.1** |
 | Exact Lemma 3.3 asymptotics: balanced-BST bound index + linear-time selection ([#167](https://github.com/Sirivasv/bmssp-js/issues/167)) | `src/boundIndex.mjs` + `src/select.mjs` | ✅ done |
 | Relaxation micro-optimizations: allocation-free hot loops, −13–23% wall-clock ([#168](https://github.com/Sirivasv/bmssp-js/issues/168)) | `src/tieBreak.mjs` + the algorithm modules | ✅ done — **1.2.0** |
+| Dense-index core: typed-array labels + CSR adjacency, ~½ the wall-clock ([#205](https://github.com/Sirivasv/bmssp-js/issues/205)) | `src/bmssp.mjs` (CSR) + `src/tieBreak.mjs` (typed labels) | ✅ done |
 
 > **Honest note:** the paper's win is asymptotic, and this repo optimizes for correctness
-> and readability, not raw speed. Measured head-to-head (algorithm time only, graph
-> loading excluded — rerun it yourself with `npm run bench`; methodology and the deep
-> 1.0.0 record in [benchmarks/HEAD-TO-HEAD.md](benchmarks/HEAD-TO-HEAD.md)):
-> Dijkstra still wins on wall-clock at every practical size, though the gap narrows as
-> sparse graphs grow (2.5× at 50k nodes → 1.57× at 2M). But in the paper's own metric —
+> and readability first — but the constant factors have come down a lot. Measured
+> head-to-head (algorithm time only, graph loading excluded — rerun it yourself with
+> `npm run bench`; methodology and the deep 1.0.0 record in
+> [benchmarks/HEAD-TO-HEAD.md](benchmarks/HEAD-TO-HEAD.md)): Dijkstra still wins on
+> wall-clock, but after the dense-index engine
+> ([#205](https://github.com/Sirivasv/bmssp-js/issues/205): typed-array labels + CSR
+> adjacency) **BMSSP is within ~1.1–1.4× on sparse graphs** (sparse-random 1.38×,
+> sparse-l4 1.07×, dense 1.16×) — down from ~2.5× before. And in the paper's own metric —
 > **comparisons between path lengths** — BMSSP does **fewer comparisons than Dijkstra
 > from under n = 50k on sparse graphs** (`npm run bench:counts` measures 0.95× at 50k →
 > 0.76× at 200k → **0.65× at 1M**), and the advantage grows with size: the "sorting
-> barrier" is measurably broken; what remains is JS constant factors. That crossover
+> barrier" is measurably broken. That crossover
 > used to sit at ~n = 1M until [#167](https://github.com/Sirivasv/bmssp-js/issues/167)
 > replaced the block structure's sort-based internals with the paper's exact machinery
 > (balanced-BST bound index + deterministic linear-time selection).
@@ -74,12 +78,13 @@ with every building block shipped, tested, and released individually:
    ordered *between* blocks but unsorted *within* them — enough to repeatedly pull the next
    closest batch without paying the Θ(log n)-per-vertex "sorting barrier."
 
-The wall-clock crossover point is astronomically large, but the asymptotics are real: in
-measured comparison counts this implementation already beats Dijkstra from under 50k
-nodes on sparse graphs, by a third at 1M
-([benchmarks/HEAD-TO-HEAD.md](benchmarks/HEAD-TO-HEAD.md)). This repo
-optimizes for a **correct, readable, well-tested** implementation, validated line-by-line
-against a Dijkstra oracle — not for raw speed.
+Dijkstra still wins the wall-clock race, but only by a small margin on sparse graphs now
+(~1.1–1.4× since the dense-index engine); in measured comparison counts this
+implementation already beats Dijkstra from under 50k nodes on sparse graphs, by a third
+at 1M ([benchmarks/HEAD-TO-HEAD.md](benchmarks/HEAD-TO-HEAD.md)). This repo optimizes for
+a **correct, readable, well-tested** implementation, validated line-by-line against a
+Dijkstra oracle first — with the constant factors brought down where it doesn't cost
+clarity.
 
 ## Installation
 
@@ -190,7 +195,7 @@ graphs in a few seconds), and set `FUZZ_XL=1` for an additional 2-million-node r
 | [`1.0.0`](https://github.com/Sirivasv/bmssp-js/milestones) | First end-to-end functional BMSSP (issues #40–#45) | ✅ done |
 | `1.1.0` | Correctness hardening — fuzz tests, edge cases, tie-breaking, input validation, constant-degree transform, API docs | ✅ done |
 | `1.2.0` | Performance & ergonomics — exact Lemma 3.3 asymptotics, BMSSP-vs-Dijkstra benchmarks, cliff investigation, relaxation micro-optimizations | ✅ done |
-| `2.0.0` | API generalization — public multi-source/bounded entry point, flexible inputs | 🔨 next |
+| `2.0.0` | API generalization — dense-index engine (done), typed/flexible inputs, public multi-source/bounded entry point | 🔨 current |
 
 ## Contributing (humans and AI agents welcome)
 

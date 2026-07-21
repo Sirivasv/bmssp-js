@@ -1,7 +1,6 @@
 import {
   compareKeyParts,
   toBound,
-  makeTies,
   relaxEdge,
   RELAX_LOST,
 } from "./tieBreak.mjs";
@@ -15,17 +14,19 @@ import {
  * the pivots need to be carried into the deeper BMSSP recursion.
  *
  * Preconditions (guaranteed by the caller, Algorithm 3):
- * - Every vertex in S is complete (dHat holds its true distance).
+ * - Every vertex in S is complete (labels.dist holds its true distance).
  * - Every incomplete vertex v with d(v) < B has a shortest path through some
  *   complete vertex in S.
  *
- * Distance estimates are read from and written into dHat in place — exactly
- * like the paper's global d̂[·] labels, so improvements made here are visible
- * to the levels above. Relaxation is canonical (#163, src/tieBreak.mjs):
- * d̂, hops and preds move together under the composite [length, hops, id]
- * order, and an exact-equality result re-admits a vertex to W through its
- * one canonical label-setter (the paper's `≤` made deterministic). The `< B`
- * test only gates membership in W; d̂ updates are not gated.
+ * Since #205 the engine works on dense vertex indices: S holds indices, the
+ * graph is the class's CSR bundle, and the labels are the shared typed
+ * arrays (see tieBreak's makeLabels) — updated in place, exactly like the
+ * paper's global d̂[·], so improvements made here are visible to the levels
+ * above. Relaxation is canonical (#163): dist, hops and preds move together
+ * under the composite [length, hops, index] order, and an exact-equality
+ * result re-admits a vertex to W through its one canonical label-setter (the
+ * paper's `≤` made deterministic). The `< B` test only gates membership in
+ * W; label updates are not gated.
  *
  * The paper's tight-edge forest falls out of the canonical labels: each
  * vertex of W \ S hangs off its recorded canonical predecessor, which is
@@ -44,19 +45,20 @@ import {
  *
  * @param {number|[number, number, *]} B - Strict upper bound gating membership
  *   in W: a number (Infinity is allowed) or a composite bound
- * @param {Set<*>|Iterable<*>} S - Non-empty set of complete frontier sources
- * @param {Map<*, number>} dHat - Global distance estimates d̂[·], updated in place
- * @param {Map<*, Array<[*, number]>>} adjacency - nodeId -> outgoing [to, weight] edges
+ * @param {Set<number>|Iterable<number>} S - Non-empty set of complete frontier
+ *   source indices
+ * @param {{ dist: Float64Array, hops: Uint32Array, preds: Int32Array }} labels
+ *   - Engine label state (d̂[·] and tie-break labels), updated in place
+ * @param {{ offsets: Uint32Array, targets: Uint32Array, weights: Float64Array }} csr
+ *   - The graph in CSR layout over dense indices
  * @param {number} k - Relaxation rounds / tree-size threshold, >= 1 (floored);
  *   the paper's ⌊log^(1/3) n⌋
- * @param {{ hops: Map<*, number>, preds: Map<*, *> }} [ties] - Canonical
- *   tie-break labels updated alongside dHat; fresh throwaway maps by default
- * @returns {{ pivots: Set<*>, W: Set<*> }} The pivot subset of S and the set W
- *   of vertices touched below B (W always contains S)
+ * @returns {{ pivots: Set<number>, W: Set<number> }} The pivot subset of S and
+ *   the set W of vertex indices touched below B (W always contains S)
  * @throws {Error} If k is not a number >= 1, S is empty, or any source has no
  *   finite distance estimate
  */
-function findPivots(B, S, dHat, adjacency, k, ties = makeTies()) {
+function findPivots(B, S, labels, csr, k) {
   if (typeof k !== "number" || Number.isNaN(k) || k < 1) {
     throw new Error("k must be a number >= 1");
   }
@@ -66,12 +68,12 @@ function findPivots(B, S, dHat, adjacency, k, ties = makeTies()) {
     throw new Error("S must contain at least one source node");
   }
   for (const x of sources) {
-    const distance = dHat.get(x);
-    if (typeof distance !== "number" || !Number.isFinite(distance)) {
+    if (!Number.isFinite(labels.dist[x])) {
       throw new Error("every source must have a finite distance estimate");
     }
   }
   const boundKey = toBound(B);
+  const { offsets, targets, weights } = csr;
 
   // W accumulates everything relaxed below B; layer is the paper's W_{i-1}
   const sourceSet = new Set(sources);
@@ -81,20 +83,17 @@ function findPivots(B, S, dHat, adjacency, k, ties = makeTies()) {
   for (let i = 1; i <= rounds; i += 1) {
     const nextLayer = new Set();
     for (const u of layer) {
-      const edges = adjacency.get(u);
-      if (edges === undefined) continue;
-      for (let j = 0; j < edges.length; j += 1) {
-        const edge = edges[j];
-        const v = edge[0];
-        // Canonical relaxation: d̂ updates are not gated by B (paper), and
-        // both improvements and exact canonical equality admit v to the
+      for (let e = offsets[u]; e < offsets[u + 1]; e += 1) {
+        const v = targets[e];
+        // Canonical relaxation: label updates are not gated by B (paper),
+        // and both improvements and exact canonical equality admit v to the
         // next layer when its key is below B. Non-lost ⇒ v's stored label
         // is the candidate, so the W gate compares the unpacked stored
         // components — no key allocation (#168).
-        const result = relaxEdge(u, v, edge[1], dHat, ties);
+        const result = relaxEdge(u, v, weights[e], labels);
         if (
           result !== RELAX_LOST &&
-          compareKeyParts(dHat.get(v), ties.hops.get(v) ?? 0, v, boundKey) < 0
+          compareKeyParts(labels.dist[v], labels.hops[v], v, boundKey) < 0
         ) {
           nextLayer.add(v);
         }
@@ -114,7 +113,7 @@ function findPivots(B, S, dHat, adjacency, k, ties = makeTies()) {
   const children = new Map();
   for (const v of W) {
     if (sourceSet.has(v)) continue;
-    const parent = ties.preds.get(v);
+    const parent = labels.preds[v];
     if (!children.has(parent)) children.set(parent, []);
     children.get(parent).push(v);
   }

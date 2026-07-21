@@ -1,11 +1,10 @@
 # 06 — Milestones Roadmap
 
-<!-- SYNCED-FROM-GITHUB: 2026-07-21 Phase C of the #168 PR (verified live at RKB the
-     same day: 1.2.0 open with 1 open issue #168 — done-pending-merge in this PR;
-     2.0.0 open with 3 open issues #171/#172/#173) -->
-<!-- Current package version: 1.2.0 (bumped in the #168 PR — milestone-closing minor;
-     release fires in Phase E after the user confirms the merge. Last released: 1.1.1,
-     2026-07-21, with Announcements discussion) -->
+<!-- SYNCED-FROM-GITHUB: 2026-07-21 Phase C of the #205 PR (verified live at RKB the same
+     day: 1.2.0 CLOSED with 5/5 done; 2.0.0 open with 4 open issues #171/#172/#173/#205 —
+     #205 done-pending-merge in this PR) -->
+<!-- Current package version: 1.2.0 — released 2026-07-21 (tag + GitHub Release with
+     Announcements discussion → npm + Docker Hub via publish.yml); tag matches -->
 <!-- Release-discussion convention (user-directed 2026-07-21): every GitHub Release also
      creates a linked discussion — pass --discussion-category "Announcements" to
      gh release create (the UI's "Create a discussion for this release" checkbox) -->
@@ -44,19 +43,27 @@ it runs the same Phase C reconciliation directly on `main`.
 
 ## 📋 Roadmap proposals (pending user approval)
 
-From the #168 PR (Phase C, 2026-07-21):
+From the #205 PR (Phase C, 2026-07-21):
 
-1. **Close milestone `1.2.0`** once this PR merges — #168 is its last open issue
-   (5/5 done: #167/#168/#169/#170/#182).
-2. **Open a new 2.0.0 issue: "Dense-index core: typed-array labels + CSR adjacency".**
-   Post-#168 profiles put ~38% of self-time in `relaxEdge`'s label-Map traffic (5–6
-   `Map` ops per edge attempt) and ~24% in `bmssp()`'s Set bookkeeping. The next real
-   wall-clock lever is mapping node IDs to dense indices once and holding d̂/hops/preds
-   in typed arrays with CSR adjacency — but that reshapes the public label contracts
-   (`shortestPaths` Map, `bmssp(l, B, S)`'s in-place d̂ seeding for multi-source
-   callers), so it belongs in the 2.0.0 API-breaking milestone alongside #172
-   (typed/flexible graph inputs), not in a micro-optimization PR.
+1. **Comment on #172 (typed / flexible graph inputs)** with the engine baseline it now
+   builds on: #205 landed the dense-index core, so the class already maps ids → dense
+   indices (sorted-id order) and stores the graph as CSR (`this.csr`) + typed labels.
+   #172's builder/typed-input forms should **construct straight into that index+CSR
+   layout** rather than the `[from,to,weight]` array, and #172 is the natural place to
+   expose an explicit vertex-set / id-normalization API (today ids are inferred from
+   edges and sorted). Note the surprising #205 result — the dense engine roughly halved
+   wall-clock (sparse-random head-to-head 2.5× → **1.38×**), so typed inputs are now the
+   main remaining constant-factor lever before #171/#173.
+2. **Reassess the #205↔#171 ordering (no GitHub write, build-order note):** #205 kept the
+   public API backward-compatible (the `bmssp(l,B,S)` wrapper still speaks ids and seeds
+   via `shortestPaths`), so #171's public multi-source entrypoint is now a **surface**
+   design over a finished engine — confirming the RKB build order #205 → #172 → #171 →
+   #173. No issue edit needed; recorded here and in #173's stabilization scope.
 
+_(The #168-PR proposals — close milestone **1.2.0** (5/5 done) and open the
+**dense-index core** issue (typed-array labels + CSR adjacency; label-Map traffic ~38%
+of post-#168 self-time) — were approved and executed 2026-07-21: milestone #3 closed,
+issue **#205** created in 2.0.0.)_
 _(The #167-PR proposal — the post-#167 baseline comment on **#168** (BlockList no longer
 a count factor, crossover now <50k; relaxEdge allocation / Set churn / per-level relax
 pass are the remaining targets; #168 is the milestone-closing issue) — was approved and
@@ -175,7 +182,8 @@ executed 2026-07-17.)_
   `HEAD-TO-HEAD.md`; `RESULTS.md` recaptured; stale crossover blurbs updated in the
   harness and `benchmarks/README.md`. The Phase E proposal (baseline comment on #168)
   was approved and posted the same day.
-- **#168 done-pending-merge (this PR, 2026-07-21; minor → 1.2.0):** relaxation
+- **#168 merged (PR #203, 2026-07-21, commit f7052c5; minor → 1.2.0, released and
+  milestone closed same day):** relaxation
   micro-optimizations. `relaxEdge` reworked allocation-free (returns `RELAX_LOST` /
   `RELAX_EQUAL` / `RELAX_IMPROVED` codes; the old per-attempt `{ key, improved }`
   object + up to three throwaway key arrays are gone — callers materialize a key with
@@ -193,6 +201,25 @@ executed 2026-07-17.)_
   Suite 186 (+1 compareKeyParts agreement sweep; relaxEdge unit tests updated to the
   code contract); FUZZ_ROUNDS=25 and FUZZ_XL green. Next lever (label-Map traffic,
   ~38% self-time) proposed as a 2.0.0 dense-index issue (Roadmap proposal 2).
+- **#205 done-pending-merge (this PR, 2026-07-21; no bump — API-non-breaking):** the
+  dense-index core, first issue of milestone 2.0.0. `buildIndex()` assigns every node id
+  a dense index in **ascending-id order**, lays the graph out in **CSR** typed arrays
+  (`this.csr` = offsets/targets/weights), and holds d̂/hops/preds as typed arrays
+  (`makeLabels` in `tieBreak`: Float64/Uint32/Int32). `baseCase`/`findPivots`/the new
+  `bmsspIndex` recursion run **entirely on indices** — `relaxEdge` reads/writes the typed
+  arrays, edge loops walk CSR ranges, `NO_PRED` became `-1`. Because index order = id
+  order, canonical labels are byte-for-byte identical to the Map engine (the whole
+  determinism + oracle suite passes unchanged — the correctness proof). **The public API
+  did NOT change:** `bmssp(l,B,S)` is now a thin id↔index wrapper (syncLabelsIn/Out +
+  boundToEngine/keyToPublic), `shortestPaths`/`hops`/`preds` stay the public Maps,
+  `reconstructPath` reads the mirror. **Result: roughly halved wall-clock** — clean A/B
+  vs 1.2.0: sparse 50k ~104 → ~53 ms, star ~145 → ~100 ms, sparse-l4 300k ~982 → ~424 ms;
+  head-to-head **sparse-random 2.5× → 1.38×**, l4 1.07×, dense 1.16×. Comparison counts
+  unchanged (0.95×/0.76×/0.65× sparse). Suite 191 (+5: 4 #205 boundary tests in
+  `bmssp.test.mjs` + a `makeLabels`-defaults check; `baseCase`/`findPivots`/`tieBreak`
+  unit tests rewritten to drive the index API); 100% statement coverage, lint clean,
+  FUZZ_ROUNDS=25 + FUZZ_XL green. Roadmap proposals: engine-baseline comment on #172,
+  build-order confirmation for #171/#173.
 - **Semver release convention (user-directed 2026-07-17, PR #186):** bumps only on bug
   fix (patch) or milestone-closing PR (minor/major) — see "Release mechanics" below.
 - **2026-07-16 reflection session (post-release):** measured the BMSSP-vs-Dijkstra
@@ -237,16 +264,16 @@ All six issues done (build order as executed — cheapest protection first, then
 | 5 | 164 | Optional constant-degree transform (in/out-degree ≤ 2) | enhancement · help wanted | ✅ merged (PR #195, no bump): `src/constantDegree.mjs`, opt-in + distance-preserving, re-exported |
 | 6 | 166 | JSDoc / API docs for the new modules | documentation · good first issue | ✅ merged (PR #196, **minor → `1.1.0`**, released 2026-07-21): JSDoc on `index.mjs`'s re-exports + `docs/index.html` rewritten as the public-API reference (`BMSSP`, `dijkstra`, `constantDegreeTransform`; internals stay out). **Closed milestone 1.1.0** |
 
-## Milestone `1.2.0` (milestone #3) — performance & ergonomics — CURRENT
+## Milestone `1.2.0` (milestone #3) — performance & ergonomics — ✅ CLOSED (released 2026-07-21)
 
 Build order (as executed): ~~#170~~ (merged, PR #198), ~~#182~~ (merged, PR #200, 1.1.1),
-~~#167~~ (merged, PR #202), ~~#168~~ (done-pending-merge, this PR, **minor → 1.2.0**) —
-all five issues done; the milestone closes in Phase E.
+~~#167~~ (merged, PR #202), ~~#168~~ (merged, PR #203, **minor → 1.2.0**, released
+2026-07-21) — all five issues done; milestone closed 2026-07-21.
 
 | # | Issue | Labels | Notes |
 |---|---|---|---|
 | 167 | Restore Lemma 3.3's exact asymptotics in BlockList (balanced-BST bound index + linear-time selection) | enhancement · help wanted | ✅ merged (PR #202, no bump): `BoundIndex` AVL sequence + `partitionByRank` introselect; count crossover moved ~1M → <50k (0.66× at 1M); wall-clock at-or-better |
-| 168 | Adjacency and relaxation micro-optimizations | enhancement · help wanted | ✅ done-pending-merge (this PR, **minor → 1.2.0**): allocation-free relaxEdge (RELAX_* codes) + compareKeyParts routing + indexed edge loops → −13–23% wall-clock, counts down ~1–3%; heap strategy measured, indexed MinHeap kept; dense-index core proposed as a 2.0.0 issue |
+| 168 | Adjacency and relaxation micro-optimizations | enhancement · help wanted | ✅ merged (PR #203, **minor → 1.2.0**, released 2026-07-21): allocation-free relaxEdge (RELAX_* codes) + compareKeyParts routing + indexed edge loops → −13–23% wall-clock, counts down ~1–3%; heap strategy measured, indexed MinHeap kept; dense-index follow-up = #205 (2.0.0) |
 | 169 | Optional shortest-path reconstruction (`Pred[]` → paths) | enhancement · help wanted | ✅ merged (PR #189, no bump): public API + independent path oracle |
 | 170 | BMSSP-vs-Dijkstra benchmark comparison | enhancement · help wanted | ✅ merged (PR #198, no bump): head-to-head + count mode in the harness, verified outputs |
 | 182 | Investigate BMSSP performance cliffs: high-fanout (star) graphs and recursion-level transitions | enhancement · help wanted | ✅ merged (PR #200, **patch → 1.1.1**, released 2026-07-21): star = quadratic batchPrepend, fixed (61 s → ~3.1 s at 500k); level step = inherent +24%, documented (HEAD-TO-HEAD addendum) |
@@ -255,13 +282,22 @@ _Note:_ both #182 shapes stay as regression sentinels in every `npm run bench` (
 `sparse-random-l4`), and `npm run bench:counts` reproduces the comparison-count crossover
 (below 1.0 before n = 50k since #167; ~n = 1M in the 1.0.0/1.1.1 records).
 
-## Milestone `2.0.0` (milestone #4) — API-breaking generalization
+## Milestone `2.0.0` (milestone #4) — API-breaking generalization — CURRENT
 
-| # | Issue | Labels |
-|---|---|---|
-| 171 | Public multi-source / bounded BMSSP entrypoint | enhancement · help wanted |
-| 172 | Typed / flexible graph inputs | enhancement · help wanted |
-| 173 | Stabilize the public API surface for 1.0 → 2.0 | documentation · enhancement |
+Build order (derived 2026-07-21 at RKB, after 1.2.0 closed): ~~#205~~
+(done-pending-merge, this PR) → **#172 → #171 → #173**. Rationale: the dense-index engine
+(#205) decides the internal shapes every new API wraps, so it went first — the
+alternatives would build #171/#172 on the Map core and rebuild them; typed inputs (#172)
+then feed CSR directly; the public multi-source entrypoint (#171) is designed
+value-in/value-out over the finished engine; and stabilization (#173) locks the surface
+last and takes the **major → 2.0.0** bump as the milestone-closing PR.
+
+| # | Issue | Labels | Notes |
+|---|---|---|---|
+| 205 | Dense-index core: typed-array labels + CSR adjacency | enhancement | ✅ done-pending-merge (this PR, no bump — API-non-breaking): sorted-id index + CSR + typed labels; wall-clock ~halved (sparse head-to-head 2.5× → 1.38×), counts unchanged |
+| 172 | Typed / flexible graph inputs | enhancement · help wanted | NEXT — after #205 builder forms ingest straight into index+CSR (`this.csr`); the main remaining constant-factor lever |
+| 171 | Public multi-source / bounded BMSSP entrypoint | enhancement · help wanted | value-in/value-out API over the dense engine; #205 kept the id-based `bmssp(l,B,S)` wrapper, so this is surface design |
+| 173 | Stabilize the public API surface for 1.0 → 2.0 | documentation · enhancement | milestone-closing: per-module public/private decision, migration note, **major → 2.0.0** |
 
 _Note after #43:_ `bmssp(l, B, S)` already **is** a bounded multi-source call internally —
 #171 is mostly about designing the public API around it (initial per-source distances,

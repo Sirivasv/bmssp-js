@@ -1,14 +1,15 @@
 # 05 — Codebase Map (current state)
 
-<!-- BOOKMARK-COMMIT: 1af81c2 -->
-<!-- PENDING-PR-BRANCH: feat/168-relaxation-micro-optimizations -->
-<!-- Last validated: 2026-07-21 (Phase C of the #168 PR). Describes the tree as it will
-     exist once that PR merges: relaxation micro-optimizations — allocation-free
-     relaxEdge (RELAX_* codes), compareKeyParts for unpacked band routing, indexed edge
-     loops. Wall-clock −13–23% (sparse-l4 ~1123→~862 ms); counts −1–3%. Heap strategy
-     measured: indexed kept (lazy wins only an isolated micro-benchmark; end-to-end
-     noise). Milestone-closing PR → minor bump 1.2.0 (release in Phase E after the
-     user confirms the merge). -->
+<!-- BOOKMARK-COMMIT: f7052c5 -->
+<!-- PENDING-PR-BRANCH: feat/205-dense-index-core -->
+<!-- Last validated: 2026-07-21 (Phase C of the #205 PR). Describes the tree as it will
+     exist once that PR merges: the dense-index engine — node ids mapped to dense
+     indices once (sorted-id order), the graph in CSR arrays, and d̂/hops/preds in typed
+     arrays (src/tieBreak.mjs makeLabels). The algorithm modules run entirely on indices;
+     the BMSSP class keeps a thin id<->index boundary (public Maps unchanged). Wall-clock
+     roughly halved (sparse 50k ~104->~53 ms, l4 300k ~982->~424 ms); counts unchanged.
+     First 2.0.0-milestone issue, mid-milestone → NO bump (the API stayed
+     backward-compatible; #173 takes the major bump). -->
 
 
 Snapshot of what exists in `bmssp-js` today, so you know what to build on vs. what's missing.
@@ -63,14 +64,15 @@ src/
   bmssp.mjs               # BMSSP class — full Algorithm 3 recursion (#43); wires the pieces below
   dijkstra.mjs            # reference Dijkstra (array binary-heap) — DONE, used as oracle
   constantDegree.mjs      # #164: opt-in constant-degree transform (in/out-degree ≤ 2); public, re-exported
-  tieBreak.mjs            # #163: composite [length, hops, id] keys — Assumption 2.1 realized (compareKeys/toBound/relaxEdge)
+  tieBreak.mjs            # #163: composite [length, hops, index] keys — Assumption 2.1 realized; since #205
+                          #      also the engine label state: makeLabels (typed d̂/hops/preds), labelKey, relaxEdge
   blockList.mjs           # #42: Lemma 3.3 block-based partial-sort structure D (comparator-aware since #163;
                           #      exact Lemma 3.3 asymptotics since #167 via boundIndex + select)
   boundIndex.mjs          # #167: AVL ordered block sequence — the paper's balanced-BST bound index (BoundIndex)
   select.mjs              # #167: deterministic worst-case-linear selection (partitionByRank, median of medians)
   heap.mjs                # #41: indexed binary min-heap (MinHeap) for BaseCase (comparator-aware since #163)
-  baseCase.mjs            # #40: BaseCase(B, S) — Algorithm 2 bounded mini-Dijkstra on composite keys
-  findPivots.mjs          # #44: FindPivots(B, S) — Algorithm 1 frontier shrink, canonical-pred forest
+  baseCase.mjs            # #40: BaseCase(B, S) — Algorithm 2 bounded mini-Dijkstra; on the CSR + typed labels (#205)
+  findPivots.mjs          # #44: FindPivots(B, S) — Algorithm 1 frontier shrink, canonical-pred forest (dense indices, #205)
 test/
   main.test.mjs           # Jest tests: constructor validation, nodeIDs, adjacency, shortestPaths, BMSSP-vs-Dijkstra (seeded 10k sparse)
   bmssp.test.mjs          # #43: 15 recursion tests — params, hand graphs, ties, Lemma 3.1 contract, seeded stress
@@ -113,7 +115,7 @@ knowledge base (markdown with pseudocode fences) isn't linted as shippable code.
 verified signatures (squash-merge via the GitHub UI signs for you), and CodeQL must pass —
 direct `git push origin main` is rejected, including for docs-only bookkeeping commits.
 
-## `src/bmssp.mjs` — the BMSSP class (Algorithm 3 wired in, #43)
+## `src/bmssp.mjs` — the BMSSP class (Algorithm 3 wired in, #43; dense-index engine, #205)
 
 ```js
 class BMSSP {
@@ -121,24 +123,32 @@ class BMSSP {
                                    // node IDs, finite non-negative weights; [] remains valid
   //   this.graph          : deep-copied edge array
   //   this.nodeIDs        : Set of all node IDs (from both endpoints)
-  //   this.shortestPaths  : Map<nodeId, distance>, initialized to Infinity  ← this is d̂[·]
-  //   this.adjacency      : Map<nodeId, Array<[to, weight]>>  ← #45, built in constructor
-  //   this.hops, this.preds : Map — #163 canonical labels (edge count + predecessor of the
-  //                           canonical shortest path), updated in lockstep with d̂
-  //   this.ties           : { hops, preds } bundle handed to relaxEdge
+  //   this.shortestPaths  : Map<nodeId, distance>, initialized to Infinity  ← public d̂[·]
+  //   this.adjacency      : Map<nodeId, Array<[to, weight]>>  ← #45 public edge view (getEdges)
+  //   this.hops, this.preds : Map — #163 canonical labels, public mirror refreshed after a run
+  //   this.ties           : { hops, preds } bundle (public boundary compatibility)
+  //   --- #205 dense engine (indices assigned in ascending-id order) ---
+  //   this.ids            : Float64Array index → original node id
+  //   this.indexOf        : Map<nodeId, index>  (inverse of ids)
+  //   this.csr            : { offsets:Uint32Array, targets:Uint32Array, weights:Float64Array }
+  //   this.labels         : { dist:Float64Array, hops:Uint32Array, preds:Int32Array } ← engine d̂
   //   this.k, this.t, this.topLevel : paper parameters, derived in the constructor
-  initializeShortestPaths()        // (re)set every nodeId's distance to Infinity; clears hops/preds
-  buildAdjacency()                 // #45: (re)build adjacency from this.graph
+  initializeShortestPaths()        // reset public Maps AND engine label arrays to ∞ / 0 / NO_PRED
+  buildAdjacency()                 // #45: (re)build the public adjacency Map from this.graph
+  buildIndex()                     // #205: sorted-id index + CSR + typed labels (called in ctor)
   getEdges(nodeId)                 // #45: O(1) outgoing-edge lookup; [] for unknown nodes
   deriveParameters()               // #43: k = max(1,⌊(log₂n)^⅓⌋), t = max(1,⌊(log₂n)^⅔⌋),
                                    //      topLevel = max(1,⌈log₂n / t⌉) — from this.nodeIDs.size
-  bmssp(l, B, S)                   // #43: Algorithm 3 → { bound, boundKey, vertices } (B', its
-                                   //      composite key, U); B scalar or composite — scalar in,
-                                   //      scalar bound out (boundKey always composite)
-  calculateShortestPaths(startNode)// #43: validates, sets d̂[start] = 0 (hop 0), runs
-                                   //      bmssp(topLevel, Infinity, {startNode}) — NO Dijkstra
-  reconstructPath(target)          // #169: source→target path from canonical preds; [] before
-                                   //      a run or when unreachable; throws for unknown target
+  syncLabelsIn() / syncLabelsOut() // #205: snapshot public shortestPaths → engine arrays before a
+                                   //      public bmssp() call, mirror arrays → public Maps after
+  boundToEngine(B) / keyToPublic(k)// #205: id↔index translation for a bound / a returned key
+  bmssp(l, B, S)                   // #205 PUBLIC wrapper (id space): sync in, translate, run
+                                   //      bmsspIndex, translate out → { bound, boundKey, vertices }
+  bmsspIndex(l, boundKey, S)       // #43 + #205: Algorithm 3 recursion, entirely in dense-index
+                                   //      space (S/U = indices, keys = [len,hops,index], CSR + labels)
+  calculateShortestPaths(startNode)// #43: validates, sets labels.dist[startIdx] = 0, runs
+                                   //      bmsspIndex(topLevel, ∞, {startIdx}), then syncLabelsOut
+  reconstructPath(target)          // #169: source→target path from the public preds mirror
 }
 ```
 
@@ -148,13 +158,35 @@ numbers, and weights must be non-negative. Failures identify the offending edge 
 An empty edge list remains valid and preserves the #162 contract: construction succeeds,
 then `calculateShortestPaths()` rejects any start node because the graph has no nodes.
 
-**`bmssp(l, B, S)` (#43):** level 0 delegates to `baseCase`. At level ≥ 1: `findPivots`
-shrinks the frontier; pivots seed a `BlockList(M = 2^((l-1)·t), B, compareKeys)`; the loop
-pulls `Bi, Si ← D.pull()`, recurses `bmssp(l-1, Bi, Si)`, relaxes edges out of the returned
-`Ui` (band `[Bi, B)` → `D.insert`, band `[Bi', Bi)` → staged `K` → `D.batchPrepend` together
-with the uncompleted `Si` members), and stops when `D` empties (success, `boundKey` = B's
-key) or `|U| ≥ k·2^(l·t)` trips (partial). Finally folds in the `W` vertices below the
-returned bound. Since `k·2^(topLevel·t) ≥ n`, the top call is always a successful execution.
+**Dense-index engine (#205).** The algorithm no longer touches Maps in its hot path. The
+constructor assigns every node id a dense index **in ascending numeric id order**
+(`buildIndex`), lays the graph out in **CSR** arrays (`offsets`/`targets`/`weights`), and
+allocates the labels as **typed arrays** (`dist:Float64Array`, `hops:Uint32Array`,
+`preds:Int32Array`; `makeLabels` in `tieBreak`). `baseCase`/`findPivots`/`bmsspIndex` all
+run purely on indices — `relaxEdge` reads/writes the typed arrays, edge loops walk CSR
+ranges. Because index order equals id order, the composite-key id tie-break picks the same
+canonical labels the pre-#205 id-keyed engine did, so **distances/hops/preds are unchanged
+and still edge-order-invariant** (the determinism fuzz + oracle suites pass untouched).
+`NO_PRED` is now `-1` (a valid `Int32Array` sentinel below every real index; was `-Infinity`).
+
+**Public boundary stays backward-compatible.** `this.shortestPaths` / `this.hops` /
+`this.preds` remain the documented public Maps (keyed by original id). The public
+`bmssp(l, B, S)` is a thin wrapper: `syncLabelsIn` snapshots seeded distances from
+`shortestPaths` into the engine arrays, the id-based `S`/bound are translated to index space
+(`boundToEngine`), `bmsspIndex` runs, then `syncLabelsOut` mirrors the arrays back and the
+result's indices/key are translated to id space (`keyToPublic`). `calculateShortestPaths`
+skips the wrapper (runs `bmsspIndex` directly, then one `syncLabelsOut`). `reconstructPath`
+reads the public `preds` mirror as before. This is why #205 is **API-non-breaking** despite
+being in the 2.0.0 milestone: it re-engineers the interior, not the surface.
+
+**`bmsspIndex(l, boundKey, S)` (#43):** level 0 delegates to `baseCase`. At level ≥ 1:
+`findPivots` shrinks the frontier; pivots seed a `BlockList(M = 2^((l-1)·t), boundKey,
+compareKeys)`; the loop pulls `Bi, Si ← D.pull()`, recurses `bmsspIndex(l-1, Bi, Si)`,
+relaxes edges out of the returned `Ui` (band `[Bi, B)` → `D.insert`, band `[Bi', Bi)` →
+staged `K` → `D.batchPrepend` together with the uncompleted `Si` members), and stops when
+`D` empties (success, `boundKey` = B's key) or `|U| ≥ k·2^(l·t)` trips (partial). Finally
+folds in the `W` vertices below the returned bound. Since `k·2^(topLevel·t) ≥ n`, the top
+call is always a successful execution.
 
 **Deterministic tie-breaking (#163, `src/tieBreak.mjs`).** All internal ordering uses
 composite `[length, hops, id]` keys (lexicographic), realizing the paper's Assumption 2.1
@@ -177,21 +209,22 @@ make every frontier comparison strict. Consequences, replacing the pre-#163 guar
 4. **Full determinism:** distances, hops, preds, and even partial-call `U`/`boundKey` are
    invariant under edge-list permutation (`test/tieBreak.test.mjs` asserts this).
 
-**Performance (measured 2026-07-16, addenda 2026-07-21; Apple Silicon, node v26.5.0 —
-full data + methodology in `benchmarks/HEAD-TO-HEAD.md`, latest capture in
+**Performance (measured 2026-07-16, addenda through 2026-07-21; Apple Silicon, node
+v26.5.0 — full data + methodology in `benchmarks/HEAD-TO-HEAD.md`, latest capture in
 `benchmarks/RESULTS.md`):** algorithm-only wall-clock (construction excluded, Dijkstra fed
-the same prebuilt adjacency): Dijkstra wins every shape/size; sparse-graph ratio narrows
-with n (1.0.0 record: 2.54× at 50k → **1.57× at 2M**). **Comparison counts (the paper's
-metric) crossed over at ~n = 1M sparse in the 1.0.0/1.1.1 records; after #167's
-selection-based BlockList they cross before n = 50k** — with #168's routing rework the
-1.2.0 capture reads **0.95× at 50k, 0.76× at 200k, 0.65× at 1M** (grid 700×700 1.10×).
-**#168 (1.2.0) cut wall-clock a further −13–23%** over post-#167 in clean A/B (sparse 50k
-~111 → ~87 ms, star ~147 → ~127 ms, sparse-l4 300k ~1123 → ~862 ms): allocation-free
-`relaxEdge` + unpacked band routing (`compareKeyParts`) + indexed edge loops. Post-#168
-profiles put remaining self-time in `relaxEdge`'s label-Map traffic (~38%, the 5–6
-Map ops per attempt — a dense-index/typed-array core would be the next lever, but it
-changes the public label contracts: proposed for 2.0.0) and `bmssp()`'s Set bookkeeping
-(~24%). **Heap strategy (#168, measured):** the lazy duplicate-and-skip variant wins an
+the same prebuilt adjacency): Dijkstra still wins every shape, but **#205's dense-index
+engine roughly halved BMSSP's time and brought sparse graphs to near-parity** — the
+2026-07-21 post-#205 capture reads **sparse-random 1.38×** (was ~2.5–2.8× at 1.2.0),
+**sparse-random-l4 1.07×**, **dense 1.16×**, grid 2.27×, chain 3.10×, star 2.48×. Clean
+A/B vs 1.2.0: sparse 50k ~104 → ~53 ms, star ~145 → ~100 ms, sparse-l4 300k ~982 →
+~424 ms. **Comparison counts are unchanged by #205** (identical algorithm, just typed
+storage): they crossed over at ~n = 1M sparse in the 1.0.0/1.1.1 records and, since #167's
+selection-based BlockList, cross before n = 50k — **0.95× at 50k, 0.76× at 200k, 0.65× at
+1M** (grid 700×700 1.10×). Earlier deltas for context: #168 (1.2.0) cut wall-clock −13–23%
+over #167 via allocation-free `relaxEdge` + unpacked band routing (`compareKeyParts`) +
+indexed edge loops; #205 then removed the label-Map traffic those profiles flagged (~38%
+self-time) by moving d̂/hops/preds into typed arrays over dense indices and the graph into
+CSR. **Heap strategy (#168, measured):** the lazy duplicate-and-skip variant wins an
 isolated BaseCase micro-benchmark (~29–33 ms vs ~37–52 ms per 10k bounded runs at
 n = 100k) but BaseCase's heaps are capped at k+1 ≈ 4 entries and never register in
 end-to-end profiles — the paper-literal indexed `MinHeap` is kept. The two #182
@@ -316,39 +349,38 @@ The **true indexed heap** from §03-A (entries array + `position` Map for O(log 
 `decreaseKey`), matching Algorithm 2 literally — deliberately not the lazy duplicate-and-skip
 variant `src/dijkstra.mjs` uses internally. An extracted key may be re-inserted later.
 
-## `src/baseCase.mjs` — `BaseCase(B, S)`, Algorithm 2 (#40)
+## `src/baseCase.mjs` — `BaseCase(B, S)`, Algorithm 2 (#40; dense engine #205)
 
 ```js
-baseCase(B, S, dHat, adjacency, k, ties?)  // → { bound, boundKey, vertices }
-// B         : strict upper bound — scalar (Infinity OK) or composite key; scalar in,
-//             scalar bound out (boundKey always the composite boundary)
-// S         : singleton Set holding the complete source x (throws otherwise)
-// dHat      : Map<nodeId, number> — the global d̂[·]; RELAXED IN PLACE
-// adjacency : Map<nodeId, [to, weight][]> — the class's this.adjacency
-// k         : settle cap >= 1 (floored); throws otherwise
-// ties      : { hops, preds } canonical labels (#163); fresh throwaway maps by default
+baseCase(B, S, labels, csr, k)  // → { bound, boundKey, vertices }
+// B      : strict upper bound — scalar (Infinity OK) or composite key; scalar in,
+//          scalar bound out (boundKey always the composite boundary)
+// S      : singleton Set holding the complete source INDEX x (throws otherwise)
+// labels : { dist, hops, preds } typed-array engine labels (#205); RELAXED IN PLACE
+// csr    : { offsets, targets, weights } — the class's CSR graph (#205)
+// k      : settle cap >= 1 (floored); throws otherwise
 export { baseCase };     // NOT re-exported from index.mjs — internal to the algorithm
 ```
 
-Bounded mini-Dijkstra from `x` on a `MinHeap(compareKeys)` ordered by composite keys,
-stopping after settling `k+1` vertices. Full success (heap exhausted at ≤ k settled) →
-`{ bound: B, vertices: U0 }`; partial (cap hit) → `boundKey` = max settled key, `vertices` =
-exactly the k strictly-closer ones (composite-strict: a returned vertex may tie the
-boundary's scalar length). Relaxation is canonical `relaxEdge` gated by `< B`; the settled
-filter only skips exact-equality re-enqueue signals, keeping zero-weight plateaus quiescent.
-`bmssp()` calls it at level 0 (the pre-#163 escape-hatch re-use is gone).
+Bounded mini-Dijkstra from `x` on a `MinHeap(compareKeys)` ordered by composite keys (now
+`[len, hops, index]`), stopping after settling `k+1` vertices. Full success (heap exhausted
+at ≤ k settled) → `{ bound: B, vertices: U0 }`; partial (cap hit) → `boundKey` = max settled
+key, `vertices` = exactly the k strictly-closer indices (composite-strict: a returned vertex
+may tie the boundary's scalar length). Relaxation is canonical `relaxEdge` gated by `< B`;
+the settled filter only skips exact-equality re-enqueue signals, keeping zero-weight plateaus
+quiescent. `bmsspIndex()` calls it at level 0. Since #205 vertices are dense indices and the
+graph is CSR — no per-edge `adjacency.get` / iterator allocation.
 
-## `src/findPivots.mjs` — `FindPivots(B, S)`, Algorithm 1 (#44)
+## `src/findPivots.mjs` — `FindPivots(B, S)`, Algorithm 1 (#44; dense engine #205)
 
 ```js
-findPivots(B, S, dHat, adjacency, k, ties?)  // → { pivots, W }
+findPivots(B, S, labels, csr, k)  // → { pivots, W }
 // B         : strict bound gating membership in W — scalar (Infinity OK) or composite key;
 //             d̂ updates are NOT gated
-// S         : non-empty Set of complete frontier sources (throws if empty / any d̂ not finite)
-// dHat      : Map<nodeId, number> — the global d̂[·]; RELAXED IN PLACE
-// adjacency : Map<nodeId, [to, weight][]> — the class's this.adjacency
+// S         : non-empty Set of complete frontier source INDICES (throws if empty / d̂ not finite)
+// labels    : { dist, hops, preds } typed-array engine labels (#205); RELAXED IN PLACE
+// csr       : { offsets, targets, weights } — the class's CSR graph (#205)
 // k         : rounds + tree-size threshold >= 1 (floored); throws otherwise
-// ties      : { hops, preds } canonical labels (#163); fresh throwaway maps by default
 export { findPivots };   // NOT re-exported from index.mjs — internal to the algorithm
 ```
 
@@ -356,47 +388,54 @@ export { findPivots };   // NOT re-exported from index.mjs — internal to the a
 `< B` in the composite order gates only membership in `W`, and exact canonical equality
 re-admits an already-labeled vertex through its recorded setter). **Early exit:** as soon
 as `|W| > k·|S|`, returns `pivots = S` (copy) with the partial `W`. Otherwise the paper's
-tight-edge forest is simply the canonical predecessor pointers: every vertex of `W \ S`
-hangs off `preds[v]` (always itself in `W`), a DAG or tight cycle is impossible (one pred
-per vertex; zero-weight edges strictly increase hops), parent chains always end in `S`,
-and `S` members are roots by definition. Pivots = `S`-roots of trees with `≥ k` vertices;
-`|pivots| ≤ |W|/k`. The two #44-era tie ambiguities are resolved by construction. Note: a
-source with key ≥ `B` can still be returned as a pivot (early exit copies all of `S`,
-and direct multi-source callers may pass such sources); `bmssp()` filters them at seeding.
+tight-edge forest is simply the canonical predecessor pointers (`labels.preds[v]`): every
+vertex of `W \ S` hangs off its pred (always itself in `W`), a DAG or tight cycle is
+impossible (one pred per vertex; zero-weight edges strictly increase hops), parent chains
+always end in `S`, and `S` members are roots by definition. Pivots = `S`-roots of trees
+with `≥ k` vertices; `|pivots| ≤ |W|/k`. The two #44-era tie ambiguities are resolved by
+construction. Note: a source with key ≥ `B` can still be returned as a pivot (early exit
+copies all of `S`, and direct multi-source callers may pass such sources); `bmsspIndex()`
+filters them at seeding.
 
-## `src/tieBreak.mjs` — composite keys, Assumption 2.1 realized (#163)
+## `src/tieBreak.mjs` — composite keys + engine labels, Assumption 2.1 realized (#163, #205)
 
 ```js
-compareKeys(a, b)                  // lexicographic compare of [length, hops, id] triples
+compareKeys(a, b)                  // lexicographic compare of [length, hops, index] triples
 compareKeyParts(length, hops, id, key) // #168: same order, left side unpacked — the hot
                                    // loops' allocation-free compare; counts as one comparison
 toBound(B)                         // scalar B → [B, -Infinity, -Infinity] (infimum of length-B
                                    // keys, so key < toBound(B) ⇔ the strict scalar contract);
                                    // composite bounds pass through
-makeTies(hops?, preds?)            // bundle the canonical label maps (fresh by default)
-orderKey(v, dHat, ties)            // frontier key [d̂[v], hops[v] ?? 0, v]
-relaxEdge(u, v, w, dHat, ties, bound?) // canonical relaxation → RELAX_IMPROVED (d̂/hops/preds
-                                   // updated together) | RELAX_EQUAL (candidate exactly
-                                   // matches v's stored label; u is the recorded setter —
-                                   // the re-enqueue signal) | RELAX_LOST (labels untouched).
-                                   // Allocation-free since #168; callers that enqueue v
-                                   // materialize its key with orderKey only on that path
+makeLabels(n)                      // #205: engine label state — { dist:Float64Array(∞),
+                                   //   hops:Uint32Array(0), preds:Int32Array(NO_PRED) }
+labelKey(v, labels)                // #205: engine frontier key [dist[v], hops[v], v]
+relaxEdge(u, v, w, labels, bound?) // #205: canonical relaxation on the typed arrays →
+                                   //   RELAX_IMPROVED (dist/hops/preds updated together) |
+                                   //   RELAX_EQUAL (candidate exactly matches v's stored
+                                   //   label; u is the recorded setter — the re-enqueue
+                                   //   signal) | RELAX_LOST (labels untouched). Allocation-
+                                   //   free; enqueue paths build the key with labelKey
+makeTies(hops?, preds?)            // #163 public-boundary label Maps (BMSSP class mirror)
+orderKey(v, dHat, ties)            // #163 Map-based frontier key [d̂[v], hops[v] ?? 0, v]
 resetComparisonCount() / getComparisonCount() // #170: unconditional comparison counter over
                                    // compareKeys + compareKeyParts + relaxEdge's inlined
-                                   // label compare (the paper's cost metric); read by the
-                                   // benchmark harness
-export { compareKeys, compareKeyParts, toBound, makeTies, orderKey, relaxEdge,
-         NO_PRED, RELAX_LOST, RELAX_EQUAL, RELAX_IMPROVED,
+                                   // label compare (the paper's cost metric)
+export { compareKeys, compareKeyParts, toBound, makeTies, makeLabels, orderKey, labelKey,
+         relaxEdge, NO_PRED, RELAX_LOST, RELAX_EQUAL, RELAX_IMPROVED,
          resetComparisonCount, getComparisonCount };
                                    // NOT re-exported from index.mjs — internal to the algorithm
 ```
 
 The paper's Assumption 2.1 ("all path lengths distinct") in code: paths ranked by
-`[length, hops, id]` — `hops` (the paper's "#vertices") makes zero-weight extensions
-strictly increasing, `id` (pred id inside relaxation, own id for frontier order) stands in
-for the paper's full vertex-sequence comparison at O(1). Sources (no stored pred) hold a
-`-Infinity` pred sentinel and never lose an equal-`(length, hops)` tie; unlabeled vertices
-read as hop-0 / distance-∞, so externally seeded multi-source calls need no extra setup.
+`[length, hops, index]` — `hops` (the paper's "#vertices") makes zero-weight extensions
+strictly increasing, the third component (pred index inside relaxation, own index for
+frontier order) stands in for the paper's full vertex-sequence comparison at O(1). Since
+#205 the engine uses dense **indices** here; because indices are assigned in ascending
+id order, the canonical choice is identical to the pre-#205 id-keyed one. Sources (no
+stored pred) hold the `NO_PRED = -1` sentinel (below every real index) and never lose an
+equal-`(length, hops)` tie; unlabeled vertices read as hop-0 / distance-∞. `makeTies` and
+`orderKey` remain for the **public boundary** — the BMSSP class mirrors the engine arrays
+into `{ hops, preds }` Maps for `reconstructPath` and external inspection.
 
 ## `src/dijkstra.mjs` — the oracle (already done)
 
@@ -442,20 +481,25 @@ edge-order deterministic (copies allocated in edge order); ~2m copies, ~3m edges
   SNAP road network with unseeded random weights — removed in PR #185 and purged from git
   history: irreproducible failures, ~71 s of every run, coverage superseded by the seeded
   fuzz + scale suite.)
-- `test/bmssp.test.mjs` (15, NEW in #43): parameter derivation (clamps, paper formulas,
+- `test/bmssp.test.mjs` (18, #43 + 3 for #205): parameter derivation (clamps, paper formulas,
   `k·2^(topLevel·t) ≥ n` guard), end-to-end hand-built graphs (README example, multi-hop vs
   direct, unreachable ⇒ Infinity, self-loop, source switch), degenerate ties (zero-weight
   cycles/clusters, layered equal-length paths, seeded 0–2-weight stress), the Lemma 3.1
   recursion contract (bounded call: complete-below-boundary, exact membership, d̂ never
   underestimates; unbounded call: successful execution returning exactly the reachable set),
-  and seeded full-map-vs-oracle stress across sizes (up to n = 2000).
+  seeded full-map-vs-oracle stress across sizes (up to n = 2000), and the **#205 public
+  boundary**: a composite bound with non-contiguous ids round-tripping id↔index, a
+  composite bound keyed on a non-node id, a partial level-0 scalar projection, and an
+  unknown-source throw.
 - `test/blockList.test.mjs` (25), `test/heap.test.mjs` (16), `test/baseCase.test.mjs` (13),
   `test/findPivots.test.mjs` (12): per-module contracts incl. seeded stress — see the
-  module sections above. (Since #163 the baseCase partial-run tests assert the composite
-  contract: strictly below `boundKey`, `≤` the scalar bound. #167 added five BlockList
-  tests: hundreds-of-splits drain at M = 2, interior-block drops via duplicate-key
-  replacement, both chunking branches of `batchPrepend` — sort and median-recursion —
-  and a middle-`d0`-block unlink.)
+  module sections above. (Since #205 the `baseCase`/`findPivots` tests drive the functions
+  in **dense-index space**: fixtures build a `BMSSP`, seed `g.labels.dist`, pass
+  `idxSet(...)` / `g.csr`, and translate results back with `g.ids`. Since #163 the baseCase
+  partial-run tests assert the composite contract: strictly below `boundKey`, `≤` the
+  scalar bound. #167 added five BlockList tests: hundreds-of-splits drain at M = 2,
+  interior-block drops via duplicate-key replacement, both chunking branches of
+  `batchPrepend` — sort and median-recursion — and a middle-`d0`-block unlink.)
 - `test/select.test.mjs` (11, #167): `partitionByRank` — validation, the every-rank
   contract on shuffled/sorted/reverse/duplicate-heavy/organ-pipe inputs, custom
   comparators, the forced median-of-medians fallback (`cheapBudget: 0`), seeded stress
@@ -465,10 +509,11 @@ edge-order deterministic (copies allocated in edge order); ~2m copies, ~3m edges
   bound runs, and AVL invariants (parent pointers, stored heights, |balance| ≤ 1)
   verified recursively under append-only growth (height ≤ 17 at n = 2048) and two
   seeded random-churn stresses against a reference array.
-- `test/tieBreak.test.mjs` (20, #163 + 3 counter tests from #170 + the #168
-  `compareKeyParts`-vs-`compareKeys` agreement sweep): unit tests for
-  `compareKeys`/`toBound`/`relaxEdge` (asserting the #168 RELAX_* code contract with
-  label state read from the maps)
+- `test/tieBreak.test.mjs` (21, #163 + 3 counter tests from #170 + the #168
+  `compareKeyParts`-vs-`compareKeys` agreement sweep + a #205 `makeLabels`-defaults check):
+  unit tests for `compareKeys`/`toBound`/`relaxEdge` (asserting the #168 RELAX_* code
+  contract, since #205 with label state read from typed **engine arrays** via `makeLabels`
+  and asserted through `labelKey`)
   (lexicographic order, scalar-bound infimum, canonical pred choice, zero-weight-cycle
   quiescence, the equality re-enqueue signal), then the system-level properties:
   **edge-order determinism** (full runs AND bounded partial calls return identical
@@ -520,10 +565,14 @@ edge-order deterministic (copies allocated in edge order); ~2m copies, ~3m edges
   (identical maps incl. Infinity → 0; wrong/missing entries counted); `runScenarioBenchmark`
   and `runComparisonCountBenchmark` on tiny injected scenarios return the expected columns
   with **zero mismatches**.
-- Current suite: **186 tests — 185 passing + 1 XL skipped by default**, ~100% statement
+- Current suite: **191 tests — 190 passing + 1 XL skipped by default**, ~100% statement
   coverage, ~7.5 s wall-clock (the #164 distance-preservation sweeps run BMSSP/Dijkstra
   from every source). No graph data files: every generated test graph comes from a
-  seed; the #162 fixtures are hand-built and fully deterministic.
+  seed; the #162 fixtures are hand-built and fully deterministic. The #205 dense-index
+  engine changed the internal function signatures (`baseCase`/`findPivots` take
+  `labels`/`csr` + index sets) but not a single oracle/determinism assertion — the fuzz,
+  edge-case, tie-break-determinism and constant-degree suites pass unchanged, which is
+  the correctness proof that the id→index refactor preserved every canonical label.
 
 ## Benchmarks (`benchmarks/`, `npm run bench` / `npm run bench:counts`)
 
@@ -537,9 +586,11 @@ BMSSP-vs-Dijkstra head-to-head itself:
   Scenario registry adds `sparse-random-l4` (n = 300k, degree 3): `topLevel` steps 3→4 at
   exactly n = 2^18 + 1 and stays 4 until t reaches 7 (~n = 376k), so 300k sits inside the
   #182 level-transition window (the step itself measures ~+24% at the exact straddle).
-  Post-#167 capture (2026-07-21): sparse 2.46×, star 4.53× (~131 ms; pre-#182 8.73×),
-  l4 2.96× — ratios are noisy run-to-run (the Dijkstra denominator swings ±20%); compare
-  `bmssp ms` across captures for regressions.
+  **Post-#205 capture (2026-07-21): sparse-random 1.38×, dense 1.16×, grid 2.27×,
+  chain 3.10×, star 2.48×, sparse-random-l4 1.07×** — the dense-index engine roughly
+  halved `bmssp ms` on every shape (sparse-l4 ~1083 → ~426 ms). Ratios are noisy
+  run-to-run (the Dijkstra denominator swings ±20%); compare `bmssp ms` across captures
+  for regressions.
 - `compare-counts.bench.mjs` (opt-in, `npm run bench:counts` or `--counts`): comparisons
   between path lengths — BMSSP counted via `tieBreak`'s unconditional `compareKeys`
   counter, Dijkstra via matching counters in `dijkstra-adj.mjs`. One exact run per side
@@ -570,10 +621,11 @@ BMSSP-vs-Dijkstra head-to-head itself:
 | BMSSP-vs-Dijkstra head-to-head in the harness | `benchmarks/` + `src/tieBreak.mjs` counter | #170 | ✅ merged (PR #198, no bump) |
 | Performance-cliff investigation + quadratic batchPrepend fix | `src/blockList.mjs` + HEAD-TO-HEAD addendum | #182 | ✅ merged (PR #200, **patch → 1.1.1**, released 2026-07-21) |
 | Exact Lemma 3.3 asymptotics (BST bound index + linear selection) | `src/boundIndex.mjs` + `src/select.mjs` + `src/blockList.mjs` | #167 | ✅ merged (PR #202, no bump) |
-| Relaxation micro-optimizations (allocation-free relaxEdge, unpacked routing, heap measurement) | `src/tieBreak.mjs` + `src/bmssp.mjs` + `src/baseCase.mjs` + `src/findPivots.mjs` | #168 | ✅ done-pending-merge (this PR, **minor → 1.2.0**) |
+| Relaxation micro-optimizations (allocation-free relaxEdge, unpacked routing, heap measurement) | `src/tieBreak.mjs` + `src/bmssp.mjs` + `src/baseCase.mjs` + `src/findPivots.mjs` | #168 | ✅ merged (PR #203, **minor → 1.2.0**, released 2026-07-21) |
+| Dense-index core: typed-array labels + CSR adjacency | `src/tieBreak.mjs` (makeLabels) + `src/bmssp.mjs` (buildIndex/CSR) + `src/baseCase.mjs` + `src/findPivots.mjs` | #205 | ✅ done-pending-merge (this PR, no bump — API-non-breaking) |
 
-Milestone `1.1.0` (correctness hardening) is **closed** — released 2026-07-21 (npm +
-Docker Hub). This PR closes **#168**, milestone `1.2.0`'s last open issue → **minor bump
-1.2.0** (release + milestone close in Phase E after the merge). Next up: milestone
-`2.0.0` (#171/#172/#173 + the proposed dense-index core issue); see
-[06-milestones-roadmap.md](06-milestones-roadmap.md).
+Milestones `1.1.0` (correctness hardening) and `1.2.0` (performance & ergonomics) are
+both **closed** — 1.2.0 released 2026-07-21 (npm + Docker Hub). Milestone `2.0.0`
+(API-breaking generalization) is current: **#205** (dense-index core) done-pending-merge
+in this PR, then **#172 → #171 → #173** (build order in `06`; #173 closes the milestone
+with the **major → 2.0.0** bump). See [06-milestones-roadmap.md](06-milestones-roadmap.md).

@@ -216,6 +216,84 @@ describe("BMSSP recursion contract (Lemma 3.1)", () => {
     }
   });
 
+  test("accepts a composite bound and translates ids across the index boundary (#205)", () => {
+    // Non-contiguous ids so dense index != id: the public wrapper must map
+    // the bound's id component to its index on the way in and the returned
+    // boundKey's index back to an id on the way out.
+    const edges = [
+      [10, 20, 3],
+      [20, 30, 4],
+      [30, 40, 5],
+      [10, 40, 100],
+    ];
+    const bmssp = new BMSSP(edges);
+    // Canonical key of vertex 30: distance 7 (10->20->30), 2 hops
+    bmssp.calculateShortestPaths(10);
+    expect(bmssp.shortestPaths.get(30)).toBe(7);
+    expect(bmssp.hops.get(30)).toBe(2);
+
+    // A composite bound exactly at vertex 30's key is strict, so 30 and
+    // everything farther (40 at distance 12) are excluded
+    bmssp.initializeShortestPaths();
+    bmssp.shortestPaths.set(10, 0);
+    const { bound, boundKey, vertices } = bmssp.bmssp(
+      bmssp.topLevel,
+      [7, 2, 30],
+      new Set([10]),
+    );
+    expect(vertices).toEqual(new Set([10, 20]));
+    // Successful execution echoes the bound back, in id space
+    expect(boundKey).toEqual([7, 2, 30]);
+    expect(bound).toEqual([7, 2, 30]);
+  });
+
+  test("a composite bound whose id is not a graph node passes through (#205)", () => {
+    // The 3rd key component only breaks ties at an identical (length, hops);
+    // a bound keyed on a non-node id must still bound correctly by length,
+    // exercising the index-translation fallbacks at the public boundary
+    const bmssp = new BMSSP([
+      [0, 1, 3],
+      [1, 2, 4],
+    ]);
+    bmssp.initializeShortestPaths();
+    bmssp.shortestPaths.set(0, 0);
+    // Length 7 with a large hop budget: every vertex (d = 0, 3, 7) is below it
+    const { boundKey, vertices } = bmssp.bmssp(
+      bmssp.topLevel,
+      [7, 5, 999],
+      new Set([0]),
+    );
+    expect(vertices).toEqual(new Set([0, 1, 2]));
+    expect(boundKey).toEqual([7, 5, 999]);
+  });
+
+  test("a direct level-0 call projects a partial scalar boundary (#205)", () => {
+    // Level 0 delegates to BaseCase; a chain longer than the settle cap k
+    // forces a partial execution, so the scalar bound is the separator's
+    // length rather than the input B
+    const bmssp = new BMSSP([
+      [0, 1, 1],
+      [1, 2, 1],
+      [2, 3, 1],
+    ]);
+    expect(bmssp.k).toBe(1); // cap k + 1 = 2 settled before stopping
+    bmssp.initializeShortestPaths();
+    bmssp.shortestPaths.set(0, 0);
+    const { bound, vertices } = bmssp.bmssp(0, Infinity, new Set([0]));
+    // Settled {0, 1}; B' = d(1) = 1, returned set is the strictly-closer {0}
+    expect(bound).toBe(1);
+    expect(vertices).toEqual(new Set([0]));
+  });
+
+  test("a public call with an unknown source id throws (#205)", () => {
+    const bmssp = new BMSSP([[0, 1, 1]]);
+    bmssp.initializeShortestPaths();
+    bmssp.shortestPaths.set(0, 0);
+    expect(() => bmssp.bmssp(bmssp.topLevel, Infinity, new Set([999]))).toThrow(
+      "finite distance estimate",
+    );
+  });
+
   test("an unbounded top call is a successful execution (B' = B)", () => {
     const rand = mulberry32(433);
     const edges = randomEdges(rand, 40, 160, 1000);

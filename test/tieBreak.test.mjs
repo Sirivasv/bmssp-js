@@ -4,8 +4,11 @@ import {
   compareKeyParts,
   toBound,
   makeTies,
+  makeLabels,
   orderKey,
+  labelKey,
   relaxEdge,
+  NO_PRED,
   RELAX_LOST,
   RELAX_EQUAL,
   RELAX_IMPROVED,
@@ -146,101 +149,81 @@ describe("toBound — scalar bounds keep strict semantics", () => {
   });
 });
 
-describe("relaxEdge — canonical relaxation", () => {
+describe("relaxEdge — canonical relaxation (on #205 engine labels)", () => {
   test("updates d̂, hops and preds together on improvement", () => {
-    const dHat = new Map([
-      [0, 0],
-      [1, Infinity],
-    ]);
-    const ties = makeTies();
-    const result = relaxEdge(0, 1, 5, dHat, ties);
+    const labels = makeLabels(2);
+    labels.dist[0] = 0;
+    const result = relaxEdge(0, 1, 5, labels);
     expect(result).toBe(RELAX_IMPROVED);
-    expect(dHat.get(1)).toBe(5);
-    expect(ties.hops.get(1)).toBe(1);
-    expect(ties.preds.get(1)).toBe(0);
-    expect(orderKey(1, dHat, ties)).toEqual([5, 1, 1]);
+    expect(labels.dist[1]).toBe(5);
+    expect(labels.hops[1]).toBe(1);
+    expect(labels.preds[1]).toBe(0);
+    expect(labelKey(1, labels)).toEqual([5, 1, 1]);
   });
 
   test("equal-length candidates win only on fewer hops, then smaller pred", () => {
-    const dHat = new Map([
-      [0, 0],
-      [7, 3],
-      [3, 3],
-      [9, 3],
-      [5, 6],
-    ]);
-    const ties = makeTies(
-      new Map([
-        [7, 1],
-        [3, 1],
-        [9, 1],
-        [5, 2],
-      ]),
-      new Map([[5, 7]]),
-    );
+    const labels = makeLabels(10);
+    labels.dist[0] = 0;
+    labels.dist[7] = 3;
+    labels.dist[3] = 3;
+    labels.dist[9] = 3;
+    labels.dist[5] = 6;
+    labels.hops[7] = 1;
+    labels.hops[3] = 1;
+    labels.hops[9] = 1;
+    labels.hops[5] = 2;
+    labels.preds[5] = 7;
     // Same length (3 + 3 = 6), same hops (3), pred 9 > current pred 7: no
-    expect(relaxEdge(9, 5, 3, dHat, ties)).toBe(RELAX_LOST);
-    expect(ties.preds.get(5)).toBe(7);
+    expect(relaxEdge(9, 5, 3, labels)).toBe(RELAX_LOST);
+    expect(labels.preds[5]).toBe(7);
     // Same length, same hops, pred 3 < current pred 7: canonical update
-    expect(relaxEdge(3, 5, 3, dHat, ties)).toBe(RELAX_IMPROVED);
-    expect(orderKey(5, dHat, ties)).toEqual([6, 2, 5]);
-    expect(ties.preds.get(5)).toBe(3);
+    expect(relaxEdge(3, 5, 3, labels)).toBe(RELAX_IMPROVED);
+    expect(labelKey(5, labels)).toEqual([6, 2, 5]);
+    expect(labels.preds[5]).toBe(3);
     // Re-relaxation from the now-canonical pred reports exact equality —
     // the caller's re-enqueue signal — without touching the labels
-    expect(relaxEdge(3, 5, 3, dHat, ties)).toBe(RELAX_EQUAL);
-    expect(orderKey(5, dHat, ties)).toEqual([6, 2, 5]);
-    expect(ties.preds.get(5)).toBe(3);
+    expect(relaxEdge(3, 5, 3, labels)).toBe(RELAX_EQUAL);
+    expect(labelKey(5, labels)).toEqual([6, 2, 5]);
+    expect(labels.preds[5]).toBe(3);
   });
 
   test("a zero-weight edge strictly increases the key: cycles cannot loop", () => {
-    const dHat = new Map([
-      [0, 2],
-      [1, 2],
-    ]);
-    const ties = makeTies(
-      new Map([
-        [0, 1],
-        [1, 2],
-      ]),
-      new Map([
-        [0, 5],
-        [1, 0],
-      ]),
-    );
+    const labels = makeLabels(6);
+    labels.dist[0] = 2;
+    labels.dist[1] = 2;
+    labels.hops[0] = 1;
+    labels.hops[1] = 2;
+    labels.preds[0] = 5;
+    labels.preds[1] = 0;
     // 1 -> 0 with weight 0: candidate [2, 3, 1] vs current [2, 1, 5] — the
     // extra hops lose outright
-    expect(relaxEdge(1, 0, 0, dHat, ties)).toBe(RELAX_LOST);
+    expect(relaxEdge(1, 0, 0, labels)).toBe(RELAX_LOST);
     // 0 -> 1 with weight 0 reproduces 1's canonical label exactly: reported
     // as equality, no update — so the cycle is quiescent, never looping
-    expect(relaxEdge(0, 1, 0, dHat, ties)).toBe(RELAX_EQUAL);
-    expect(orderKey(1, dHat, ties)).toEqual([2, 2, 1]);
-    expect(ties.hops.get(1)).toBe(2);
+    expect(relaxEdge(0, 1, 0, labels)).toBe(RELAX_EQUAL);
+    expect(labelKey(1, labels)).toEqual([2, 2, 1]);
+    expect(labels.hops[1]).toBe(2);
   });
 
   test("a source (no stored pred) never loses an equal-(length, hops) tie", () => {
-    const dHat = new Map([
-      [4, 0],
-      [2, 5],
-    ]);
-    const ties = makeTies(new Map([[2, 0]]), new Map());
-    // Vertex 2 is an externally seeded hop-0 source at distance 5; an
-    // equal-length, equal-hops... any candidate has hops >= 1 > 0, and even
-    // a shorter-hop tie would face the -Infinity pred sentinel
-    expect(relaxEdge(4, 2, 5, dHat, ties)).toBe(RELAX_LOST);
-    expect(dHat.get(2)).toBe(5);
+    const labels = makeLabels(5);
+    labels.dist[4] = 0;
+    labels.dist[2] = 5;
+    // Vertex 2 is an externally seeded hop-0 source at distance 5; any
+    // candidate has hops >= 1 > 0, and even a shorter-hop tie would face
+    // the NO_PRED sentinel, which compares below every real index
+    expect(relaxEdge(4, 2, 5, labels)).toBe(RELAX_LOST);
+    expect(labels.dist[2]).toBe(5);
   });
 
   test("the optional bound gates the update entirely (paper's < B)", () => {
-    const dHat = new Map([
-      [0, 0],
-      [1, Infinity],
-    ]);
-    const ties = makeTies();
-    expect(relaxEdge(0, 1, 5, dHat, ties, toBound(5))).toBe(RELAX_LOST);
-    expect(dHat.get(1)).toBe(Infinity);
-    expect(ties.preds.has(1)).toBe(false);
-    expect(relaxEdge(0, 1, 5, dHat, ties, toBound(5.1))).toBe(RELAX_IMPROVED);
-    expect(orderKey(1, dHat, ties)).toEqual([5, 1, 1]);
+    const labels = makeLabels(2);
+    labels.dist[0] = 0;
+    expect(relaxEdge(0, 1, 5, labels, toBound(5))).toBe(RELAX_LOST);
+    expect(labels.dist[1]).toBe(Infinity);
+    expect(labels.preds[1]).toBe(NO_PRED);
+    expect(relaxEdge(0, 1, 5, labels, toBound(5.1))).toBe(RELAX_IMPROVED);
+    expect(labelKey(1, labels)).toEqual([5, 1, 1]);
   });
 
   test("orderKey defaults: missing labels read as hop-0, distance Infinity", () => {
@@ -248,6 +231,13 @@ describe("relaxEdge — canonical relaxation", () => {
     const ties = makeTies();
     expect(orderKey(3, dHat, ties)).toEqual([4, 0, 3]);
     expect(orderKey(99, dHat, ties)).toEqual([Infinity, 0, 99]);
+  });
+
+  test("makeLabels defaults match the Map engine's ?? fallbacks", () => {
+    const labels = makeLabels(3);
+    expect(labelKey(2, labels)).toEqual([Infinity, 0, 2]);
+    expect(labels.preds[0]).toBe(NO_PRED);
+    expect(NO_PRED).toBeLessThan(0); // below every real vertex index
   });
 });
 
@@ -438,13 +428,10 @@ describe("comparison counter (#170): benchmark instrumentation", () => {
   });
 
   test("counts comparisons made inside relaxEdge", () => {
-    const dHat = new Map([
-      [0, 0],
-      [1, Infinity],
-    ]);
-    const ties = makeTies();
+    const labels = makeLabels(2);
+    labels.dist[0] = 0;
     resetComparisonCount();
-    relaxEdge(0, 1, 5, dHat, ties);
+    relaxEdge(0, 1, 5, labels);
     expect(getComparisonCount()).toBeGreaterThan(0);
   });
 
