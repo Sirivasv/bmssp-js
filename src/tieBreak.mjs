@@ -38,9 +38,11 @@
  * source is a hop-0 root) and "no predecessor" (which never loses a tie).
  */
 
-// Sentinel predecessor for sources: compares below every real id, so a
-// source's own label never loses an equal-(length, hops) comparison.
-const NO_PRED = -Infinity;
+// Sentinel predecessor for sources: compares below every real vertex index,
+// so a source's own label never loses an equal-(length, hops) comparison.
+// Since #205 the engine works on dense vertex indices (>= 0), so -1 is a
+// valid sentinel AND fits the Int32Array holding the predecessors.
+const NO_PRED = -1;
 
 // Running count of compareKeys calls — the paper's cost metric ("comparisons
 // between path lengths"). Every BMSSP-side comparison funnels through
@@ -110,13 +112,40 @@ function toBound(B) {
 }
 
 /**
- * Bundle (or create) the tie-break label maps that accompany d̂.
+ * Bundle (or create) the tie-break label maps that accompany d̂ at the PUBLIC
+ * boundary (the BMSSP class mirrors the engine's arrays into these Maps,
+ * keyed by original node ids).
  * @param {Map<*, number>} [hops] - Canonical path edge counts
  * @param {Map<*, *>} [preds] - Canonical predecessor of each vertex
  * @returns {{ hops: Map<*, number>, preds: Map<*, *> }}
  */
 function makeTies(hops = new Map(), preds = new Map()) {
   return { hops, preds };
+}
+
+/**
+ * Allocate the engine's label state for n vertices (#205): d̂, hops and
+ * canonical predecessors as typed arrays over dense vertex indices.
+ * Unlabeled vertices read as distance Infinity, hop 0, no predecessor —
+ * the same defaults the pre-#205 Maps gave via `?? Infinity` / `?? 0`.
+ * @param {number} n - Vertex count
+ * @returns {{ dist: Float64Array, hops: Uint32Array, preds: Int32Array }}
+ */
+function makeLabels(n) {
+  const dist = new Float64Array(n).fill(Infinity);
+  const hops = new Uint32Array(n);
+  const preds = new Int32Array(n).fill(NO_PRED);
+  return { dist, hops, preds };
+}
+
+/**
+ * The frontier-ordering key of vertex index v under the engine labels.
+ * @param {number} v - Dense vertex index
+ * @param {{ dist: Float64Array, hops: Uint32Array }} labels
+ * @returns {[number, number, number]} [dist[v], hops[v], v]
+ */
+function labelKey(v, labels) {
+  return [labels.dist[v], labels.hops[v], v];
 }
 
 /**
@@ -155,11 +184,16 @@ function orderKey(v, dHat, ties) {
  * with orderKey(v, dHat, ties) — only on the rare paths that enqueue v,
  * instead of on every attempt.
  *
- * @param {*} u - Edge tail (its labels are read)
- * @param {*} v - Edge head (its labels may be updated)
+ * Since #205 the labels live in typed arrays over dense vertex indices
+ * (see makeLabels); u and v are indices, and index order equals original-id
+ * order (the BMSSP class assigns indices by sorted id), so the canonical
+ * choices are identical to the pre-#205 Map engine's.
+ *
+ * @param {number} u - Edge tail index (its labels are read)
+ * @param {number} v - Edge head index (its labels may be updated)
  * @param {number} weight - Edge weight, >= 0
- * @param {Map<*, number>} dHat - Distance estimates d̂[·], updated in place
- * @param {{ hops: Map<*, number>, preds: Map<*, *> }} ties - Updated in place
+ * @param {{ dist: Float64Array, hops: Uint32Array, preds: Int32Array }} labels
+ *   - Engine label state, updated in place
  * @param {[number, number, *]} [bound] - Optional gate: skip (no d̂ update)
  *   unless the resulting order key would be strictly below this bound
  * @returns {number} RELAX_IMPROVED when the labels were updated,
@@ -167,34 +201,34 @@ function orderKey(v, dHat, ties) {
  *   (the re-enqueue signal), RELAX_LOST when the candidate loses or the
  *   bound gates it (labels untouched)
  */
-function relaxEdge(u, v, weight, dHat, ties, bound) {
-  const length = dHat.get(u) + weight;
-  const hopCount = (ties.hops.get(u) ?? 0) + 1;
+function relaxEdge(u, v, weight, labels, bound) {
+  const length = labels.dist[u] + weight;
+  const hopCount = labels.hops[u] + 1;
   if (bound !== undefined && compareKeyParts(length, hopCount, v, bound) >= 0) {
     return RELAX_LOST;
   }
   // Candidate path key [length, hopCount, u] vs. v's current path key
-  // [d̂[v], hops[v], preds[v] ?? NO_PRED] — compareKeys inlined on the
-  // unpacked components (one counted comparison, no arrays)
+  // [dist[v], hops[v], preds[v]] — compareKeys inlined on the unpacked
+  // components (one counted comparison, no arrays)
   comparisonCount += 1;
   let cmp;
-  const currentLength = dHat.get(v) ?? Infinity;
+  const currentLength = labels.dist[v];
   if (length !== currentLength) {
     cmp = length < currentLength ? -1 : 1;
   } else {
-    const currentHops = ties.hops.get(v) ?? 0;
+    const currentHops = labels.hops[v];
     if (hopCount !== currentHops) {
       cmp = hopCount < currentHops ? -1 : 1;
     } else {
-      const currentPred = ties.preds.has(v) ? ties.preds.get(v) : NO_PRED;
+      const currentPred = labels.preds[v];
       cmp = u !== currentPred ? (u < currentPred ? -1 : 1) : 0;
     }
   }
   if (cmp > 0) return RELAX_LOST;
   if (cmp === 0) return RELAX_EQUAL;
-  dHat.set(v, length);
-  ties.hops.set(v, hopCount);
-  ties.preds.set(v, u);
+  labels.dist[v] = length;
+  labels.hops[v] = hopCount;
+  labels.preds[v] = u;
   return RELAX_IMPROVED;
 }
 
@@ -209,7 +243,9 @@ export {
   compareKeyParts,
   toBound,
   makeTies,
+  makeLabels,
   orderKey,
+  labelKey,
   relaxEdge,
   NO_PRED,
   RELAX_LOST,

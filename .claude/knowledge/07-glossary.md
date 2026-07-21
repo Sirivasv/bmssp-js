@@ -1,9 +1,9 @@
 # 07 — Glossary
 
-<!-- Updated on: 2026-07-21 (#168 PR: compareKeyParts + RELAX_* codes; relaxEdge,
-     re-enqueue-signal and indexed-vs-lazy-heap entries updated to the new contract /
-     measurement. Previous update the same day: #167 PR added BoundIndex,
-     partitionByRank, introselect) -->
+<!-- Updated on: 2026-07-21 (#205 PR: dense-index engine — makeLabels, labelKey, CSR,
+     dense index, buildIndex, syncLabelsIn/Out, boundToEngine/keyToPublic, bmsspIndex;
+     NO_PRED now -1; relaxEdge/baseCase/findPivots entries updated to the typed-array
+     signature. Previous update the same day: #168 PR added compareKeyParts + RELAX_*) -->
 
 > **Lifecycle: dynamic — updated in Phase C of every PR.** When a PR introduces new symbols
 > or terms (module names, data-structure fields, paper notation newly used in code), add
@@ -90,12 +90,25 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
   algorithm-internal modules). Correctness-independent: BMSSP never calls it. Usage:
   `const t = constantDegreeTransform(g); …run from t.sourceCopy(s)…; t.collapse(dist)`.
 - **`adjacency`** (#45) — `Map<nodeId, Array<[to, weight]>>` field on the `BMSSP` class:
-  a node's outgoing edges, so lookups are O(1) instead of scanning the whole edge array.
-  Every known node has an entry (empty array for sinks). Built in the constructor.
+  a node's outgoing edges. Since #205 this is the **public edge view** behind `getEdges`
+  (and the fair-baseline Dijkstra in the benchmarks); the algorithm's hot path uses the
+  CSR arrays instead. Every known node has an entry (empty array for sinks). Built in the
+  constructor.
 - **`buildAdjacency()`** (#45) — class method that (re)builds `this.adjacency` from
   `this.graph`. Called by the constructor.
 - **`getEdges(nodeId)`** (#45) — class method returning a node's outgoing edges as
   `[to, weight]` pairs; returns `[]` for unknown nodes.
+- **Dense index** (#205) — the `BMSSP` class maps every original node id to a contiguous
+  integer `0..n-1`, assigned in **ascending numeric id order** (`buildIndex`). `this.ids`
+  (`Float64Array`) is index → id, `this.indexOf` (`Map`) is the inverse. Index order
+  equals id order, so the composite-key tie-break makes the same canonical choice it did
+  on ids — the refactor is label-preserving. The algorithm modules run entirely on indices.
+- **CSR** (#205) — Compressed-Sparse-Row graph layout, `this.csr = { offsets:Uint32Array,
+  targets:Uint32Array, weights:Float64Array }`. Node `u`'s outgoing edges are
+  `targets/weights[offsets[u] .. offsets[u+1])`. Replaces per-edge `adjacency.get` +
+  iterator/destructuring in the hot loops.
+- **`buildIndex()`** (#205) — constructor step building the dense index (`ids`/`indexOf`),
+  the CSR arrays (`this.csr`), and the typed label state (`this.labels`).
 - **Adjacency list (oracle)** — the *local* adjacency `Map` that `src/dijkstra.mjs` builds
   internally per call; distinct from the class's persistent `this.adjacency`.
 - **`BlockList`** (#42) — `src/blockList.mjs`, the Lemma 3.3 structure `D`. API:
@@ -145,22 +158,23 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
   measurement in #168:** lazy wins an isolated BaseCase micro-benchmark, but BaseCase
   heaps are capped at k+1 ≈ 4 entries and never register in end-to-end profiles, so the
   indexed paper-literal `MinHeap` is kept.
-- **`baseCase(B, S, dHat, adjacency, k)`** (#40) — `src/baseCase.mjs`, Algorithm 2:
-  bounded mini-Dijkstra from the singleton complete source in `S`, settling at most `k+1`
-  vertices, relaxing the shared `dHat` (`d̂[·]`) **in place** (canonically, with an optional
-  `ties` bundle since #163). Returns `{ bound, boundKey, vertices }` (= the paper's `B'`,
-  its composite key, `U`). Internal (not re-exported from `index.mjs`).
+- **`baseCase(B, S, labels, csr, k)`** (#40; dense engine #205) — `src/baseCase.mjs`,
+  Algorithm 2: bounded mini-Dijkstra from the singleton complete source **index** in `S`,
+  settling at most `k+1` vertices, relaxing the shared typed-array `labels` (d̂/hops/preds)
+  **in place** over the `csr` graph. Returns `{ bound, boundKey, vertices }` (= the paper's
+  `B'`, its composite key, `U` as index set). Internal (not re-exported from `index.mjs`).
 - **Settled filter** (#40, re-scoped by #163) — `baseCase` never re-inserts a vertex it
   already settled in the same call. Pre-#163 this guarded against equal-sum ping-pong
   loops; since #163 strict canonical relaxation makes improvements on settled vertices
   impossible, and the filter only skips exact-equality re-enqueue signals (see
   "Re-enqueue signal"), keeping zero-weight plateaus quiescent.
-- **`findPivots(B, S, dHat, adjacency, k, ties?)`** (#44) — `src/findPivots.mjs`,
+- **`findPivots(B, S, labels, csr, k)`** (#44; dense engine #205) — `src/findPivots.mjs`,
   Algorithm 1: `k` strictly-layered rounds of canonical Bellman-Ford out of the complete
-  frontier `S`, relaxing the shared `dHat` (`d̂[·]`) **in place**; `< B` (composite) gates
-  membership in `W` only (the d̂ write is unconditional). Returns `{ pivots, W }` (= the
-  paper's `P, W`), with `|pivots| ≤ |W|/k`; the forest is the canonical `preds` pointers.
-  Internal (not re-exported from `index.mjs`).
+  frontier `S` (indices), relaxing the shared typed-array `labels` **in place** over the
+  `csr` graph; `< B` (composite) gates membership in `W` only (the d̂ write is
+  unconditional). Returns `{ pivots, W }` (= the paper's `P, W`, index sets), with
+  `|pivots| ≤ |W|/k`; the forest is the canonical `labels.preds` pointers. Internal
+  (not re-exported from `index.mjs`).
 - **Early exit** (#44) — `findPivots`' first branch: as soon as `|W| > k·|S|` after a round,
   return `pivots = S` — the frontier is already small relative to `W`.
 - **One-parent rule** (#44, superseded by #163) — pre-#163, each vertex accepted the first
@@ -168,12 +182,27 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
   made `F` a DAG. Since #163 the forest **is** the canonical `preds` pointers: exactly one
   deterministic parent per vertex of `W \ S`, no DAG possible, and tight cycles cannot
   exist (zero-weight edges strictly increase hops). `S` members are roots by definition.
-- **`bmssp(l, B, S)`** (#43) — method on the `BMSSP` class, Algorithm 3: the main bounded
-  multi-source recursion. Level 0 delegates to `baseCase`; level ≥ 1 wires `findPivots` →
-  `BlockList` → recursive `bmssp(l-1, Bi, Si)` calls with band-routed relaxation. Returns
-  `{ bound, boundKey, vertices }` (= the paper's `B'`, its composite key, `U`); scalar `B`
-  in → scalar `bound` out. `calculateShortestPaths(start)` runs
-  `bmssp(topLevel, Infinity, {start})` after setting `d̂[start] = 0`, `hops[start] = 0`.
+- **`bmssp(l, B, S)`** (#43; public wrapper since #205) — method on the `BMSSP` class:
+  the PUBLIC Algorithm 3 entry in **id space**. Snapshots seeded distances from
+  `this.shortestPaths` into the engine (`syncLabelsIn`), translates `S`/bound to indices
+  (`boundToEngine`), runs `bmsspIndex`, then mirrors labels back (`syncLabelsOut`) and
+  translates the result to ids (`keyToPublic`). Returns `{ bound, boundKey, vertices }`
+  (= the paper's `B'`, its composite key, `U`); scalar `B` in → scalar `bound` out.
+- **`bmsspIndex(l, boundKey, S)`** (#43; dense engine #205) — the actual Algorithm 3
+  recursion, **entirely in dense-index space**: `S`/`U` are index sets, keys are
+  `[len, hops, index]`, the graph is `this.csr`, labels are `this.labels`. Level 0
+  delegates to `baseCase`; level ≥ 1 wires `findPivots` → `BlockList` → recursive
+  `bmsspIndex(l-1, Bi, Si)` with band-routed relaxation. `calculateShortestPaths(start)`
+  sets `labels.dist[startIdx] = 0` and calls `bmsspIndex(topLevel, toBound(∞), {startIdx})`
+  directly (skipping the id-translation wrapper), then `syncLabelsOut`.
+- **`syncLabelsIn()` / `syncLabelsOut()`** (#205) — the public↔engine label bridge.
+  `syncLabelsIn` fills the typed arrays from `this.shortestPaths` (seeded distances only —
+  sources are hop-0 roots) before a public `bmssp()` call; `syncLabelsOut` mirrors the
+  arrays back into `shortestPaths`/`hops`/`preds` (keyed by id) after a run, skipping
+  unreached (∞) vertices and the `NO_PRED` sentinel.
+- **`boundToEngine(B)` / `keyToPublic(key)`** (#205) — id↔index translation for the public
+  boundary: a scalar bound → `toBound`, a composite bound's id → its index; a returned
+  key's index → its id (sentinel / out-of-range components pass through).
 - **`deriveParameters()`** (#43) — class method (called by the constructor) that derives and
   stores `this.k`, `this.t`, `this.topLevel` from `n = nodeIDs.size`, each clamped to ≥ 1:
   `k = ⌊(log₂n)^(1/3)⌋`, `t = ⌊(log₂n)^(2/3)⌋`, `topLevel = ⌈log₂n / t⌉`. The clamp keeps
@@ -194,15 +223,27 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
   (`src/tieBreak.mjs`): `length` = path length, `hops` = edge count (the paper's
   "#vertices" tie-break — zero-weight extensions strictly increase it), `id` = pred id in
   relaxation / own id in frontier order (O(1) stand-in for the paper's vertex-sequence
-  comparison). Realizes Assumption 2.1: all frontier comparisons strict.
-- **Canonical label / relaxation** (#163, allocation-free since #168) —
-  `relaxEdge(u, v, w, dHat, ties, bound?)` updates `d̂`/`hops`/`preds` together iff the
+  comparison). Since #205 the engine's third component is a dense **index** rather than a
+  raw id; index order equals id order, so the canonical choice is unchanged. Realizes
+  Assumption 2.1: all frontier comparisons strict.
+- **`makeLabels(n)` / `labelKey(v, labels)`** (#205) — `src/tieBreak.mjs`: the engine label
+  state and its frontier key. `makeLabels` returns `{ dist:Float64Array(∞),
+  hops:Uint32Array(0), preds:Int32Array(NO_PRED) }`; `labelKey(v, labels)` builds
+  `[dist[v], hops[v], v]`. These replace the Map-based `dHat`/`ties`/`orderKey` in the
+  algorithm's hot path (the Maps remain at the public boundary).
+- **`NO_PRED`** (#163; `-1` since #205) — the source predecessor sentinel: compares below
+  every real vertex, so a source never loses an equal-`(length, hops)` tie. Was `-Infinity`
+  when preds lived in a Map (ids could be negative); since #205 preds live in an
+  `Int32Array` over dense indices (`≥ 0`), so `-1` both fits the array and stays below all.
+- **Canonical label / relaxation** (#163; allocation-free #168; typed arrays #205) —
+  `relaxEdge(u, v, w, labels, bound?)` updates `labels.dist`/`hops`/`preds` together iff the
   candidate path key beats the stored one; the fixed point is the lexicographic minimum
   over all paths, so labels, predecessor pointers and completed sets are invariant under
   edge/iteration order (tested in `test/tieBreak.test.mjs` against an O(n²)
   lexicographic Dijkstra oracle). Since #168 it returns one of three integer codes —
   `RELAX_IMPROVED` / `RELAX_EQUAL` / `RELAX_LOST` — and allocates nothing; a caller
-  that enqueues `v` materializes its key with `orderKey` on that path only.
+  that enqueues `v` materializes its key with `labelKey` on that path only. Since #205 `u`
+  and `v` are dense indices and the labels are typed arrays.
 - **`compareKeyParts(length, hops, id, key)`** (#168) — `src/tieBreak.mjs`: compareKeys
   with the left key unpacked into its components, so the hot relax/routing loops can
   test a stored label against a band bound without building a throwaway array. Same
@@ -217,14 +258,15 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
   labeled by a deeper call without being completed. The caller re-enqueues `v` unless it
   is already settled/completed — the paper's `≤` relaxation made canonical, firing from
   exactly one predecessor.
-- **`ties`** (#163) — the `{ hops, preds }` bundle (`makeTies`) that accompanies `dHat`
-  through `baseCase`/`findPivots`/`relaxEdge`; the `BMSSP` class owns one as `this.ties`
-  (`this.hops`, `this.preds`), cleared by `initializeShortestPaths()`. Missing entries
-  read as hop-0 / no-pred, so externally seeded sources need no setup.
+- **`ties`** (#163; public boundary since #205) — the `{ hops, preds }` bundle
+  (`makeTies`) that the `BMSSP` class owns as `this.ties` (`this.hops`, `this.preds`),
+  cleared by `initializeShortestPaths()`. Since #205 these Maps are the **public mirror**
+  of the engine's typed `labels` (refreshed by `syncLabelsOut`), used by `reconstructPath`
+  and external inspection — the algorithm no longer threads them through relaxation.
 - **`reconstructPath(target)`** (#169) — public `BMSSP` method that walks the canonical
-  `preds` chain from `target` to the latest calculation's source, then reverses it into a
-  source-to-target node sequence. Returns `[]` before a calculation or for an unreachable
-  target; throws when `target` is not a known graph node.
+  `preds` chain (the public mirror Map, #205) from `target` to the latest calculation's
+  source, then reverses it into a source-to-target node sequence. Returns `[]` before a
+  calculation or for an unreachable target; throws when `target` is not a known graph node.
 - **`boundKey`** (#163) — the composite boundary in `baseCase`/`bmssp` results: every
   returned vertex's order key is strictly below it. The scalar `bound` is its projection
   (a returned vertex may tie `bound`'s length, never exceed it).

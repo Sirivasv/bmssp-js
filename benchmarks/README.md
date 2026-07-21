@@ -103,25 +103,27 @@ harness reruns it on every `npm run bench` (fresh capture:
 [`RESULTS.md`](./RESULTS.md); the deeper 1.0.0 record up to n = 4M:
 [`HEAD-TO-HEAD.md`](./HEAD-TO-HEAD.md)):
 
-- **Use Dijkstra for wall-clock speed:** it wins on every shape and size
-  measured (algorithm-only timing, ~1.6–3× on sparse graphs, more on
-  dense/chain/star). `bmssp-js` itself uses Dijkstra as the oracle precisely
+- **Use Dijkstra for wall-clock speed:** it still wins on every shape and
+  size measured — but on sparse graphs the margin is now small
+  (algorithm-only timing, **~1.1–1.4×** since the #205 dense-index engine,
+  down from ~2.5–3×). `bmssp-js` itself uses Dijkstra as the oracle precisely
   because it is correct and fast.
-- **BMSSP's asymptotics are real and visible:** on sparse graphs the
-  wall-clock gap narrows with n (2.5× at 50k → 1.57× at 2M in the 1.0.0
-  record), and in the paper's own metric the harness's count mode shows the
-  ratio below 1.0 from n = 50k on: **0.95× at 50k → 0.76× at 200k → 0.65×
-  at 1M** (since #167; ~1M crossover before it; #168 shaved a further
-  ~1–3%). The sorting barrier is measurably broken; the remaining loss is
-  constant factors — #168 cut −13–23% of wall-clock from the hot loops.
-- **Shapes that blunt BMSSP's edge, per the harness:** `dense-random`
-  (relaxation-bound, ~4.7×), `chain` (depth, not sorting, is the cost —
-  ~7.4× against the prebuilt-adjacency baseline), `star` (extreme fanout,
-  ~3.8× at 50k — the #182 quadratic-`batchPrepend` blowup is **fixed**, 500k
+- **BMSSP's asymptotics are real and visible:** after #205 (typed-array
+  labels + CSR adjacency) the sparse head-to-head reads **1.38×**
+  (sparse-random 50k), **1.07×** (sparse-random-l4 300k) and **1.16×**
+  (dense) — roughly half the pre-#205 wall-clock. In the paper's own metric
+  the harness's count mode shows the ratio below 1.0 from n = 50k on:
+  **0.95× at 50k → 0.76× at 200k → 0.65× at 1M** (unchanged by #205 —
+  identical algorithm, just typed storage; the crossover moved to <50k at
+  #167, and #168 shaved a further ~1–3%). The sorting barrier is measurably
+  broken; the remaining wall-clock loss is ordinary JS constant factors.
+- **Shapes that blunt BMSSP's edge, per the harness:** `grid` (~2.3×),
+  `chain` (depth, not sorting, is the cost — ~3.1×), `star` (extreme fanout,
+  ~2.5× at 50k — the #182 quadratic-`batchPrepend` blowup is **fixed**, 500k
   went 61 s → ~3 s and the ratio now falls with n), and the `topLevel` 3→4
-  window (`sparse-random-l4`: ~3× at 300k — a measured **~+24% step** at the
-  exact transition n = 2^18 → 2^18 + 1, inherent one-extra-relax-pass cost;
-  both stay as regression sentinels; see the #182 addendum in
+  window (`sparse-random-l4`: the measured **~+24% step** at the exact
+  transition n = 2^18 → 2^18 + 1 is an inherent one-extra-relax-pass cost;
+  both #182 shapes stay as regression sentinels; see the #182 addendum in
   [`HEAD-TO-HEAD.md`](./HEAD-TO-HEAD.md)).
 
 **Bottom line for this repo:** BMSSP is implemented here for **correctness and

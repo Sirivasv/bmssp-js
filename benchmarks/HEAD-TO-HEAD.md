@@ -170,3 +170,33 @@ Wall-clock stayed at-or-better than 1.1.1 on every shape (star 50k ~144 ms → ~
 sparse 50k within noise; `sparse-random-l4` ~1,246 ms → ~1,083 ms) — the AVL bound index
 and selection cost about what the array + native sort did, while doing asymptotically
 honest work. Current capture: [`RESULTS.md`](./RESULTS.md).
+
+## Addendum — #205 dense-index engine roughly halves wall-clock (2026-07-21)
+
+[#205](https://github.com/Sirivasv/bmssp-js/issues/205) replaced the Map-based label
+storage that #168's profiles flagged (`relaxEdge`'s ~38% self-time was `Map.get`/`set` on
+arbitrary node ids) with a **dense-index engine**: node ids are mapped to contiguous
+integers once (in ascending-id order, so the canonical tie-break is unchanged), the graph
+is stored in **CSR** arrays, and `d̂`/`hops`/`preds` live in **typed arrays**
+(`Float64Array`/`Uint32Array`/`Int32Array`). The algorithm runs entirely on indices; a thin
+id↔index wrapper keeps the public API identical (so #205 shipped **no** version bump).
+
+Algorithm-only wall-clock, head-to-head vs. Dijkstra on the same prebuilt adjacency
+(2026-07-21 capture, [`RESULTS.md`](./RESULTS.md)):
+
+| shape | 1.2.0 ratio | post-#205 ratio | bmssp ms (1.2.0 → #205) |
+| --- | --- | --- | --- |
+| sparse-random 50k | ~2.5–2.8× | **1.38×** | ~104 → ~48 |
+| sparse-random-l4 300k | ~2.5–3× | **1.07×** | ~1,083 → ~426 |
+| dense 8k | ~4.5× | **1.16×** | ~61 → ~18 |
+| grid 40k | ~3.9× | 2.27× | ~66 → ~38 |
+| chain 50k | ~6.5× | 3.10× | ~37 → ~23 |
+| star 50k | ~4.5× | 2.48× | ~131 → ~92 |
+
+Clean A/B (fresh processes, alternating rounds): sparse 50k ~104 → ~53 ms, star ~145 →
+~100 ms, sparse-l4 300k ~982 → ~424 ms — roughly a 2× speedup on the algorithm itself.
+**Comparison counts are unchanged** (0.95× / 0.76× / 0.65× sparse at 50k / 200k / 1M): the
+algorithm and its canonical choices are byte-for-byte identical, only the storage changed —
+which is exactly what the untouched determinism + oracle suites certify. BMSSP is now within
+~1.1–1.4× of Dijkstra's wall-clock on sparse graphs; the remaining gap is ordinary JS
+constant factors, with typed/flexible inputs (#172) the next lever.
