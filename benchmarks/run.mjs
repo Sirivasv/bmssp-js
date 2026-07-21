@@ -47,8 +47,9 @@ if (withCounts) {
   out.push(section("Comparison counts — the sorting barrier, measured (#170)"));
   out.push(
     "Comparisons between path lengths (the paper's cost metric), one exact" +
-      " run per side. On sparse graphs the ratio falls with n and crosses" +
-      " below 1.0 between n = 200k and n = 1M.\n",
+      " run per side. On sparse graphs the ratio falls with n and is" +
+      " already below 1.0 at n = 50k (since #167's selection-based" +
+      " BlockList; it was ~n = 1M before).\n",
   );
   out.push(counts.table);
 }

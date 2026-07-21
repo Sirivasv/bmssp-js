@@ -36,6 +36,7 @@ with every building block shipped, tested, and released individually:
 | Opt-in constant-degree transform, in/out-degree ≤ 2 ([#164](https://github.com/Sirivasv/bmssp-js/issues/164)) | `constantDegreeTransform()` | ✅ done |
 | BMSSP-vs-Dijkstra head-to-head in the benchmark harness ([#170](https://github.com/Sirivasv/bmssp-js/issues/170)) | `npm run bench` / `npm run bench:counts` | ✅ done |
 | Performance-cliff investigation; quadratic `BatchPrepend` fixed ([#182](https://github.com/Sirivasv/bmssp-js/issues/182)) | `src/blockList.mjs` | ✅ done — **1.1.1** |
+| Exact Lemma 3.3 asymptotics: balanced-BST bound index + linear-time selection ([#167](https://github.com/Sirivasv/bmssp-js/issues/167)) | `src/boundIndex.mjs` + `src/select.mjs` | ✅ done |
 
 > **Honest note:** the paper's win is asymptotic, and this repo optimizes for correctness
 > and readability, not raw speed. Measured head-to-head (algorithm time only, graph
@@ -44,10 +45,13 @@ with every building block shipped, tested, and released individually:
 > Dijkstra still wins on wall-clock at every practical size, though the gap narrows as
 > sparse graphs grow (2.5× at 50k nodes → 1.57× at 2M). But in the paper's own metric —
 > **comparisons between path lengths** — BMSSP does **fewer comparisons than Dijkstra
-> from about n = 1M on sparse graphs** (`npm run bench:counts` measures the ratio falling
-> 1.20× at 50k → 1.03× at 200k → 0.98× at 1M; 0.91× at 2M in the record), and the
-> advantage grows with size: the "sorting barrier" is measurably broken; what remains is
-> JS constant factors. The two performance cliffs found in the 1.0.0 measurements were
+> from under n = 50k on sparse graphs** (`npm run bench:counts` measures 0.97× at 50k →
+> 0.77× at 200k → **0.66× at 1M**), and the advantage grows with size: the "sorting
+> barrier" is measurably broken; what remains is JS constant factors. That crossover
+> used to sit at ~n = 1M until [#167](https://github.com/Sirivasv/bmssp-js/issues/167)
+> replaced the block structure's sort-based internals with the paper's exact machinery
+> (balanced-BST bound index + deterministic linear-time selection).
+> The two performance cliffs found in the 1.0.0 measurements were
 > run down in [#182](https://github.com/Sirivasv/bmssp-js/issues/182): the star-graph
 > blowup was a quadratic in `BatchPrepend`'s bookkeeping — fixed in `1.1.1` (500k-node
 > star: 61 s → ~3 s) — and the recursion-level step is an inherent, measured ~+24% per
@@ -70,8 +74,9 @@ with every building block shipped, tested, and released individually:
    closest batch without paying the Θ(log n)-per-vertex "sorting barrier."
 
 The wall-clock crossover point is astronomically large, but the asymptotics are real: in
-measured comparison counts this implementation already beats Dijkstra past ~1M nodes on
-sparse graphs ([benchmarks/HEAD-TO-HEAD.md](benchmarks/HEAD-TO-HEAD.md)). This repo
+measured comparison counts this implementation already beats Dijkstra from under 50k
+nodes on sparse graphs, by a third at 1M
+([benchmarks/HEAD-TO-HEAD.md](benchmarks/HEAD-TO-HEAD.md)). This repo
 optimizes for a **correct, readable, well-tested** implementation, validated line-by-line
 against a Dijkstra oracle — not for raw speed.
 

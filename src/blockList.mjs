@@ -42,6 +42,9 @@ class BlockList {
     this.M = Math.floor(M);
     this.B = B;
     this.compare = compare ?? ((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    // Shared [key, value]-pair comparator for splits/chunking/pulls, hoisted
+    // so the hot paths don't allocate a closure per call
+    this.compareBySecond = (a, b) => this.compare(a[1], b[1]);
     // d1 starts as a single empty block with upper bound B; that block is
     // kept as the sequence's last forever so every value < B has a home
     this.d1 = new BoundIndex();
@@ -108,7 +111,7 @@ class BlockList {
   splitBlock(block) {
     const pairs = [...block.entries];
     const half = pairs.length >> 1;
-    partitionByRank(pairs, half - 1, (a, b) => this.compare(a[1], b[1]));
+    partitionByRank(pairs, half - 1, this.compareBySecond);
     const lower = this.makeBlock(pairs[half - 1][1]);
     for (let i = 0; i < half; i += 1) {
       const [key, value] = pairs[i];
@@ -151,15 +154,32 @@ class BlockList {
       fresh.push([key, value]);
     }
     if (fresh.length === 0) return;
-    // One block if the batch fits; otherwise recursive median splitting into
-    // value-ordered chunks of <= ceil(M/2) — O(|L|/M) blocks built with
-    // O(|L|·max{1, log(|L|/M)}) comparisons, the Lemma 3.3 bound
+    // One block if the batch fits; otherwise value-ordered chunks of
+    // <= ceil(M/2) — O(|L|/M) blocks built with O(|L|·max{1, log(|L|/M)})
+    // comparisons, the Lemma 3.3 bound
     let chunks;
     if (fresh.length <= this.M) {
       chunks = [fresh];
     } else {
+      const chunkSize = Math.ceil(this.M / 2);
       chunks = [];
-      this.chunkByMedian(fresh, Math.ceil(this.M / 2), chunks);
+      if (fresh.length >= chunkSize * chunkSize) {
+        // Many chunks (|L| >= chunkSize², e.g. the M = 1 star regime, where
+        // |L|/M ~ |L|): sorting's O(|L| log |L|) is within 2x of the
+        // O(|L| log(|L|/chunkSize)) target — |L| >= c² gives
+        // log |L| <= 2 log(|L|/c) — and a single sort is much faster than
+        // log(|L|/M) rounds of median selection
+        fresh.sort(this.compareBySecond);
+        for (let i = 0; i < fresh.length; i += chunkSize) {
+          chunks.push(fresh.slice(i, i + chunkSize));
+        }
+      } else {
+        // Few chunks (|L| < chunkSize²): repeated median splitting — here
+        // the recursion is at most log2(chunkSize) levels deep, and a sort
+        // would overshoot the Lemma bound (up to O(|L| log |L|) for
+        // O(|L| log(|L|/M)) with |L| close to M)
+        this.chunkByMedian(fresh, chunkSize, chunks);
+      }
     }
     // Materialize the chunks as blocks (ascending order)...
     const blocks = [];
@@ -194,7 +214,7 @@ class BlockList {
       return;
     }
     const half = pairs.length >> 1;
-    partitionByRank(pairs, half - 1, (a, b) => this.compare(a[1], b[1]));
+    partitionByRank(pairs, half - 1, this.compareBySecond);
     this.chunkByMedian(pairs.slice(0, half), maxSize, out);
     this.chunkByMedian(pairs.slice(half), maxSize, out);
   }
@@ -246,7 +266,7 @@ class BlockList {
     }
     // Move the M smallest candidates to the front (linear-time selection,
     // the Lemma 3.3 O(M) pull) and take them out of the structure
-    partitionByRank(candidates, this.M - 1, (a, b) => this.compare(a[1], b[1]));
+    partitionByRank(candidates, this.M - 1, this.compareBySecond);
     const keys = new Set();
     for (let i = 0; i < this.M; i += 1) {
       const [key, , block] = candidates[i];

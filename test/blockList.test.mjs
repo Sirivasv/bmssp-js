@@ -358,7 +358,9 @@ describe("BlockList #167 machinery (balanced bound index + selection)", () => {
     expect(previous).toBe(390); // key 29's untouched original value
   });
 
-  test("a large batchPrepend chunks by median and drains sorted", () => {
+  test("a many-chunk batchPrepend (sort branch) drains sorted", () => {
+    // 1000 pairs at M = 8 (chunkSize 4): |L| >= chunkSize², the sort-based
+    // chunking branch
     const M = 8;
     const list = new BlockList(M, Infinity);
     list.insert("far", 1e9);
@@ -371,6 +373,31 @@ describe("BlockList #167 machinery (balanced bound index + selection)", () => {
     }
     list.batchPrepend(batch);
     expect(list.size).toBe(1001);
+    let previous = -Infinity;
+    for (const { keys } of drain(list)) {
+      expect(keys.size).toBeLessThanOrEqual(M);
+      const pulled = [...keys].map((k) => values.get(k));
+      expect(Math.min(...pulled)).toBeGreaterThan(previous);
+      previous = Math.max(...pulled);
+    }
+    expect(previous).toBe(1e9);
+  });
+
+  test("a few-chunk batchPrepend (median-recursion branch) drains sorted", () => {
+    // 2000 pairs at M = 100 (chunkSize 50): M < |L| < chunkSize², the
+    // repeated-median-splitting branch of the chunker
+    const M = 100;
+    const list = new BlockList(M, Infinity);
+    list.insert("far", 1e9);
+    const values = new Map([["far", 1e9]]);
+    const batch = [];
+    for (let i = 0; i < 2000; i += 1) {
+      const value = (i * 1223) % 2000; // distinct values 0..1999, shuffled
+      batch.push([i, value]);
+      values.set(i, value);
+    }
+    list.batchPrepend(batch);
+    expect(list.size).toBe(2001);
     let previous = -Infinity;
     for (const { keys } of drain(list)) {
       expect(keys.size).toBeLessThanOrEqual(M);

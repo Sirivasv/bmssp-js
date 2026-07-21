@@ -64,7 +64,10 @@ src/
   dijkstra.mjs            # reference Dijkstra (array binary-heap) — DONE, used as oracle
   constantDegree.mjs      # #164: opt-in constant-degree transform (in/out-degree ≤ 2); public, re-exported
   tieBreak.mjs            # #163: composite [length, hops, id] keys — Assumption 2.1 realized (compareKeys/toBound/relaxEdge)
-  blockList.mjs           # #42: Lemma 3.3 block-based partial-sort structure D (comparator-aware since #163)
+  blockList.mjs           # #42: Lemma 3.3 block-based partial-sort structure D (comparator-aware since #163;
+                          #      exact Lemma 3.3 asymptotics since #167 via boundIndex + select)
+  boundIndex.mjs          # #167: AVL ordered block sequence — the paper's balanced-BST bound index (BoundIndex)
+  select.mjs              # #167: deterministic worst-case-linear selection (partitionByRank, median of medians)
   heap.mjs                # #41: indexed binary min-heap (MinHeap) for BaseCase (comparator-aware since #163)
   baseCase.mjs            # #40: BaseCase(B, S) — Algorithm 2 bounded mini-Dijkstra on composite keys
   findPivots.mjs          # #44: FindPivots(B, S) — Algorithm 1 frontier shrink, canonical-pred forest
@@ -76,7 +79,9 @@ test/
   tieBreak.test.mjs       # #163: 16 tests — key order, canonical relaxEdge, edge-order determinism, strict Lemma 3.1, lex-oracle hops/preds
   constantDegree.test.mjs # #164: 11 tests — degree ≤ 2 on hand + seeded shapes (incl. star hub), distance preservation via oracle, BMSSP-on-transform, determinism, empty/validation
   pathReconstruction.test.mjs # #169: 3 public-API tests — Dijkstra path oracle, unreachable/pre-run/source switching, target validation
-  blockList.test.mjs      # #42: 20 BlockList tests incl. seeded random stress + #182 many-chunk/M=1 batchPrepend regression tests
+  blockList.test.mjs      # #42: 25 BlockList tests incl. seeded random stress, #182 many-chunk/M=1 regression tests + #167 machinery tests
+  boundIndex.test.mjs     # #167: 8 BoundIndex tests — sequence ops, monotone findFirst, AVL invariants under seeded churn
+  select.test.mjs         # #167: 9 partitionByRank tests — every-rank contract, worst-case orderings, duplicates, determinism
   heap.test.mjs           # #41: 16 MinHeap tests incl. a seeded stress test vs. a naive queue
   baseCase.test.mjs       # #40: 13 BaseCase tests incl. seeded oracle-comparison stress
   findPivots.test.mjs     # #44: 12 FindPivots tests incl. two seeded oracle stress tests
@@ -172,21 +177,24 @@ make every frontier comparison strict. Consequences, replacing the pre-#163 guar
 4. **Full determinism:** distances, hops, preds, and even partial-call `U`/`boundKey` are
    invariant under edge-list permutation (`test/tieBreak.test.mjs` asserts this).
 
-**Performance (measured 2026-07-16, addendum 2026-07-21; Apple Silicon, node v26.5.0 —
-full data + methodology in `benchmarks/HEAD-TO-HEAD.md`):** algorithm-only wall-clock
-(construction excluded, Dijkstra fed the same prebuilt adjacency): Dijkstra wins every
-shape/size; sparse-graph ratio narrows with n (2.54× at 50k → **1.57× at 2M**).
-**Comparison counts (the paper's metric) cross over:** BMSSP does fewer distance
-comparisons than Dijkstra past ~n = 1M sparse (0.96× at 1M, **0.91× at 2M**). The two
-#182 pathologies were profiled 2026-07-21 (HEAD-TO-HEAD addendum): the **star blowup was
-quadratic `batchPrepend` bookkeeping — fixed in 1.1.1** (500k: 61 s → ~3.1 s, ratio now
-falls with n); the **`topLevel` 3→4 step is an inherent ~+24%** (one extra full relax
-pass per level, measured at the exact n = 2^18 straddle) — the recorded 5× at 4M is that
-step plus GC/memory amplification at 12M edges. Note `topLevel` is **3 from n = 10k to
-2M** (4 only in n ∈ (2^18, ~376k]) — scale tests buy volume/memory pressure, not
-recursion depth. The default suite runs in ~7.5 s; the opt-in `FUZZ_XL=1` 2M-node round
-takes ~33 s (#163's composite keys added ~10% over the ~30 s scalar baseline — candidate
-for #168).
+**Performance (measured 2026-07-16, addenda 2026-07-21; Apple Silicon, node v26.5.0 —
+full data + methodology in `benchmarks/HEAD-TO-HEAD.md`, latest capture in
+`benchmarks/RESULTS.md`):** algorithm-only wall-clock (construction excluded, Dijkstra fed
+the same prebuilt adjacency): Dijkstra wins every shape/size; sparse-graph ratio narrows
+with n (1.0.0 record: 2.54× at 50k → **1.57× at 2M**). **Comparison counts (the paper's
+metric) crossed over at ~n = 1M sparse in the 1.0.0/1.1.1 records; after #167's
+selection-based BlockList they cross before n = 50k** — 0.97× at 50k, 0.77× at 200k,
+**0.66× at 1M** (grid 700×700 down to 1.12×): replacing the sort-based splits/pulls
+removed a major comparison cost, and #167's wall-clock is also at-or-better than 1.1.1
+on every shape (star ~134 ms vs ~144 ms at 50k, sparse ~100 ms vs ~96 ms — within noise).
+The two #182 pathologies were profiled 2026-07-21 (HEAD-TO-HEAD addendum): the **star
+blowup was quadratic `batchPrepend` bookkeeping — fixed in 1.1.1** (500k: 61 s → ~3.1 s);
+the **`topLevel` 3→4 step is an inherent ~+24%** (one extra full relax pass per level,
+measured at the exact n = 2^18 straddle) — the recorded 5× at 4M is that step plus
+GC/memory amplification at 12M edges. Note `topLevel` is **3 from n = 10k to 2M** (4 only
+in n ∈ (2^18, ~376k]) — scale tests buy volume/memory pressure, not recursion depth. The
+default suite runs in ~7.5 s; the opt-in `FUZZ_XL=1` 2M-node round takes ~33 s (#163's
+composite keys added ~10% over the ~30 s scalar baseline — candidate for #168).
 
 ## `src/blockList.mjs` — Lemma 3.3 structure `D` (#42)
 
@@ -203,20 +211,80 @@ class BlockList {
 export { BlockList };      // NOT re-exported from index.mjs — internal to the algorithm
 ```
 
-Implementation notes (matches §03-B including its documented shortcuts):
+Implementation notes (matches §03-B; since #167 both of its documented shortcuts are gone
+and the structure meets Lemma 3.3's exact per-operation bounds):
 - `d1` (insert blocks) + `d0` (prepend blocks); values ordered between blocks, unsorted within.
-  Blocks are `{ bound, entries: Map }`; a `locator` Map (key → block) gives O(1) duplicate handling.
-- Bound index = plain array + binary search instead of a balanced BST (upgrade tracked as #167).
-- Overfull `d1` block splits around the median via sort (O(M log M), not linear-time selection).
-- Big `batchPrepend` batches are sorted and chunked into blocks of ≤ ⌈M/2⌉, prepended to `d0`
-  **in one concat** (#182 fix, 1.1.1): the earlier per-chunk `unshift` re-shifted the whole
-  `d0` array per chunk — O(n²) when M is small and the chunk count approaches |L|, which was
-  the star-graph blowup (67.8× at 500k; now ~5.5× and falling with n).
-- Last `d1` block (bound `B`) is kept even when empty so every `insert` finds a home.
+  Blocks are `{ bound, entries: Map, node, prev, next }`; a `locator` Map (key → block) gives
+  O(1) duplicate handling.
+- **Bound index = `BoundIndex` AVL sequence tree (#167)**, replacing the plain sorted array:
+  `insert` finds its block via a monotone-predicate descent (`findFirst`, O(log #blocks)),
+  splits insert the lower half via `insertBefore`, emptied blocks leave via `remove` — no
+  O(#blocks) `splice`/`indexOf` anywhere. Each `d1` block keeps its tree-node handle in
+  `block.node` (`null` marks a `d0` block; `d0` is a doubly-linked list via `prev`/`next`
+  with O(1) unlink).
+- **Splits, chunking and pulls use `partitionByRank` (#167)** — deterministic worst-case-
+  linear selection — instead of an O(M log M) sort: an overfull `d1` block partitions around
+  its median rank; `pull` selects the exact M smallest candidates in O(M).
+- Big `batchPrepend` batches become value-ordered chunks of ≤ ⌈M/2⌉ prepended to `d0` in one
+  linked-list splice (#182 fix preserved). Chunking is a two-branch hybrid, both inside the
+  Lemma bound O(|L|·max{1, log(|L|/M)}): with many chunks (|L| ≥ ⌈M/2⌉², e.g. the M = 1 star
+  regime) one sort is within 2× of the target and far faster than log(|L|/M) median rounds;
+  with few chunks (|L| < ⌈M/2⌉²) recursive median splitting (≤ log₂⌈M/2⌉ levels) avoids the
+  sort's O(|L| log |L|) overshoot.
+- The shared `compareBySecond` pair comparator is hoisted onto the instance so hot paths
+  don't allocate a closure per call.
+- Last `d1` block (bound `B`, `this.lastD1Block`) is kept even when empty so every `insert`
+  finds a home.
 - The pulled set is always the exact M smallest values regardless of block layout, so pulls
   are insertion-order independent. Under #163's composite keys (all values distinct) the
   separator is strictly above every pulled value — the pre-#163 tie caveat (bound tying a
   pulled key, `d̂ == Bi` batch members) is gone.
+
+## `src/boundIndex.mjs` — AVL ordered block sequence (#167)
+
+```js
+class BoundIndex {
+  constructor()            // empty sequence
+  get size
+  clear()
+  first() / last()         // sequence ends (node handles), null when empty
+  next(node)               // in-order successor, null at the end
+  findFirst(predicate)     // leftmost node whose ITEM satisfies predicate — predicate must
+                           // be monotone along the sequence (false…false, true…true);
+                           // O(log size). BlockList passes bound >= value.
+  append(item)             // → node handle; insert at the end
+  insertBefore(node, item) // → node handle; insert immediately before an existing node
+  remove(node)             // remove by handle
+}
+export { BoundIndex };     // NOT re-exported from index.mjs — internal to the algorithm
+```
+
+The paper's "balanced BST over block upper bounds", realized as a POSITIONAL AVL tree: the
+tree never compares items — a node's in-order position is its sequence position, and because
+`d1` bounds are monotone along the sequence, `findFirst` with a monotone predicate is a
+binary search. Nodes are plain `{ item, parent, left, right, height }` objects handed back
+as handles (blocks store theirs in `block.node`). Insert/remove rebalance with standard AVL
+rotations walking to the root.
+
+## `src/select.mjs` — deterministic linear-time selection (#167)
+
+```js
+partitionByRank(items, rank, compare?, cheapBudget?)  // → items[rank]
+// Reorders items IN PLACE: items[0..rank] become the rank+1 smallest and
+// items[rank] the rank-th smallest (their max); order within the sides is
+// unspecified. compare defaults to numeric. cheapBudget (default 6·|items|)
+// is the introselect knob: elements the median-of-3 phase may visit before
+// pivots switch to median-of-medians; 0 forces the fallback (tests).
+export { partitionByRank };   // NOT re-exported from index.mjs — internal to the algorithm
+```
+
+Introselect: deterministic median-of-3 quickselect (three-way partition, ~2–3n comparisons
+on typical inputs — below a sort's n log n, which keeps the #170 comparison counts honest)
+with a work budget; exhausting it switches pivots to median-of-medians (groups of 5), whose
+guaranteed middle-40% split makes the remainder — and thus the worst case — linear. Pure
+median-of-medians was measured at ~10–20n comparisons, worse than sorting at practical
+sizes; the budgeted hybrid keeps both the bound and the constant. No randomness: fully
+reproducible.
 
 ## `src/heap.mjs` — indexed binary min-heap (#41)
 
@@ -365,10 +433,22 @@ edge-order deterministic (copies allocated in edge order); ~2m copies, ~3m edges
   recursion contract (bounded call: complete-below-boundary, exact membership, d̂ never
   underestimates; unbounded call: successful execution returning exactly the reachable set),
   and seeded full-map-vs-oracle stress across sizes (up to n = 2000).
-- `test/blockList.test.mjs` (18), `test/heap.test.mjs` (16), `test/baseCase.test.mjs` (13),
+- `test/blockList.test.mjs` (25), `test/heap.test.mjs` (16), `test/baseCase.test.mjs` (13),
   `test/findPivots.test.mjs` (12): per-module contracts incl. seeded stress — see the
   module sections above. (Since #163 the baseCase partial-run tests assert the composite
-  contract: strictly below `boundKey`, `≤` the scalar bound.)
+  contract: strictly below `boundKey`, `≤` the scalar bound. #167 added five BlockList
+  tests: hundreds-of-splits drain at M = 2, interior-block drops via duplicate-key
+  replacement, both chunking branches of `batchPrepend` — sort and median-recursion —
+  and a middle-`d0`-block unlink.)
+- `test/select.test.mjs` (11, #167): `partitionByRank` — validation, the every-rank
+  contract on shuffled/sorted/reverse/duplicate-heavy/organ-pipe inputs, custom
+  comparators, the forced median-of-medians fallback (`cheapBudget: 0`), seeded stress
+  across sizes, and determinism of the final arrangement.
+- `test/boundIndex.test.mjs` (8, #167): `BoundIndex` — sequence semantics of
+  append/insertBefore/remove/first/last/next, leftmost-match `findFirst` on duplicate
+  bound runs, and AVL invariants (parent pointers, stored heights, |balance| ≤ 1)
+  verified recursively under append-only growth (height ≤ 17 at n = 2048) and two
+  seeded random-churn stresses against a reference array.
 - `test/tieBreak.test.mjs` (19, #163 + 3 counter tests from #170): unit tests for
   `compareKeys`/`toBound`/`relaxEdge`
   (lexicographic order, scalar-bound infimum, canonical pred choice, zero-weight-cycle
@@ -422,7 +502,7 @@ edge-order deterministic (copies allocated in edge order); ~2m copies, ~3m edges
   (identical maps incl. Infinity → 0; wrong/missing entries counted); `runScenarioBenchmark`
   and `runComparisonCountBenchmark` on tiny injected scenarios return the expected columns
   with **zero mismatches**.
-- Current suite: **161 tests — 160 passing + 1 XL skipped by default**, ~100% statement
+- Current suite: **185 tests — 184 passing + 1 XL skipped by default**, ~100% statement
   coverage, ~7.5 s wall-clock (the #164 distance-preservation sweeps run BMSSP/Dijkstra
   from every source). No graph data files: every generated test graph comes from a
   seed; the #162 fixtures are hand-built and fully deterministic.
@@ -438,17 +518,19 @@ BMSSP-vs-Dijkstra head-to-head itself:
   is the fair baseline) and outputs are verified node-by-node (`mismatches` must be 0).
   Scenario registry adds `sparse-random-l4` (n = 300k, degree 3): `topLevel` steps 3→4 at
   exactly n = 2^18 + 1 and stays 4 until t reaches 7 (~n = 376k), so 300k sits inside the
-  #182 level-transition window (~3× vs ~2.2× at 50k on the 2026-07-21 post-fix capture;
-  the step itself measures ~+24% at the exact straddle). Star post-#182-fix: 3.82× at
-  50k (was 8.73×).
+  #182 level-transition window (the step itself measures ~+24% at the exact straddle).
+  Post-#167 capture (2026-07-21): sparse 2.46×, star 4.53× (~131 ms; pre-#182 8.73×),
+  l4 2.96× — ratios are noisy run-to-run (the Dijkstra denominator swings ±20%); compare
+  `bmssp ms` across captures for regressions.
 - `compare-counts.bench.mjs` (opt-in, `npm run bench:counts` or `--counts`): comparisons
   between path lengths — BMSSP counted via `tieBreak`'s unconditional `compareKeys`
   counter, Dijkstra via matching counters in `dijkstra-adj.mjs`. One exact run per side
-  (counts are deterministic). 2026-07-21 capture reproduces the crossover: sparse 1.20× at
-  50k → 1.03× at 200k → **0.98× at 1M**; grid 700×700 stays 1.27×.
+  (counts are deterministic). 2026-07-21 post-#167 capture: crossover before n = 50k —
+  sparse **0.97× at 50k → 0.77× at 200k → 0.66× at 1M**; grid 700×700 down to 1.12×
+  (pre-#167: 1.20× / 1.03× / 0.98× / 1.27× — sort-based splits/pulls were the cost).
 - **`HEAD-TO-HEAD.md` is the frozen 1.0.0 measurement record** (2026-07-16, sizes to
-  n = 4M incl. star-500k 67.8× and the 4M cliff); `RESULTS.md` is the latest captured
-  harness report.
+  n = 4M incl. star-500k 67.8× and the 4M cliff) plus dated addenda (#182 cliffs,
+  #167 crossover shift); `RESULTS.md` is the latest captured harness report.
 
 ## Gaps to fill (the actual work)
 
@@ -469,8 +551,9 @@ BMSSP-vs-Dijkstra head-to-head itself:
 | JSDoc on `index.mjs` exports + public-API docs page | `index.mjs` + `docs/index.html` | #166 | ✅ merged (PR #196, **minor → 1.1.0**, released 2026-07-21) |
 | BMSSP-vs-Dijkstra head-to-head in the harness | `benchmarks/` + `src/tieBreak.mjs` counter | #170 | ✅ merged (PR #198, no bump) |
 | Performance-cliff investigation + quadratic batchPrepend fix | `src/blockList.mjs` + HEAD-TO-HEAD addendum | #182 | ✅ merged (PR #200, **patch → 1.1.1**, released 2026-07-21) |
+| Exact Lemma 3.3 asymptotics (BST bound index + linear selection) | `src/boundIndex.mjs` + `src/select.mjs` + `src/blockList.mjs` | #167 | ✅ done-pending-merge (this PR, no bump) |
 
 Milestone `1.1.0` (correctness hardening) is **closed** — released 2026-07-21 (npm +
-Docker Hub). Milestone `1.2.0` is the current focus: **#167 / #168** remain (the
-structural/constant-factor work the #182 investigation informs — findings posted on both
-issues 2026-07-21); see [06-milestones-roadmap.md](06-milestones-roadmap.md).
+Docker Hub). Milestone `1.2.0` is the current focus: after #167 merges, **#168** is its
+last open issue (adjacency/relaxation micro-optimizations; the PR closing it takes the
+**minor → 1.2.0** bump); see [06-milestones-roadmap.md](06-milestones-roadmap.md).

@@ -1,8 +1,8 @@
 # 06 — Milestones Roadmap
 
-<!-- SYNCED-FROM-GITHUB: 2026-07-21 Phase A (post-#182 session; verified live):
-     1.2.0 open with 2 open issues #167/#168 (3 closed incl. #182, merged PR #200);
-     2.0.0 open with 3 open issues #171/#172/#173 -->
+<!-- SYNCED-FROM-GITHUB: 2026-07-21 Phase C of the #167 PR (verified live at Phase A the
+     same day: 1.2.0 open with 2 open issues #167/#168 — #167 done-pending-merge in this
+     PR; 2.0.0 open with 3 open issues #171/#172/#173) -->
 <!-- Current package version: 1.1.1 — released 2026-07-21 (tag + GitHub Release with
      Announcements discussion → npm + Docker Hub via publish.yml); tag matches -->
 <!-- Release-discussion convention (user-directed 2026-07-21): every GitHub Release also
@@ -43,7 +43,15 @@ it runs the same Phase C reconciliation directly on `main`.
 
 ## 📋 Roadmap proposals (pending user approval)
 
-_None pending._
+From the #167 PR (Phase C, 2026-07-21):
+
+1. **Comment on #168** with the post-#167 baseline its work should start from: the
+   BlockList is no longer a comparison-count factor at all (introselect does ~2–3n
+   comparisons where sorts did n log n — the count crossover moved from ~n = 1M to
+   before n = 50k: 0.97× at 50k, 0.66× at 1M), and wall-clock profiles now put the
+   dominant costs squarely in #168's stated targets — `relaxEdge` allocation, `U`/`W`
+   Set churn, and the per-level O(m + n) relax pass. Also note #168 is now 1.2.0's
+   last open issue, so its PR takes the **minor → 1.2.0** bump and release.
 
 _(The #182-PR proposals — findings comments on **#167** (remaining scope = BST bound
 index + linear-time selection; batchPrepend quadratic fixed) and **#168** (per-level
@@ -140,6 +148,24 @@ executed 2026-07-17.)_
   5× at 4M is that step plus GC/memory amplification. **Bug fix → patch bump 1.1.1**
   (batchPrepend violated its documented Lemma 3.3 amortized bound); **1.1.1 released
   2026-07-21**. Findings posted on #167/#168 (approved proposals, executed same day).
+- **#167 done-pending-merge (this PR, 2026-07-21):** BlockList's two documented
+  shortcuts replaced to meet Lemma 3.3's exact per-operation bounds — the plain-array
+  bound index by `src/boundIndex.mjs` (`BoundIndex`, a positional AVL tree searched
+  through the monotone block bounds; O(log #blocks) search/split/drop) and the
+  sort-based splits/chunking/pulls by `src/select.mjs` (`partitionByRank`, budgeted
+  introselect: deterministic median-of-3 quickselect with a median-of-medians fallback —
+  worst-case linear, ~2–3n comparisons typical). First cut used pure median-of-medians
+  (~10–20n comparisons) and REGRESSED both wall-clock (star +68%) and counts (1M
+  crossover lost) — caught by the harness, fixed with the introselect budget and a
+  two-branch batchPrepend chunker (sort when |L| ≥ ⌈M/2⌉², median recursion below).
+  Net result: **comparison-count crossover moved from ~n = 1M to before n = 50k**
+  (0.97×/0.77×/0.66× at 50k/200k/1M; grid 1.27× → 1.12×), wall-clock at-or-better than
+  1.1.1 everywhere. +22 tests (suite 185: `select` 11, `boundIndex` 8, BlockList +5,
+  incl. a forced-fallback path via the `cheapBudget: 0` knob). Behavior-preserving:
+  all pre-existing tests unchanged; extended FUZZ_ROUNDS=25 and FUZZ_XL runs green.
+  No bump (not a bug fix; #168 still open in 1.2.0). Addendum added to
+  `HEAD-TO-HEAD.md`; `RESULTS.md` recaptured; stale crossover blurbs updated in the
+  harness and `benchmarks/README.md`.
 - **Semver release convention (user-directed 2026-07-17, PR #186):** bumps only on bug
   fix (patch) or milestone-closing PR (minor/major) — see "Release mechanics" below.
 - **2026-07-16 reflection session (post-release):** measured the BMSSP-vs-Dijkstra
@@ -186,21 +212,21 @@ All six issues done (build order as executed — cheapest protection first, then
 
 ## Milestone `1.2.0` (milestone #3) — performance & ergonomics — CURRENT
 
-Build order: ~~#170~~ (merged, PR #198), ~~#182~~ (merged, PR #200, 1.1.1), then
-**#167 / #168** (the structural/constant-factor work the investigation informs — the
-findings each inherits are posted as 2026-07-21 comments on the issues).
+Build order: ~~#170~~ (merged, PR #198), ~~#182~~ (merged, PR #200, 1.1.1), ~~#167~~
+(done-pending-merge, this PR), then **#168** — 1.2.0's last open issue, whose PR takes
+the **minor → 1.2.0** bump and release.
 
 | # | Issue | Labels | Notes |
 |---|---|---|---|
-| 167 | Restore Lemma 3.3's exact asymptotics in BlockList (balanced-BST bound index + linear-time selection) | enhancement · help wanted | remaining scope = bound index + median selection; the batchPrepend quadratic was fixed by #182 (1.1.1) |
-| 168 | Adjacency and relaxation micro-optimizations | enhancement · help wanted | #182 findings: per-level O(m+n) relax pass dominates; relaxEdge allocation + Set churn are the targets |
+| 167 | Restore Lemma 3.3's exact asymptotics in BlockList (balanced-BST bound index + linear-time selection) | enhancement · help wanted | ✅ done-pending-merge (this PR, no bump): `BoundIndex` AVL sequence + `partitionByRank` introselect; count crossover moved ~1M → <50k (0.66× at 1M); wall-clock at-or-better |
+| 168 | Adjacency and relaxation micro-optimizations | enhancement · help wanted | #182 findings: per-level O(m+n) relax pass dominates; relaxEdge allocation + Set churn are the targets. **Milestone-closing → minor 1.2.0** |
 | 169 | Optional shortest-path reconstruction (`Pred[]` → paths) | enhancement · help wanted | ✅ merged (PR #189, no bump): public API + independent path oracle |
 | 170 | BMSSP-vs-Dijkstra benchmark comparison | enhancement · help wanted | ✅ merged (PR #198, no bump): head-to-head + count mode in the harness, verified outputs |
 | 182 | Investigate BMSSP performance cliffs: high-fanout (star) graphs and recursion-level transitions | enhancement · help wanted | ✅ merged (PR #200, **patch → 1.1.1**, released 2026-07-21): star = quadratic batchPrepend, fixed (61 s → ~3.1 s at 500k); level step = inherent +24%, documented (HEAD-TO-HEAD addendum) |
 
 _Note:_ both #182 shapes stay as regression sentinels in every `npm run bench` (`star`,
 `sparse-random-l4`), and `npm run bench:counts` reproduces the comparison-count crossover
-(below 1.0 between n = 200k and n = 1M).
+(below 1.0 before n = 50k since #167; ~n = 1M in the 1.0.0/1.1.1 records).
 
 ## Milestone `2.0.0` (milestone #4) — API-breaking generalization
 

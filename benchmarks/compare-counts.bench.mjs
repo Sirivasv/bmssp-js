@@ -10,8 +10,9 @@
 //
 // Counts are deterministic (seeded graphs), so a single run per side is
 // exact. On sparse graphs the bmssp/dijkstra ratio falls with n and crosses
-// below 1.0 between n = 200k and n = 1M — the measured form of the paper's
-// asymptotic claim (see benchmarks/HEAD-TO-HEAD.md for the 1.0.0 record).
+// below 1.0 — before n = 50k since #167's selection-based BlockList
+// (~n = 1M in the 1.0.0/1.1.1 records) — the measured form of the paper's
+// asymptotic claim (see benchmarks/HEAD-TO-HEAD.md for the records).
 
 import { BMSSP } from "../src/bmssp.mjs";
 import { resetComparisonCount, getComparisonCount } from "../src/tieBreak.mjs";

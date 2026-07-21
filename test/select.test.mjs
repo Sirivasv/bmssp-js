@@ -131,6 +131,36 @@ describe("partitionByRank selection contract", () => {
     }
   });
 
+  test("median-of-medians fallback (cheapBudget 0) selects every rank", () => {
+    // Forcing the budget to 0 routes every pivot through median-of-medians —
+    // the worst-case-linear fallback that ordinary inputs never reach
+    const rand = mulberry32(7);
+    for (let round = 0; round < 50; round += 1) {
+      const size = 5 + Math.floor(rand() * 200);
+      const original = Array.from({ length: size }, () =>
+        Math.floor(rand() * 60),
+      );
+      const rank = Math.floor(rand() * size);
+      const items = [...original];
+      partitionByRank(items, rank, (a, b) => a - b, 0);
+      expectPartitioned(items, rank, original);
+    }
+  });
+
+  test("organ-pipe input stays correct at the default budget", () => {
+    // Ascending-then-descending — a classically awkward shape for cheap
+    // quickselect pivots; the budget guard keeps it linear either way
+    const n = 1024;
+    const original = Array.from({ length: n }, (_, i) =>
+      i < n / 2 ? i : n - i,
+    );
+    for (const rank of [0, 255, 511, 512, 1023]) {
+      const items = [...original];
+      partitionByRank(items, rank, (a, b) => a - b);
+      expectPartitioned(items, rank, original);
+    }
+  });
+
   test("is deterministic: identical inputs produce identical arrangements", () => {
     const rand = mulberry32(99);
     const original = Array.from({ length: 300 }, () => Math.floor(rand() * 25));
