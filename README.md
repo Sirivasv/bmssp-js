@@ -41,6 +41,7 @@ with every building block shipped, tested, and released individually:
 | Dense-index core: typed-array labels + CSR adjacency, ~½ the wall-clock ([#205](https://github.com/Sirivasv/bmssp-js/issues/205)) | `src/bmssp.mjs` (CSR) + `src/tieBreak.mjs` (typed labels) | ✅ done |
 | Typed / flexible graph inputs: `Graph` builder + adjacency Map/object + explicit vertex universe ([#172](https://github.com/Sirivasv/bmssp-js/issues/172)) | `src/graph.mjs` + `BMSSP` constructor | ✅ done |
 | Public multi-source / bounded entrypoint ([#171](https://github.com/Sirivasv/bmssp-js/issues/171)) | `BMSSP.calculateShortestPathsFrom()` | ✅ done |
+| Public API stabilization + 1.0→2.0 migration note ([#173](https://github.com/Sirivasv/bmssp-js/issues/173)) | `MIGRATION.md` + `docs/index.html` + contract test | ✅ done — **2.0.0** |
 
 > **Honest note:** the paper's win is asymptotic, and this repo optimizes for correctness
 > and readability first — but the constant factors have come down a lot. Measured
@@ -119,7 +120,9 @@ when the target is unreachable (or before any run) and throws for a node outside
 
 A reference `dijkstra` implementation is also exported. See the `examples/` directory for
 more, or the [public API reference](https://sirivasv.github.io/bmssp-js/) for the complete
-documented surface.
+documented surface. The public API is **stable as of 2.0.0** — see
+[MIGRATION.md](MIGRATION.md) for the 1.0 → 2.0 note (no breaking changes) and the locked
+surface.
 
 ### Flexible graph inputs
 
@@ -272,7 +275,7 @@ graphs in a few seconds), and set `FUZZ_XL=1` for an additional 2-million-node r
 | [`1.0.0`](https://github.com/Sirivasv/bmssp-js/milestones) | First end-to-end functional BMSSP (issues #40–#45) | ✅ done |
 | `1.1.0` | Correctness hardening — fuzz tests, edge cases, tie-breaking, input validation, constant-degree transform, API docs | ✅ done |
 | `1.2.0` | Performance & ergonomics — exact Lemma 3.3 asymptotics, BMSSP-vs-Dijkstra benchmarks, cliff investigation, relaxation micro-optimizations | ✅ done |
-| `2.0.0` | API generalization — dense-index engine (done), typed/flexible inputs (done), public multi-source/bounded entry point (done); API stabilization remaining | 🔨 current |
+| `2.0.0` | API generalization — dense-index engine, typed/flexible inputs, public multi-source/bounded entry point, and public-API stabilization (migration note + locked surface) | ✅ done |
 
 ## Contributing (humans and AI agents welcome)
 

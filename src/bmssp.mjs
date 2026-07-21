@@ -14,7 +14,38 @@ import {
   RELAX_LOST,
 } from "./tieBreak.mjs";
 
+/**
+ * BMSSP — the paper's Algorithm 3 behind a small class API.
+ *
+ * **Supported public API (stable as of 2.0.0 — see `MIGRATION.md`):**
+ * - `new BMSSP(input)` — construct from an edge array, an adjacency `Map`/object,
+ *   or a {@link Graph} builder (see the constructor).
+ * - {@link BMSSP#calculateShortestPaths} — single-source SSSP.
+ * - {@link BMSSP#calculateShortestPathsFrom} — multi-source / bounded run (the
+ *   ergonomic front door to the paper's `BMSSP(l, B, S)` generalization).
+ * - {@link BMSSP#bmssp} — the low-level bounded multi-source primitive (advanced;
+ *   composite keys, returns `{ bound, boundKey, vertices }`).
+ * - {@link BMSSP#reconstructPath} — canonical path for the latest run.
+ * - {@link BMSSP#getEdges} — O(1) outgoing-edge lookup.
+ * - Public fields: `shortestPaths`, `nodeIDs`, `hops`, `preds`, `adjacency`,
+ *   `graph` (all documented in the constructor).
+ *
+ * **Everything else on this class is `@internal`** — the dense-index engine
+ * (`csr`, `labels`, `ids`, `indexOf`, `bmsspIndex`, `syncLabelsIn/Out`,
+ * `boundToEngine`, `keyToPublic`, `buildIndex`, …) and the derived parameters
+ * (`k`, `t`, `topLevel`, `ties`). It is not part of the public contract and may
+ * change in a minor release. The algorithm-internal modules (`BlockList`,
+ * `MinHeap`, `baseCase`, `findPivots`, `BoundIndex`, `select`, `tieBreak`) are
+ * likewise not re-exported from `index.mjs`.
+ *
+ * @public
+ */
 class BMSSP {
+  /**
+   * @public
+   * @param {Array<[number,number,number]>|Map|Object|Graph} inputGraph - Any
+   *   #172 input shape: an edge array, an adjacency `Map`/object, or a `Graph`.
+   */
   constructor(inputGraph) {
     // #172: accept several input shapes (edge array, adjacency map/object, or
     // a Graph builder) and reduce them to a canonical { edges, vertices }.
@@ -118,6 +149,8 @@ class BMSSP {
    * same canonical labels the id-keyed engine did — and, because the
    * assignment depends only on the node-ID set, results stay invariant
    * under edge-list permutation.
+   *
+   * @internal
    */
   buildIndex() {
     const sorted = [...this.nodeIDs].sort((a, b) => a - b);
@@ -182,6 +215,8 @@ class BMSSP {
    * - topLevel = max(1, ⌈log₂ n / t⌉) — level of the top BMSSP call.
    * Everything is clamped to >= 1 so tiny graphs stay out of degenerate
    * regimes: correctness never depends on the asymptotics.
+   *
+   * @internal
    */
   deriveParameters() {
     const logn = Math.log2(Math.max(2, this.nodeIDs.size));
@@ -267,6 +302,7 @@ class BMSSP {
    *   the returned bound's length (never exceed it).
    *   Every returned vertex is complete either way.
    *
+   * @public
    * @param {number} l - Recursion level; 0 delegates to baseCase
    * @param {number|[number, number, *]} B - Strict upper bound on the keys
    *   in scope: a number (Infinity is allowed) or a composite bound
@@ -498,6 +534,7 @@ class BMSSP {
    * declared distance violates the precondition; the multi-source ground
    * truth is trueDist(v) = min over sources s of (d0[s] + dist_s(v)).
    *
+   * @public
    * @param {Map<number,number>|Object<string,number>|Array<[number,number]>|number[]} sources
    *   The source set. A Map<id, dist>, a plain object { id: dist } (numeric
    *   string keys coerced), an array of [id, dist] pairs, or a bare array of
@@ -554,6 +591,7 @@ class BMSSP {
    * target. Returns an empty array when target is unreachable or no shortest
    * path run has completed yet.
    *
+   * @public
    * @param {number} target - A node in the graph
    * @returns {number[]} Node IDs from the source through target
    * @throws {Error} If target is not in the graph

@@ -141,7 +141,9 @@
         <pre><code>npm install bmssp</code></pre>
         <p>
             The package is ESM-only. Graphs are arrays of <code>[from, to, weight]</code>
-            edges with finite numeric node IDs and finite, non-negative weights.
+            edges with finite numeric node IDs and finite, non-negative weights — or,
+            equivalently, an adjacency <code>Map</code>/object or a <code>Graph</code> builder
+            (see below).
         </p>
 
         <h2>Quick start</h2>
@@ -158,17 +160,47 @@ graph.shortestPaths;      // Map(3) { 0 => 0, 1 => 50, 2 => 25 }
 graph.reconstructPath(1); // [0, 1]</code></pre>
 
         <h2>Public API</h2>
-        <p>The package has exactly three exports: <code>BMSSP</code>, <code>dijkstra</code>,
-           and <code>constantDegreeTransform</code>.</p>
+        <p>The package has exactly four exports: <code>BMSSP</code>, <code>Graph</code>,
+           <code>dijkstra</code>, and <code>constantDegreeTransform</code>. This surface is
+           <strong>stable as of 2.0.0</strong> — see the
+           <a href="https://github.com/Sirivasv/bmssp-js/blob/main/MIGRATION.md"
+              target="_blank" rel="noopener">1.0&nbsp;→&nbsp;2.0 migration note</a> and the
+           runnable <a href="https://github.com/Sirivasv/bmssp-js/tree/main/examples"
+              target="_blank" rel="noopener">examples gallery</a>. Anything not listed here
+           (the block list, the indexed heap, <code>BaseCase</code>/<code>FindPivots</code>,
+           and the <code>BMSSP</code> class's dense-index engine members) is internal and may
+           change in a minor release.</p>
 
-        <h3><code>new BMSSP(graph)</code></h3>
+        <h3><code>new BMSSP(input)</code></h3>
         <p>
-            Validates and stores the edge list. Every entry must be an exact three-element
-            <code>[from, to, weight]</code> array; node IDs must be finite numbers and weights
-            finite and non-negative. Malformed input throws an <code>Error</code> identifying
-            the offending edge index. An empty edge array is valid (the graph then has no
-            nodes, so any start node is rejected later).
+            Accepts any of four input shapes and reduces them to a canonical graph: an array of
+            <code>[from, to, weight]</code> edges, an adjacency <code>Map</code>
+            (<code>Map&lt;from, [[to, weight], …]&gt;</code>), a plain adjacency object
+            (<code>{ from: [[to, weight], …] }</code>, numeric-string keys coerced to numbers),
+            or a <code>Graph</code> builder instance. Node IDs must be finite numbers and
+            weights finite and non-negative; malformed edges throw an <code>Error</code>
+            identifying the offending index. An empty graph in any shape is valid (it then has
+            no nodes, so any start node is rejected later).
         </p>
+
+        <h3><code>new Graph()</code></h3>
+        <p>
+            A small mutable input builder. <code>addVertex(id)</code> declares a vertex —
+            including an <strong>isolated</strong> one (present but with no incident edges),
+            which a bare edge list can't express — and <code>addEdge(from, to, weight)</code>
+            adds a directed weighted edge, auto-declaring its endpoints. Both validate eagerly
+            and chain; pass the instance to <code>new BMSSP(graph)</code>.
+        </p>
+<pre><code>import { BMSSP, Graph } from "bmssp";
+
+const g = new Graph()
+  .addEdge(0, 1, 50)
+  .addEdge(0, 2, 25)
+  .addVertex(9); // an isolated vertex — present, but unreachable
+
+const graph = new BMSSP(g);
+graph.calculateShortestPaths(0);
+graph.shortestPaths.get(9); // Infinity</code></pre>
 
         <h3><code>graph.calculateShortestPaths(source)</code></h3>
         <p>
@@ -182,6 +214,37 @@ graph.reconstructPath(1); // [0, 1]</code></pre>
             zero-weight edges. Calling it again with a different source resets state and
             recomputes.
         </p>
+
+        <h3><code>graph.calculateShortestPathsFrom(sources, { bound })</code></h3>
+        <p>
+            The paper's multi-source, bounded generalization as public API: runs from a
+            <strong>set</strong> of sources, each with an initial distance, optionally under a
+            strict distance <code>bound</code> <em>B</em>. <code>sources</code> accepts a
+            <code>Map&lt;id, dist&gt;</code>, an object <code>{ id: dist }</code>, an array of
+            <code>[id, dist]</code> pairs, or a bare array of ids (each seeded at distance 0).
+            Single-source SSSP is the special case
+            <code>calculateShortestPathsFrom([start])</code>. Results land in
+            <code>shortestPaths</code> exactly like <code>calculateShortestPaths</code>. Under a
+            <strong>finite</strong> <code>bound</code>, only the completed set — vertices with
+            distance <em>&lt; B</em> — is exposed; BMSSP's above-<em>B</em> over-estimates are
+            pruned to <code>Infinity</code>. <code>bound</code> defaults to <code>Infinity</code>.
+        </p>
+<pre><code>const g = new BMSSP([[0, 1, 2], [1, 2, 3], [5, 2, 1]]);
+
+g.calculateShortestPathsFrom([0, 5]);          // nearest of two sources
+g.shortestPaths.get(2);                         // 1  (via 5 -> 2)
+
+g.calculateShortestPathsFrom([0], { bound: 4 }); // bounded
+g.shortestPaths.get(2);                         // Infinity  (distance 5 ≥ 4)</code></pre>
+
+        <div class="note">
+            <strong>Advanced:</strong> <code>graph.bmssp(l, B, S)</code> is the low-level
+            bounded multi-source primitive that <code>calculateShortestPathsFrom</code> wraps.
+            It works in composite <code>[length, hops, id]</code> key space and returns
+            <code>{ bound, boundKey, vertices }</code> (the paper's <em>B′</em>, its key, and
+            the completed set <em>U</em>). Most callers want
+            <code>calculateShortestPathsFrom</code> instead.
+        </div>
 
         <h3><code>graph.reconstructPath(target)</code></h3>
         <p>
@@ -221,18 +284,22 @@ t.collapse(g.shortestPaths);               // Map(3) { 0 => 0, 1 => 50, 2 => 25 
 
         <div class="note">
             Algorithm internals — the Lemma 3.3 block list, the indexed min-heap,
-            <code>BaseCase</code>, <code>FindPivots</code>, and the tie-break helpers — are
-            deliberately <em>not</em> exported. They are implementation details, documented
-            in-source for contributors.
+            <code>BaseCase</code>, <code>FindPivots</code>, the linear-time selection and
+            balanced-BST bound index, the tie-break helpers, and the <code>BMSSP</code> class's
+            dense-index engine members (<code>csr</code>, <code>labels</code>,
+            <code>bmsspIndex</code>, the <code>syncLabels…</code> bridge, …) — are deliberately
+            <em>not</em> part of the public surface. They are implementation details, documented
+            in-source for contributors, and may change in a minor release.
         </div>
 
         <h2>Correctness &amp; performance</h2>
         <p>
             Every release is validated node-by-node against the Dijkstra oracle on thousands
             of seeded graphs (up to 2 million nodes). The paper's win is asymptotic: measured
-            head-to-head, Dijkstra still wins wall-clock at practical sizes, but in the
-            paper's own metric — comparisons between path lengths — this implementation does
-            fewer comparisons than Dijkstra from about n&nbsp;=&nbsp;1M on sparse graphs. See
+            head-to-head, Dijkstra still wins wall-clock at practical sizes (the dense-index
+            engine narrowed the sparse gap to ~1.4×), but in the paper's own metric —
+            comparisons between path lengths — this implementation does fewer comparisons than
+            Dijkstra from well under n&nbsp;=&nbsp;50k on sparse graphs. See
             <a href="https://github.com/Sirivasv/bmssp-js/blob/main/benchmarks/HEAD-TO-HEAD.md"
                target="_blank" rel="noopener">benchmarks/HEAD-TO-HEAD.md</a> for the data and
             methodology.
