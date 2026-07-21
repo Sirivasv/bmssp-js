@@ -145,3 +145,28 @@ recorded 5.00× at n = 4M is memory/GC amplification at 12M edges (visible as GC
 profiles), not an algorithmic discontinuity. Known behavior; the per-level constant is
 #168's target. The `topLevel = 4` window at practical sizes is exactly
 n ∈ (2^18, ~376k] — `sparse-random-l4` (n = 300k) sits inside it.
+
+## Addendum — #167 moves the comparison-count crossover to n < 50k (2026-07-21)
+
+Restoring Lemma 3.3's exact asymptotics in the BlockList
+([#167](https://github.com/Sirivasv/bmssp-js/issues/167): balanced-BST bound index +
+deterministic linear-time selection replacing the array `splice`s and the O(M log M)
+sort-based splits/chunks/pulls) turned out to be worth far more in the paper's own metric
+than the "ordinary constant factors" the #182 profiles suggested. Selection via budgeted
+introselect (median-of-3 quickselect, ~2–3n comparisons, with a median-of-medians
+fallback keeping the worst case linear) does strictly less comparison work than the sorts
+it replaced, at every M:
+
+| case | 1.1.1 (sort-based) | post-#167 | change |
+| --- | --- | --- | --- |
+| sparse d3 n=50k | 1.20× | **0.97×** | crossover reached at 50k |
+| sparse d3 n=200k | 1.03× | **0.77×** | |
+| sparse d3 n=1M | 0.98× | **0.66×** | |
+| grid 700x700 | 1.27× | 1.12× | |
+
+The sparse crossover that previously required ~n = 1M now happens **before n = 50k**, and
+the separation widens with n exactly as O(m·log^(2/3) n) vs. O(m + n·log n) predicts.
+Wall-clock stayed at-or-better than 1.1.1 on every shape (star 50k ~144 ms → ~131 ms;
+sparse 50k within noise; `sparse-random-l4` ~1,246 ms → ~1,083 ms) — the AVL bound index
+and selection cost about what the array + native sort did, while doing asymptotically
+honest work. Current capture: [`RESULTS.md`](./RESULTS.md).

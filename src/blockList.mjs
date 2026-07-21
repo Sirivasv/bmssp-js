@@ -1,3 +1,6 @@
+import { BoundIndex } from "./boundIndex.mjs";
+import { partitionByRank } from "./select.mjs";
+
 /**
  * Block-based "partial-sort" structure D from Lemma 3.3 of the BMSSP paper
  * ("Breaking the Sorting Barrier for Directed Single-Source Shortest Paths").
@@ -11,12 +14,16 @@
  * Internal layout:
  * - d1: blocks filled by insert(). Each block carries an upper bound on its
  *   values; bounds are non-decreasing across blocks, and the last block
- *   always has bound B so every value < B has a home.
- * - d0: blocks filled by batchPrepend() only; they conceptually sit in front
- *   of d1 (their values are smaller than everything inserted so far).
+ *   always has bound B so every value < B has a home. The sequence lives in
+ *   a self-balancing BST (BoundIndex) searched through the monotone bounds.
+ * - d0: blocks filled by batchPrepend() only, kept as a doubly-linked list;
+ *   they conceptually sit in front of d1 (their values are smaller than
+ *   everything inserted so far).
  *
- * The block-bound index is a plain array searched with binary search instead
- * of the paper's balanced BST — same behavior, worse constants (issue #167).
+ * Since #167 the structure meets Lemma 3.3's exact bounds: the bound index
+ * is a balanced BST (O(log #blocks) search/split/drop instead of O(#blocks)
+ * array splices) and splits/chunking/pulls use deterministic linear-time
+ * selection (partitionByRank) instead of an O(M log M) sort.
  */
 class BlockList {
   /**
@@ -35,17 +42,26 @@ class BlockList {
     this.M = Math.floor(M);
     this.B = B;
     this.compare = compare ?? ((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-    // d1 starts as a single empty block with upper bound B
-    this.d1 = [this.makeBlock(B)];
-    this.d0 = [];
+    // Shared [key, value]-pair comparator for splits/chunking/pulls, hoisted
+    // so the hot paths don't allocate a closure per call
+    this.compareBySecond = (a, b) => this.compare(a[1], b[1]);
+    // d1 starts as a single empty block with upper bound B; that block is
+    // kept as the sequence's last forever so every value < B has a home
+    this.d1 = new BoundIndex();
+    this.lastD1Block = this.makeBlock(this.B);
+    this.lastD1Block.node = this.d1.append(this.lastD1Block);
+    // d0 is a doubly-linked list of blocks; the head holds the smallest values
+    this.d0Head = null;
     // key -> block currently holding that key, for O(1) duplicate handling
     this.locator = new Map();
     this.count = 0;
   }
 
-  // Internal: create an empty block with the given value upper bound
+  // Internal: create an empty block with the given value upper bound.
+  // node is the handle in the d1 BoundIndex (null for d0 blocks);
+  // prev/next thread the d0 linked list (null for d1 blocks).
   makeBlock(bound) {
-    return { bound, entries: new Map() };
+    return { bound, entries: new Map(), node: null, prev: null, next: null };
   }
 
   // Number of pairs currently stored
@@ -73,43 +89,37 @@ class BlockList {
       if (this.compare(holder.entries.get(key), value) <= 0) return;
       this.removeKey(key, holder);
     }
-    // Binary-search d1 for the first block whose bound covers the value
-    let lo = 0;
-    let hi = this.d1.length - 1;
-    while (lo < hi) {
-      const mid = (lo + hi) >> 1;
-      if (this.compare(this.d1[mid].bound, value) >= 0) {
-        hi = mid;
-      } else {
-        lo = mid + 1;
-      }
-    }
-    const block = this.d1[lo];
+    // First d1 block whose bound covers the value: bounds are monotone along
+    // the sequence, so this predicate search is the paper's O(log #blocks)
+    // BST lookup. It always succeeds — the last block's bound is B > value.
+    const node = this.d1.findFirst(
+      (candidate) => this.compare(candidate.bound, value) >= 0,
+    );
+    const block = node.item;
     block.entries.set(key, value);
     this.locator.set(key, block);
     this.count += 1;
     if (block.entries.size > this.M) {
-      this.splitBlock(lo);
+      this.splitBlock(block);
     }
   }
 
   // Internal: split an overfull d1 block into two halves around its median
-  // value. The lower half gets bound = its own max value; the upper half
-  // keeps the original bound, so inter-block ordering is preserved.
-  // (The paper uses linear-time median selection; sorting is O(M log M) but
-  // simpler — acceptable for this correctness-first implementation.)
-  splitBlock(index) {
-    const block = this.d1[index];
-    const sorted = [...block.entries].sort((a, b) => this.compare(a[1], b[1]));
-    const half = sorted.length >> 1;
-    const lower = this.makeBlock(sorted[half - 1][1]);
+  // value (deterministic linear-time selection, as Lemma 3.3 prescribes).
+  // The lower half gets bound = the median (its own max value); the upper
+  // half keeps the original bound, so inter-block ordering is preserved.
+  splitBlock(block) {
+    const pairs = [...block.entries];
+    const half = pairs.length >> 1;
+    partitionByRank(pairs, half - 1, this.compareBySecond);
+    const lower = this.makeBlock(pairs[half - 1][1]);
     for (let i = 0; i < half; i += 1) {
-      const [key, value] = sorted[i];
+      const [key, value] = pairs[i];
       block.entries.delete(key);
       lower.entries.set(key, value);
       this.locator.set(key, lower);
     }
-    this.d1.splice(index, 0, lower);
+    lower.node = this.d1.insertBefore(block.node, lower);
   }
 
   /**
@@ -144,23 +154,34 @@ class BlockList {
       fresh.push([key, value]);
     }
     if (fresh.length === 0) return;
-    // One block if the batch fits, otherwise sorted chunks of <= ceil(M/2)
+    // One block if the batch fits; otherwise value-ordered chunks of
+    // <= ceil(M/2) — O(|L|/M) blocks built with O(|L|·max{1, log(|L|/M)})
+    // comparisons, the Lemma 3.3 bound
     let chunks;
     if (fresh.length <= this.M) {
       chunks = [fresh];
     } else {
-      fresh.sort((a, b) => this.compare(a[1], b[1]));
       const chunkSize = Math.ceil(this.M / 2);
       chunks = [];
-      for (let i = 0; i < fresh.length; i += chunkSize) {
-        chunks.push(fresh.slice(i, i + chunkSize));
+      if (fresh.length >= chunkSize * chunkSize) {
+        // Many chunks (|L| >= chunkSize², e.g. the M = 1 star regime, where
+        // |L|/M ~ |L|): sorting's O(|L| log |L|) is within 2x of the
+        // O(|L| log(|L|/chunkSize)) target — |L| >= c² gives
+        // log |L| <= 2 log(|L|/c) — and a single sort is much faster than
+        // log(|L|/M) rounds of median selection
+        fresh.sort(this.compareBySecond);
+        for (let i = 0; i < fresh.length; i += chunkSize) {
+          chunks.push(fresh.slice(i, i + chunkSize));
+        }
+      } else {
+        // Few chunks (|L| < chunkSize²): repeated median splitting — here
+        // the recursion is at most log2(chunkSize) levels deep, and a sort
+        // would overshoot the Lemma bound (up to O(|L| log |L|) for
+        // O(|L| log(|L|/M)) with |L| close to M)
+        this.chunkByMedian(fresh, chunkSize, chunks);
       }
     }
-    // Materialize the chunks as blocks (ascending, so chunk 0 — the smallest
-    // values — ends up frontmost) and prepend them all in one concat. A
-    // per-chunk unshift here re-shifts the whole d0 array every time: with a
-    // small M the chunk count approaches |L| and the loop turns quadratic —
-    // the #182 star-graph blowup (~n single-entry chunks at M = 1).
+    // Materialize the chunks as blocks (ascending order)...
     const blocks = [];
     for (const chunk of chunks) {
       // Seed the block bound with the first value, then max-update — avoids
@@ -174,7 +195,28 @@ class BlockList {
       }
       blocks.push(block);
     }
-    this.d0 = blocks.concat(this.d0);
+    // ...and link them in front of d0, smallest chunk becoming the new head
+    let head = this.d0Head;
+    for (let i = blocks.length - 1; i >= 0; i -= 1) {
+      const block = blocks[i];
+      block.next = head;
+      if (head !== null) head.prev = block;
+      head = block;
+    }
+    this.d0Head = head;
+  }
+
+  // Internal: recursively median-split pairs (in place / via slices) into
+  // value-ordered chunks of at most maxSize, appended to out ascending
+  chunkByMedian(pairs, maxSize, out) {
+    if (pairs.length <= maxSize) {
+      out.push(pairs);
+      return;
+    }
+    const half = pairs.length >> 1;
+    partitionByRank(pairs, half - 1, this.compareBySecond);
+    this.chunkByMedian(pairs.slice(0, half), maxSize, out);
+    this.chunkByMedian(pairs.slice(half), maxSize, out);
   }
 
   /**
@@ -189,8 +231,10 @@ class BlockList {
     if (this.count <= this.M) {
       // Everything fits in one batch: drain the structure and reset it
       const keys = new Set(this.locator.keys());
-      this.d0 = [];
-      this.d1 = [this.makeBlock(this.B)];
+      this.d0Head = null;
+      this.d1.clear();
+      this.lastD1Block = this.makeBlock(this.B);
+      this.lastD1Block.node = this.d1.append(this.lastD1Block);
       this.locator.clear();
       this.count = 0;
       return { keys, bound: this.B };
@@ -198,18 +242,31 @@ class BlockList {
     // Collect prefix blocks from each sequence until that side holds >= M
     // candidate elements (or runs out). The M smallest overall are in there.
     const candidates = [];
-    for (const seq of [this.d0, this.d1]) {
-      let collected = 0;
-      for (const block of seq) {
-        if (collected >= this.M) break;
-        for (const [key, value] of block.entries) {
-          candidates.push([key, value, block]);
-        }
-        collected += block.entries.size;
+    let collected = 0;
+    for (
+      let block = this.d0Head;
+      block !== null && collected < this.M;
+      block = block.next
+    ) {
+      for (const [key, value] of block.entries) {
+        candidates.push([key, value, block]);
       }
+      collected += block.entries.size;
     }
-    // Take the M smallest candidates out of the structure
-    candidates.sort((a, b) => this.compare(a[1], b[1]));
+    collected = 0;
+    for (
+      let node = this.d1.first();
+      node !== null && collected < this.M;
+      node = this.d1.next(node)
+    ) {
+      for (const [key, value] of node.item.entries) {
+        candidates.push([key, value, node.item]);
+      }
+      collected += node.item.entries.size;
+    }
+    // Move the M smallest candidates to the front (linear-time selection,
+    // the Lemma 3.3 O(M) pull) and take them out of the structure
+    partitionByRank(candidates, this.M - 1, this.compareBySecond);
     const keys = new Set();
     for (let i = 0; i < this.M; i += 1) {
       const [key, , block] = candidates[i];
@@ -222,12 +279,20 @@ class BlockList {
     // Under a strict total order (#163's composite keys) this separator is
     // strictly above every pulled value — no boundary ties.
     let bound = null;
-    for (const seq of [this.d0, this.d1]) {
-      const block = seq.find((b) => b.entries.size > 0);
-      if (block) {
+    for (let block = this.d0Head; block !== null; block = block.next) {
+      if (block.entries.size > 0) {
         for (const value of block.entries.values()) {
           if (bound === null || this.compare(value, bound) < 0) bound = value;
         }
+        break;
+      }
+    }
+    for (let node = this.d1.first(); node !== null; node = this.d1.next(node)) {
+      if (node.item.entries.size > 0) {
+        for (const value of node.item.entries.values()) {
+          if (bound === null || this.compare(value, bound) < 0) bound = value;
+        }
+        break;
       }
     }
     return { keys, bound };
@@ -244,18 +309,18 @@ class BlockList {
     }
   }
 
-  // Internal: physically remove an emptied block. The last d1 block (bound B)
-  // is kept even when empty so insert always finds a home for any value < B.
+  // Internal: physically remove an emptied block from its sequence — an
+  // O(log #blocks) BST removal for d1, an O(1) unlink for d0. The last d1
+  // block (bound B) is kept even when empty so insert always finds a home.
   dropIfEmpty(block) {
-    const i0 = this.d0.indexOf(block);
-    if (i0 !== -1) {
-      this.d0.splice(i0, 1);
+    if (block.node !== null) {
+      if (block === this.lastD1Block) return;
+      this.d1.remove(block.node);
       return;
     }
-    const i1 = this.d1.indexOf(block);
-    if (i1 !== -1 && i1 < this.d1.length - 1) {
-      this.d1.splice(i1, 1);
-    }
+    if (block.prev !== null) block.prev.next = block.next;
+    else this.d0Head = block.next;
+    if (block.next !== null) block.next.prev = block.prev;
   }
 }
 

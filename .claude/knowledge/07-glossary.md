@@ -1,9 +1,9 @@
 # 07 — Glossary
 
-<!-- Updated on: 2026-07-21 (#166 PR: no new symbols — the PR adds JSDoc to index.mjs and
-     rewrites docs/index.html; added the "Docs page" repo term. Terms last extended in the
-     #164 PR: the constant-degree transform — port copies, zero-weight cycle,
-     constantDegreeTransform and its sourceCopy/collapse/copiesOf/originalOf surface) -->
+<!-- Updated on: 2026-07-21 (#167 PR: BoundIndex, partitionByRank, introselect; the
+     "Bound index shortcut" entry rewritten as resolved; comparison-count crossover
+     entry updated to the post-#167 <50k figure. Previous update the same day: #166 PR
+     added the "Docs page" repo term) -->
 
 > **Lifecycle: dynamic — updated in Phase C of every PR.** When a PR introduces new symbols
 > or terms (module names, data-structure fields, paper notation newly used in code), add
@@ -108,10 +108,30 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
   is `B`), `d0` receives `batchPrepend` blocks and conceptually sits in front of `d1`.
 - **`locator`** (#42) — the `BlockList`'s `Map<key, block>` giving O(1) duplicate handling
   (find/replace an existing key without scanning blocks).
-- **Bound index shortcut** (#42) — `d1`'s block bounds are binary-searched in a plain array
-  instead of the paper's balanced BST, and block **splits**/batch chunking use a sort
-  (O(M log M)) instead of linear-time median selection — same correctness, worse constants.
-  Both upgrades are tracked together in issue #167.
+- **Bound index shortcut (historical, resolved by #167)** — until #167, `d1`'s block
+  bounds were binary-searched in a plain array (O(#blocks) `splice` maintenance) and
+  splits/chunking used a sort (O(M log M)) instead of linear-time selection. Both
+  shortcuts are gone: see `BoundIndex` and `partitionByRank` below.
+- **`BoundIndex`** (#167) — `src/boundIndex.mjs`, the paper's "balanced BST over block
+  upper bounds": a POSITIONAL AVL tree holding `d1`'s block sequence (a node's in-order
+  position is its sequence position; the tree itself never compares items). API:
+  `append` / `insertBefore(node, item)` / `remove(node)` / `first` / `last` /
+  `next(node)` / `findFirst(predicate)` / `size` / `clear`, all O(log size); nodes are
+  handles (`{ item, parent, left, right, height }`), stored by BlockList in
+  `block.node`. `findFirst` requires a predicate monotone along the sequence — with
+  monotone bounds, `bound >= value` binary-searches in O(log #blocks). Internal (not
+  re-exported from `index.mjs`).
+- **`partitionByRank(items, rank, compare?, cheapBudget?)`** (#167) — `src/select.mjs`,
+  deterministic worst-case-linear selection: reorders `items` in place so
+  `items[0..rank]` are the rank+1 smallest and `items[rank]` the rank-th smallest.
+  Used by BlockList for block splits, batchPrepend chunking and pulls. Internal (not
+  re-exported from `index.mjs`).
+- **Introselect (budgeted)** (#167) — `partitionByRank`'s strategy: median-of-3
+  quickselect (deterministic, ~2–3n comparisons — below a sort's n log n) with a work
+  budget (`cheapBudget`, default 6·|items|); exhausting it switches pivots to
+  median-of-medians (groups of 5, guaranteed middle-40% split), keeping the worst case
+  linear. Pure median-of-medians costs ~10–20n comparisons — measured worse than the
+  sorts it replaced — hence the hybrid. `cheapBudget: 0` forces the fallback (tests).
 - **`MinHeap`** (#41) — `src/heap.mjs`, the *indexed* binary min-heap for BaseCase (Alg 2):
   `insert` / `extractMin()` / `peekMin() → { key, value }` / `decreaseKey` / `has` /
   `getValue` / `size` / `isEmpty()`. `has` is Algorithm 2's "is `v` in `H`?" branch;
@@ -243,11 +263,12 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
   (not re-exported from `index.mjs`).
 - **Comparison-count crossover** — head-to-head result in the paper's comparison-addition
   model: counting every comparison between two distance values (heap sifts, BlockList
-  searches/sorts, relaxations), BMSSP does **fewer** comparisons than Dijkstra past
-  ~n = 1M on sparse graphs (0.91× at n = 2M in the 1.0.0 record) even though Dijkstra
-  still wins wall-clock — the sorting barrier measurably broken, with constant factors as
-  the remaining gap. Since #170, `npm run bench:counts` reproduces it exactly
-  (`compare-counts.bench.mjs` `COUNT_CASES`: 1.20× at 50k → 1.03× at 200k → 0.98× at 1M).
+  searches/selections, relaxations), BMSSP does **fewer** comparisons than Dijkstra on
+  sparse graphs — since #167, from **before n = 50k** (0.97× at 50k → 0.77× at 200k →
+  0.66× at 1M; grid 700×700 at 1.12×), where the sort-based 1.0.0/1.1.1 records crossed
+  only at ~n = 1M (0.91× at 2M). Dijkstra still wins wall-clock — the sorting barrier is
+  measurably broken, with constant factors as the remaining gap. Since #170,
+  `npm run bench:counts` reproduces it exactly (`compare-counts.bench.mjs` `COUNT_CASES`).
 - **Performance cliffs (#182, resolved 2026-07-21)** — two measured regimes where the
   head-to-head ratio broke from its ~1.6–2× pattern; profiled and dispatched in the #182
   investigation (full write-up: `benchmarks/HEAD-TO-HEAD.md` addendum). (1) **Star
