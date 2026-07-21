@@ -248,11 +248,17 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
   still wins wall-clock — the sorting barrier measurably broken, with constant factors as
   the remaining gap. Since #170, `npm run bench:counts` reproduces it exactly
   (`compare-counts.bench.mjs` `COUNT_CASES`: 1.20× at 50k → 1.03× at 200k → 0.98× at 1M).
-- **Performance cliffs (#182)** — two measured regimes where the head-to-head ratio breaks
-  from its ~1.6–2× pattern: star graphs (superlinear blowup, 67.8× at n = 500k; already
-  8.7× at n = 50k in the harness) and the `topLevel = ⌈log₂n / t⌉` 3→4 transition (5× at
-  n = 4M on sparse; 3.11× at n = 300k via `sparse-random-l4`). Milestone 1.2.0. Both run
-  as regression sentinels in every `npm run bench` since #170.
+- **Performance cliffs (#182, resolved 2026-07-21)** — two measured regimes where the
+  head-to-head ratio broke from its ~1.6–2× pattern; profiled and dispatched in the #182
+  investigation (full write-up: `benchmarks/HEAD-TO-HEAD.md` addendum). (1) **Star
+  blowup**: quadratic per-chunk `d0.unshift` in `BlockList.batchPrepend` (M = 1 at level
+  1 → ~n single-entry chunks) — **fixed in 1.1.1** with a single-concat prepend; star
+  500k went 61 s → ~3.1 s (67.8× → ~5.5×) and the ratio now falls with n. (2)
+  **`topLevel = ⌈log₂n / t⌉` 3→4 transition**: an inherent **~+24% step** (one extra
+  full relax pass + Set churn per level), measured at the exact n = 2^18 → 2^18 + 1
+  straddle; the 1.0.0 record's 5× at n = 4M is that step plus GC/memory amplification —
+  known behavior, constant-factor work tracked in #168. Both shapes stay as regression
+  sentinels in every `npm run bench` (`star`, `sparse-random-l4`).
 - **Docs page (#166)** — `docs/index.html`, the GitHub-Pages-published public-API reference
   (deployed by `static.yml` on `docs/**` changes). Documents exactly the three `index.mjs`
   exports — `BMSSP` (constructor contract, `calculateShortestPaths`, `reconstructPath`),

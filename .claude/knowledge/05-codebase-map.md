@@ -1,14 +1,14 @@
 # 05 — Codebase Map (current state)
 
-<!-- BOOKMARK-COMMIT: a1a9ef5 -->
-<!-- PENDING-PR-BRANCH: test/compare-counts-mismatch-coverage -->
-<!-- Last validated: 2026-07-21 (Phase C of the coverage PR, same session as the #170
-     PR/Phase E). Describes the tree as it will exist once that PR merges: the mismatch
-     counter extracted to bench-util.mjs countMismatches (shared by scenarios + counts
-     benchmarks) and unit-tested on both branches — compare-counts.bench.mjs and
-     scenarios.bench.mjs at 100% statement+branch coverage; suite 159. User-directed,
-     closes no issue, no bump. Also carries the #170 Phase E facts: PR #198 merged as
-     a1a9ef5, no release (1.1.0 == tag), #182 reproductions comment posted. -->
+<!-- BOOKMARK-COMMIT: 4891318 -->
+<!-- PENDING-PR-BRANCH: fix/182-performance-cliffs -->
+<!-- Last validated: 2026-07-21 (Phase C of the #182 PR). Describes the tree as it will
+     exist once that PR merges: the #182 cliff investigation. Star cliff root-caused to
+     quadratic per-chunk d0.unshift in BlockList.batchPrepend and FIXED (one concat;
+     star 500k 61s -> ~3.1s, 67.8x -> ~5.5x, superlinearity gone); topLevel 3->4 cliff
+     measured at the exact straddle n = 2^18 -> 2^18+1 as an inherent ~+24% step (one
+     extra full relax pass per level), documented in HEAD-TO-HEAD's #182 addendum.
+     Bug fix -> patch bump 1.1.1 (release in Phase E after merge). -->
 
 Snapshot of what exists in `bmssp-js` today, so you know what to build on vs. what's missing.
 
@@ -75,7 +75,7 @@ test/
   tieBreak.test.mjs       # #163: 16 tests — key order, canonical relaxEdge, edge-order determinism, strict Lemma 3.1, lex-oracle hops/preds
   constantDegree.test.mjs # #164: 11 tests — degree ≤ 2 on hand + seeded shapes (incl. star hub), distance preservation via oracle, BMSSP-on-transform, determinism, empty/validation
   pathReconstruction.test.mjs # #169: 3 public-API tests — Dijkstra path oracle, unreachable/pre-run/source switching, target validation
-  blockList.test.mjs      # #42: 18 BlockList tests incl. a seeded random stress test
+  blockList.test.mjs      # #42: 20 BlockList tests incl. seeded random stress + #182 many-chunk/M=1 batchPrepend regression tests
   heap.test.mjs           # #41: 16 MinHeap tests incl. a seeded stress test vs. a naive queue
   baseCase.test.mjs       # #40: 13 BaseCase tests incl. seeded oracle-comparison stress
   findPivots.test.mjs     # #44: 12 FindPivots tests incl. two seeded oracle stress tests
@@ -171,17 +171,21 @@ make every frontier comparison strict. Consequences, replacing the pre-#163 guar
 4. **Full determinism:** distances, hops, preds, and even partial-call `U`/`boundKey` are
    invariant under edge-list permutation (`test/tieBreak.test.mjs` asserts this).
 
-**Performance (measured 2026-07-16, Apple Silicon, node v26.5.0 — full data + methodology
-in `benchmarks/HEAD-TO-HEAD.md`):** algorithm-only wall-clock (construction excluded,
-Dijkstra fed the same prebuilt adjacency): Dijkstra wins every shape/size; sparse-graph
-ratio narrows with n (2.54× at 50k → **1.57× at 2M**). **Comparison
-counts (the paper's metric) cross over:** BMSSP does fewer distance comparisons than
-Dijkstra past ~n = 1M sparse (0.96× at 1M, **0.91× at 2M**). Two measured pathologies,
-tracked in **#182**: star graphs blow up superlinearly (67.8× at n = 500k) and the ratio
-cliffs to 5× at n = 4M where `topLevel` steps 3→4. Note `topLevel` is **3 from n = 10k
-all the way to 2M** — scale tests buy volume/memory pressure, not recursion depth. The
-default suite runs in ~3 s; the opt-in `FUZZ_XL=1` 2M-node round takes ~33 s (#163's
-composite keys added ~10% over the ~30 s scalar baseline — candidate for #168).
+**Performance (measured 2026-07-16, addendum 2026-07-21; Apple Silicon, node v26.5.0 —
+full data + methodology in `benchmarks/HEAD-TO-HEAD.md`):** algorithm-only wall-clock
+(construction excluded, Dijkstra fed the same prebuilt adjacency): Dijkstra wins every
+shape/size; sparse-graph ratio narrows with n (2.54× at 50k → **1.57× at 2M**).
+**Comparison counts (the paper's metric) cross over:** BMSSP does fewer distance
+comparisons than Dijkstra past ~n = 1M sparse (0.96× at 1M, **0.91× at 2M**). The two
+#182 pathologies were profiled 2026-07-21 (HEAD-TO-HEAD addendum): the **star blowup was
+quadratic `batchPrepend` bookkeeping — fixed in 1.1.1** (500k: 61 s → ~3.1 s, ratio now
+falls with n); the **`topLevel` 3→4 step is an inherent ~+24%** (one extra full relax
+pass per level, measured at the exact n = 2^18 straddle) — the recorded 5× at 4M is that
+step plus GC/memory amplification at 12M edges. Note `topLevel` is **3 from n = 10k to
+2M** (4 only in n ∈ (2^18, ~376k]) — scale tests buy volume/memory pressure, not
+recursion depth. The default suite runs in ~7.5 s; the opt-in `FUZZ_XL=1` 2M-node round
+takes ~33 s (#163's composite keys added ~10% over the ~30 s scalar baseline — candidate
+for #168).
 
 ## `src/blockList.mjs` — Lemma 3.3 structure `D` (#42)
 
@@ -203,7 +207,10 @@ Implementation notes (matches §03-B including its documented shortcuts):
   Blocks are `{ bound, entries: Map }`; a `locator` Map (key → block) gives O(1) duplicate handling.
 - Bound index = plain array + binary search instead of a balanced BST (upgrade tracked as #167).
 - Overfull `d1` block splits around the median via sort (O(M log M), not linear-time selection).
-- Big `batchPrepend` batches are sorted and chunked into blocks of ≤ ⌈M/2⌉, prepended to `d0`.
+- Big `batchPrepend` batches are sorted and chunked into blocks of ≤ ⌈M/2⌉, prepended to `d0`
+  **in one concat** (#182 fix, 1.1.1): the earlier per-chunk `unshift` re-shifted the whole
+  `d0` array per chunk — O(n²) when M is small and the chunk count approaches |L|, which was
+  the star-graph blowup (67.8× at 500k; now ~5.5× and falling with n).
 - Last `d1` block (bound `B`) is kept even when empty so every `insert` finds a home.
 - The pulled set is always the exact M smallest values regardless of block layout, so pulls
   are insertion-order independent. Under #163's composite keys (all values distinct) the
@@ -414,7 +421,7 @@ edge-order deterministic (copies allocated in edge order); ~2m copies, ~3m edges
   (identical maps incl. Infinity → 0; wrong/missing entries counted); `runScenarioBenchmark`
   and `runComparisonCountBenchmark` on tiny injected scenarios return the expected columns
   with **zero mismatches**.
-- Current suite: **159 tests — 158 passing + 1 XL skipped by default**, ~100% statement
+- Current suite: **161 tests — 160 passing + 1 XL skipped by default**, ~100% statement
   coverage, ~7.5 s wall-clock (the #164 distance-preservation sweeps run BMSSP/Dijkstra
   from every source). No graph data files: every generated test graph comes from a
   seed; the #162 fixtures are hand-built and fully deterministic.
@@ -430,7 +437,9 @@ BMSSP-vs-Dijkstra head-to-head itself:
   is the fair baseline) and outputs are verified node-by-node (`mismatches` must be 0).
   Scenario registry adds `sparse-random-l4` (n = 300k, degree 3): `topLevel` steps 3→4 at
   exactly n = 2^18 + 1 and stays 4 until t reaches 7 (~n = 376k), so 300k sits inside the
-  #182 level-transition window (3.11× vs 2.79× at 50k on 2026-07-21 capture).
+  #182 level-transition window (~3× vs ~2.2× at 50k on the 2026-07-21 post-fix capture;
+  the step itself measures ~+24% at the exact straddle). Star post-#182-fix: 3.82× at
+  50k (was 8.73×).
 - `compare-counts.bench.mjs` (opt-in, `npm run bench:counts` or `--counts`): comparisons
   between path lengths — BMSSP counted via `tieBreak`'s unconditional `compareKeys`
   counter, Dijkstra via matching counters in `dijkstra-adj.mjs`. One exact run per side
@@ -458,9 +467,9 @@ BMSSP-vs-Dijkstra head-to-head itself:
 | Optional constant-degree transform (in/out-degree ≤ 2) | `src/constantDegree.mjs` + `test/constantDegree.test.mjs` | #164 | ✅ merged (PR #195, no bump) |
 | JSDoc on `index.mjs` exports + public-API docs page | `index.mjs` + `docs/index.html` | #166 | ✅ merged (PR #196, **minor → 1.1.0**, released 2026-07-21) |
 | BMSSP-vs-Dijkstra head-to-head in the harness | `benchmarks/` + `src/tieBreak.mjs` counter | #170 | ✅ merged (PR #198, no bump) |
+| Performance-cliff investigation + quadratic batchPrepend fix | `src/blockList.mjs` + HEAD-TO-HEAD addendum | #182 | ✅ done-pending-merge (this PR, **patch → 1.1.1**) |
 
 Milestone `1.1.0` (correctness hardening) is **closed** — released 2026-07-21 (npm +
-Docker Hub). Milestone `1.2.0` is the current focus: **#182 is next** (performance-cliff
-investigation, armed with the harness's small-n reproductions — see the 2026-07-21
-comment on the issue), then #167/#168; see
+Docker Hub). Milestone `1.2.0` is the current focus: after #182 merges, **#167 / #168**
+remain (the structural/constant-factor work the investigation informs); see
 [06-milestones-roadmap.md](06-milestones-roadmap.md).

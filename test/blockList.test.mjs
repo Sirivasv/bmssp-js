@@ -204,6 +204,67 @@ describe("BlockList batchPrepend", () => {
     expect(order).toEqual([...valueOf.values()].sort((a, b) => a - b));
   });
 
+  test("a many-chunk batch at M = 1 pulls in order — the #182 star shape", () => {
+    // M = 1 makes every chunk a single-entry block: the regime where the
+    // pre-#182 per-chunk unshift turned quadratic. Behavior must be
+    // unchanged: pulls come out in ascending value order, one at a time.
+    const list = new BlockList(1, Infinity);
+    list.insert("far", 10_000);
+    const batch = [];
+    for (let i = 0; i < 500; i += 1) {
+      batch.push([`v${i}`, 1 + ((i * 271) % 500)]); // distinct values 1..500
+    }
+    list.batchPrepend(batch);
+    expect(list.size).toBe(501);
+    const values = new Map([...batch, ["far", 10_000]]);
+    let previous = -Infinity;
+    for (const { keys } of drain(list)) {
+      expect(keys.size).toBe(1);
+      const value = values.get([...keys][0]);
+      expect(value).toBeGreaterThan(previous);
+      previous = value;
+    }
+    expect(previous).toBe(10_000); // the pre-existing entry drained last
+  });
+
+  test("successive prepended batches stay ordered in front of each other", () => {
+    const M = 2;
+    const list = new BlockList(M, 1000);
+    list.insert("stored", 500);
+    list.batchPrepend([
+      ["a", 40],
+      ["b", 43],
+      ["c", 41],
+      ["d", 44],
+      ["e", 42],
+    ]); // > M -> chunked
+    list.batchPrepend([
+      ["f", 4],
+      ["g", 3],
+      ["h", 1],
+      ["i", 2],
+      ["j", 5],
+    ]); // all smaller than everything above -> must drain first
+    const values = new Map([
+      ["a", 40],
+      ["b", 43],
+      ["c", 41],
+      ["d", 44],
+      ["e", 42],
+      ["f", 4],
+      ["g", 3],
+      ["h", 1],
+      ["i", 2],
+      ["j", 5],
+      ["stored", 500],
+    ]);
+    const order = [];
+    for (const { keys } of drain(list)) {
+      order.push(...[...keys].map((k) => values.get(k)).sort((a, b) => a - b));
+    }
+    expect(order).toEqual([...values.values()].sort((a, b) => a - b));
+  });
+
   test("duplicate keys keep the smallest value, within the batch and vs stored", () => {
     const list = new BlockList(2, 100);
     list.insert("x", 50);

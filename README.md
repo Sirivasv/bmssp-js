@@ -35,6 +35,7 @@ with every building block shipped, tested, and released individually:
 | Constructor input validation ([#165](https://github.com/Sirivasv/bmssp-js/issues/165)) | `BMSSP` constructor | ✅ done |
 | Opt-in constant-degree transform, in/out-degree ≤ 2 ([#164](https://github.com/Sirivasv/bmssp-js/issues/164)) | `constantDegreeTransform()` | ✅ done |
 | BMSSP-vs-Dijkstra head-to-head in the benchmark harness ([#170](https://github.com/Sirivasv/bmssp-js/issues/170)) | `npm run bench` / `npm run bench:counts` | ✅ done |
+| Performance-cliff investigation; quadratic `BatchPrepend` fixed ([#182](https://github.com/Sirivasv/bmssp-js/issues/182)) | `src/blockList.mjs` | ✅ done — **1.1.1** |
 
 > **Honest note:** the paper's win is asymptotic, and this repo optimizes for correctness
 > and readability, not raw speed. Measured head-to-head (algorithm time only, graph
@@ -46,7 +47,12 @@ with every building block shipped, tested, and released individually:
 > from about n = 1M on sparse graphs** (`npm run bench:counts` measures the ratio falling
 > 1.20× at 50k → 1.03× at 200k → 0.98× at 1M; 0.91× at 2M in the record), and the
 > advantage grows with size: the "sorting barrier" is measurably broken; what remains is
-> JS constant factors.
+> JS constant factors. The two performance cliffs found in the 1.0.0 measurements were
+> run down in [#182](https://github.com/Sirivasv/bmssp-js/issues/182): the star-graph
+> blowup was a quadratic in `BatchPrepend`'s bookkeeping — fixed in `1.1.1` (500k-node
+> star: 61 s → ~3 s) — and the recursion-level step is an inherent, measured ~+24% per
+> extra level (see the addendum in
+> [benchmarks/HEAD-TO-HEAD.md](benchmarks/HEAD-TO-HEAD.md)).
 > Where inputs violate the paper's distinct-path-lengths assumption (e.g. zero-weight
 > edges), a principled deterministic tie-break
 > ([#163](https://github.com/Sirivasv/bmssp-js/issues/163)) realizes that assumption in

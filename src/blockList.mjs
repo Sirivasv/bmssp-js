@@ -156,9 +156,13 @@ class BlockList {
         chunks.push(fresh.slice(i, i + chunkSize));
       }
     }
-    // Prepend in reverse chunk order so the smallest chunk lands at the front
-    for (let c = chunks.length - 1; c >= 0; c -= 1) {
-      const chunk = chunks[c];
+    // Materialize the chunks as blocks (ascending, so chunk 0 — the smallest
+    // values — ends up frontmost) and prepend them all in one concat. A
+    // per-chunk unshift here re-shifts the whole d0 array every time: with a
+    // small M the chunk count approaches |L| and the loop turns quadratic —
+    // the #182 star-graph blowup (~n single-entry chunks at M = 1).
+    const blocks = [];
+    for (const chunk of chunks) {
       // Seed the block bound with the first value, then max-update — avoids
       // needing a -Infinity sentinel that a custom comparator can't order
       const block = this.makeBlock(chunk[0][1]);
@@ -168,8 +172,9 @@ class BlockList {
         if (this.compare(value, block.bound) > 0) block.bound = value;
         this.count += 1;
       }
-      this.d0.unshift(block);
+      blocks.push(block);
     }
+    this.d0 = blocks.concat(this.d0);
   }
 
   /**
