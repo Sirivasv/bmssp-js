@@ -1,8 +1,9 @@
 # 07 — Glossary
 
-<!-- Updated on: 2026-07-21 (terms last extended in the #164 PR: the constant-degree
-     transform — port copies, zero-weight cycle, constantDegreeTransform and its
-     sourceCopy/collapse/copiesOf/originalOf surface) -->
+<!-- Updated on: 2026-07-21 (#166 PR: no new symbols — the PR adds JSDoc to index.mjs and
+     rewrites docs/index.html; added the "Docs page" repo term. Terms last extended in the
+     #164 PR: the constant-degree transform — port copies, zero-weight cycle,
+     constantDegreeTransform and its sourceCopy/collapse/copiesOf/originalOf surface) -->
 
 > **Lifecycle: dynamic — updated in Phase C of every PR.** When a PR introduces new symbols
 > or terms (module names, data-structure fields, paper notation newly used in code), add
@@ -231,3 +232,8 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
 - **Performance cliffs (#182)** — two measured regimes where the head-to-head ratio breaks
   from its ~1.6–2× pattern: star graphs (superlinear blowup, 67.8× at n = 500k) and the
   `topLevel = ⌈log₂n / t⌉` 3→4 transition (5× at n = 4M on sparse). Milestone 1.2.0.
+- **Docs page (#166)** — `docs/index.html`, the GitHub-Pages-published public-API reference
+  (deployed by `static.yml` on `docs/**` changes). Documents exactly the three `index.mjs`
+  exports — `BMSSP` (constructor contract, `calculateShortestPaths`, `reconstructPath`),
+  `dijkstra`, `constantDegreeTransform` — and explicitly keeps algorithm internals out.
+  Static, dependency-free HTML.

@@ -1,15 +1,14 @@
 # 05 — Codebase Map (current state)
 
-<!-- BOOKMARK-COMMIT: b36c05944cb011e3667da7802032599868dbfc81 -->
-<!-- PENDING-PR-BRANCH: feat/164-constant-degree-transform -->
-<!-- Last validated: 2026-07-21 (Phase C of the #164 PR). Describes the tree as it will
-     exist once that PR merges: adds the opt-in constant-degree transform
-     (src/constantDegree.mjs), re-exported from index.mjs. This same rewrite folds in the
-     Phase A reconciliation missed at the top of main: #165 (constructor input validation)
-     merged as PR #191 (commit 39f7494), and three dependabot workflow bumps (#192/#193/#194,
-     .github/workflows/** only) landed on top — the bookmark now sits at that HEAD (b36c059).
-     No version bump (mid-milestone enhancement; milestone 1.1.0 remains open with #166 —
-     semver convention, 06 "Release mechanics"). -->
+<!-- BOOKMARK-COMMIT: a1dac45cc2aa4f48e708fe2e0e05a964c0f858a5 -->
+<!-- PENDING-PR-BRANCH: docs/166-public-api-docs -->
+<!-- Last validated: 2026-07-21 (Phase C of the #166 PR). Describes the tree as it will
+     exist once that PR merges: JSDoc on index.mjs's three public re-exports and a full
+     rewrite of docs/index.html into a public-API reference (was a stale landing page
+     pointing at the wrong repo). No src/ or test/ changes. #166 is milestone 1.1.0's last
+     open issue → this PR closes the milestone → minor bump to 1.1.0 (semver convention,
+     06 "Release mechanics"). This rewrite also folds in the session's Phase A fast path:
+     the #164 PR merged as PR #195 (merge commit a1dac45 == the bookmark). -->
 
 Snapshot of what exists in `bmssp-js` today, so you know what to build on vs. what's missing.
 
@@ -57,7 +56,8 @@ feature branch name. Step 2 above then fast-paths the post-merge session start.
 ## Layout
 
 ```
-index.mjs                 # re-exports { BMSSP }, { dijkstra } and { constantDegreeTransform }
+index.mjs                 # re-exports { BMSSP }, { dijkstra } and { constantDegreeTransform },
+                          # each with public-API JSDoc (#166); internals stay unexported
 src/
   bmssp.mjs               # BMSSP class — full Algorithm 3 recursion (#43); wires the pieces below
   dijkstra.mjs            # reference Dijkstra (array binary-heap) — DONE, used as oracle
@@ -91,7 +91,9 @@ benchmarks/               # dependency-free benchmark harness, `npm run bench`
   HEAD-TO-HEAD.md         #   measured BMSSP-vs-Dijkstra (1.0.0): wall-clock + comparison counts
 examples/
   main.mjs                # tiny usage example (constructs BMSSP, prints .graph)
-docs/index.html           # published docs page
+docs/index.html           # public-API reference (GitHub Pages via static.yml) — rewritten in
+                          # #166 from a stale landing page (wrong repo link, stray </svg>);
+                          # documents the three exports only, internals explicitly excluded
 ```
 
 Tooling: Jest (`npm test`, needs `--experimental-vm-modules`, already in the `test` script),
@@ -428,8 +430,11 @@ comparison-count mode); the raw baseline is also on #170 as a comment.
 | Deterministic tie-breaking (Assumption 2.1) | `src/tieBreak.mjs` + all modules | #163 | ✅ done (PR #188, no bump) |
 | Public shortest-path reconstruction | `BMSSP.reconstructPath()` + `test/pathReconstruction.test.mjs` | #169 | ✅ done (PR #189, no bump) |
 | Constructor input validation | `BMSSP` constructor + `test/main.test.mjs` | #165 | ✅ merged (PR #191, no bump) |
-| Optional constant-degree transform (in/out-degree ≤ 2) | `src/constantDegree.mjs` + `test/constantDegree.test.mjs` | #164 | ✅ done-pending-merge (this PR, no bump) |
+| Optional constant-degree transform (in/out-degree ≤ 2) | `src/constantDegree.mjs` + `test/constantDegree.test.mjs` | #164 | ✅ merged (PR #195, no bump) |
+| JSDoc on `index.mjs` exports + public-API docs page | `index.mjs` + `docs/index.html` | #166 | ✅ done-pending-merge (this PR, **minor → 1.1.0**) |
 
-Milestone `1.1.0` (correctness hardening) remains in progress with **only #166 open**
-after this PR — its closing PR will bump **minor → 1.1.0**. Milestone `1.2.0` remains in
-progress with #169 merged; see [06-milestones-roadmap.md](06-milestones-roadmap.md).
+Milestone `1.1.0` (correctness hardening) **completes with this PR** — #166 was its last
+open issue, so this PR bumps **minor → 1.1.0** and its merge triggers the 1.1.0 release
+(Phase E) plus closing the milestone on GitHub (proposed). Milestone `1.2.0` becomes the
+current focus (#167, #168, #170, #182 open); see
+[06-milestones-roadmap.md](06-milestones-roadmap.md).

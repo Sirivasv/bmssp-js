@@ -95,7 +95,8 @@ console.log(graph.reconstructPath(1)); // [0, 1]
 when the target is unreachable (or before any run) and throws for a node outside the graph.
 
 A reference `dijkstra` implementation is also exported. See the `examples/` directory for
-more.
+more, or the [public API reference](https://sirivasv.github.io/bmssp-js/) for the complete
+documented surface.
 
 ### Optional: constant-degree transform
 
@@ -168,8 +169,8 @@ graphs in a few seconds), and set `FUZZ_XL=1` for an additional 2-million-node r
 | Milestone | Theme | Status |
 | --- | --- | --- |
 | [`1.0.0`](https://github.com/Sirivasv/bmssp-js/milestones) | First end-to-end functional BMSSP (issues #40–#45) | ✅ done |
-| `1.1.0` | Correctness hardening — fuzz tests, edge cases, tie-breaking, input validation, constant-degree transform | 🔨 current focus |
-| `1.2.0` | Performance & ergonomics — exact Lemma 3.3 asymptotics, path reconstruction, BMSSP-vs-Dijkstra benchmarks | 🔨 in progress |
+| `1.1.0` | Correctness hardening — fuzz tests, edge cases, tie-breaking, input validation, constant-degree transform, API docs | ✅ done |
+| `1.2.0` | Performance & ergonomics — exact Lemma 3.3 asymptotics, BMSSP-vs-Dijkstra benchmarks, performance-cliff investigation | 🔨 current focus |
 | `2.0.0` | API generalization — public multi-source/bounded entry point, flexible inputs | planned |
 
 ## Contributing (humans and AI agents welcome)

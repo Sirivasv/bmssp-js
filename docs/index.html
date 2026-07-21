@@ -2,8 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Tsinghua SSSP - BMSSP - Landing Page</title>
+    <title>bmssp — BMSSP shortest paths for JavaScript</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="JavaScript implementation of BMSSP, the O(m log^(2/3) n) single-source shortest-paths algorithm — public API documentation.">
     <style>
         body {
             margin: 0;
@@ -14,35 +15,63 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
         }
         .container {
             background: #fff;
             border-radius: 18px;
             box-shadow: 0 4px 24px rgba(0,0,0,0.08);
             padding: 2.5rem 2rem;
-            max-width: 420px;
-            text-align: center;
+            margin: 2rem 1rem;
+            max-width: 760px;
+            width: calc(100% - 2rem);
+            box-sizing: border-box;
         }
+        header { text-align: center; }
         h1 {
             font-size: 2.2rem;
             margin-bottom: 0.5rem;
             color: #3a0ca3;
         }
-        p {
-            font-size: 1.1rem;
-            margin-bottom: 1.5rem;
+        h2 {
+            font-size: 1.4rem;
+            color: #3a0ca3;
+            border-bottom: 2px solid #e0e7ff;
+            padding-bottom: 0.3rem;
+            margin-top: 2.2rem;
+        }
+        h3 {
+            font-size: 1.05rem;
+            color: #22223b;
+            margin-bottom: 0.3rem;
+        }
+        p, li {
+            font-size: 1rem;
+            line-height: 1.55;
             color: #4a4e69;
         }
+        .tagline { font-size: 1.1rem; }
+        a { color: #4361ee; }
+        code {
+            font-family: 'Cascadia Code', Consolas, Menlo, monospace;
+            font-size: 0.92em;
+            background: #eef1ff;
+            border-radius: 4px;
+            padding: 0.08em 0.35em;
+        }
+        pre {
+            background: #22223b;
+            color: #f0fdfa;
+            border-radius: 10px;
+            padding: 1rem 1.2rem;
+            overflow-x: auto;
+        }
+        pre code { background: none; color: inherit; padding: 0; }
         .graphics {
-            margin: 1.5rem 0;
+            margin: 1.2rem 0 0.4rem;
             display: flex;
             justify-content: center;
         }
-        .node-graph {
-            width: 120px;
-            height: 120px;
-        }
+        .node-graph { width: 110px; height: 110px; }
         .btn {
             display: inline-block;
             padding: 0.7em 1.5em;
@@ -54,43 +83,164 @@
             text-decoration: none;
             transition: background 0.2s;
             cursor: pointer;
+            margin: 0.3rem 0.35rem;
         }
-        .btn:hover {
-            background: #3a0ca3;
+        .btn:hover { background: #3a0ca3; }
+        .btn.secondary { background: #4cc9f0; color: #22223b; }
+        .btn.secondary:hover { background: #3ab8de; }
+        .note {
+            background: #f0fdfa;
+            border-left: 4px solid #4cc9f0;
+            border-radius: 0 8px 8px 0;
+            padding: 0.7rem 1rem;
+            margin: 1rem 0;
         }
         footer {
-            margin-top: 2rem;
+            margin: 0 0 2rem;
             font-size: 0.95rem;
-            color: #adb5bd;
+            color: #6c757d;
+            text-align: center;
         }
+        footer a { color: #6c757d; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Tsinghua SSSP - BMSSP JS</h1>
+        <header>
+            <h1>bmssp</h1>
+            <p class="tagline">
+                A JavaScript (ESM) implementation of <strong>BMSSP</strong> —
+                <strong>B</strong>ounded <strong>M</strong>ulti-<strong>S</strong>ource
+                <strong>S</strong>hortest <strong>P</strong>aths — the deterministic
+                O(m·log<sup>2/3</sup> n) single-source shortest-paths algorithm from
+                <a href="https://dl.acm.org/doi/10.1145/3717823.3718179" target="_blank" rel="noopener">
+                    “Breaking the Sorting Barrier for Directed Single-Source Shortest Paths”</a>
+                (Duan, Mao, Mao, Shu, Yin — 2025), the first to beat Dijkstra on sparse directed graphs.
+            </p>
+            <div class="graphics">
+                <!-- SVG: stylized graph with nodes and edges -->
+                <svg class="node-graph" viewBox="0 0 120 120" role="img" aria-label="Stylized graph">
+                    <line x1="60" y1="20" x2="30" y2="60" stroke="#adb5bd" stroke-width="3"/>
+                    <line x1="60" y1="20" x2="90" y2="60" stroke="#adb5bd" stroke-width="3"/>
+                    <line x1="30" y1="60" x2="60" y2="100" stroke="#adb5bd" stroke-width="3"/>
+                    <line x1="90" y1="60" x2="60" y2="100" stroke="#adb5bd" stroke-width="3"/>
+                    <circle cx="60" cy="20" r="12" fill="#4361ee" />
+                    <circle cx="30" cy="60" r="10" fill="#4cc9f0" />
+                    <circle cx="90" cy="60" r="10" fill="#4cc9f0" />
+                    <circle cx="60" cy="100" r="12" fill="#3a0ca3" />
+                </svg>
+            </div>
+            <p>
+                <a class="btn" href="https://github.com/Sirivasv/bmssp-js" target="_blank" rel="noopener">GitHub</a>
+                <a class="btn secondary" href="https://www.npmjs.com/package/bmssp" target="_blank" rel="noopener">npm</a>
+                <a class="btn secondary" href="https://hub.docker.com/r/sirivasv/bmssp-js" target="_blank" rel="noopener">Docker&nbsp;Hub</a>
+            </p>
+        </header>
+
+        <h2>Install</h2>
+        <pre><code>npm install bmssp</code></pre>
         <p>
-            Implementation of the Single Source Shortest Path (SSSP) algorithm - Bounded Multiple Source Shortest Paths (BMSSP), originally published by Tsinghua University's research.
+            The package is ESM-only. Graphs are arrays of <code>[from, to, weight]</code>
+            edges with finite numeric node IDs and finite, non-negative weights.
         </p>
+
+        <h2>Quick start</h2>
+<pre><code>import { BMSSP } from "bmssp";
+
+const graph = new BMSSP([
+  [0, 1, 50],
+  [1, 2, 75],
+  [0, 2, 25],
+]);
+
+graph.calculateShortestPaths(0);
+graph.shortestPaths;      // Map(3) { 0 => 0, 1 => 50, 2 => 25 }
+graph.reconstructPath(1); // [0, 1]</code></pre>
+
+        <h2>Public API</h2>
+        <p>The package has exactly three exports: <code>BMSSP</code>, <code>dijkstra</code>,
+           and <code>constantDegreeTransform</code>.</p>
+
+        <h3><code>new BMSSP(graph)</code></h3>
         <p>
-            Read the original paper:
-            <a href="https://dl.acm.org/doi/10.1145/3717823.3718179" target="_blank">
-                Tsinghua SSSP Paper
-            </a>
+            Validates and stores the edge list. Every entry must be an exact three-element
+            <code>[from, to, weight]</code> array; node IDs must be finite numbers and weights
+            finite and non-negative. Malformed input throws an <code>Error</code> identifying
+            the offending edge index. An empty edge array is valid (the graph then has no
+            nodes, so any start node is rejected later).
         </p>
-        <div class="graphics">
-            <!-- SVG: stylized graph with nodes and edges -->
-            <svg class="node-graph" viewBox="0 0 120 120">
-                <circle cx="60" cy="20" r="12" fill="#4361ee" />
-                <circle cx="30" cy="60" r="10" fill="#4cc9f0" />
-                <circle cx="90" cy="60" r="10" fill="#4cc9f0" />
-                <circle cx="60" cy="100" r="12" fill="#3a0ca3" />
-                <line x1="60" y1="20" x2="30" y2="60" stroke="#adb5bd" stroke-width="3"/>
-                <line x1="60" y1="20" x2="90" y2="60" stroke="#adb5bd" stroke-width="3"/>
-                <line x1="30" y1="60" x2="60" y2="100" stroke="#adb5bd" stroke-width="3"/>
-                <line x1="90" y1="60" x2="60" y2="100" stroke="#adb5bd" stroke-width="3"/>
-            </svg>
+
+        <h3><code>graph.calculateShortestPaths(source)</code></h3>
+        <p>
+            Computes shortest distances from <code>source</code> via the paper's method
+            (FindPivots → block list → recursive BMSSP with the bounded base case — not by
+            calling Dijkstra). Throws if <code>source</code> is not a node of the graph.
+            Results land in <code>graph.shortestPaths</code>, a
+            <code>Map&lt;nodeId, distance&gt;</code> holding a value for every node —
+            <code>Infinity</code> where unreachable. Distances and predecessor pointers are
+            canonical: deterministic regardless of edge-list order, even with ties and
+            zero-weight edges. Calling it again with a different source resets state and
+            recomputes.
+        </p>
+
+        <h3><code>graph.reconstructPath(target)</code></h3>
+        <p>
+            Returns the canonical shortest path from the most recent source to
+            <code>target</code> as an array of node IDs (<code>[source, …, target]</code>).
+            Returns <code>[]</code> when <code>target</code> is unreachable or no run has
+            completed yet; throws for a node that is not in the graph.
+        </p>
+
+        <h3><code>dijkstra(graph, nodeIDs, source)</code></h3>
+        <p>
+            The reference Dijkstra implementation used as the test suite's ground-truth
+            oracle, exported for comparison and independent checking. Takes the raw edge
+            array, a <code>Set</code> of node IDs, and a source; returns a
+            <code>Map&lt;nodeId, distance&gt;</code> (<code>Infinity</code> if unreachable).
+        </p>
+
+        <h3><code>constantDegreeTransform(graph)</code></h3>
+        <p>
+            Opt-in preprocessing that rewrites any graph so every vertex has in-degree and
+            out-degree ≤ 2 (the paper's preliminary assumption) by splitting each vertex into
+            a zero-weight cycle of “port” copies. Distance-preserving and never required for
+            correctness — BMSSP is validated on arbitrary graphs. Returns
+            <code>{ edges, copiesOf, originalOf, sourceCopy, collapse }</code>:
+        </p>
+<pre><code>import { BMSSP, constantDegreeTransform } from "bmssp";
+
+const t = constantDegreeTransform([
+  [0, 1, 50],
+  [0, 2, 25],
+  [1, 2, 75],
+]);
+
+const g = new BMSSP(t.edges);              // in/out-degree ≤ 2 everywhere
+g.calculateShortestPaths(t.sourceCopy(0)); // start from a copy of node 0
+t.collapse(g.shortestPaths);               // Map(3) { 0 => 0, 1 => 50, 2 => 25 }</code></pre>
+
+        <div class="note">
+            Algorithm internals — the Lemma 3.3 block list, the indexed min-heap,
+            <code>BaseCase</code>, <code>FindPivots</code>, and the tie-break helpers — are
+            deliberately <em>not</em> exported. They are implementation details, documented
+            in-source for contributors.
         </div>
-        <a class="btn" href="https://github.com/sirivasv/tsinghua-sssp" target="_blank">View on GitHub</a>
+
+        <h2>Correctness &amp; performance</h2>
+        <p>
+            Every release is validated node-by-node against the Dijkstra oracle on thousands
+            of seeded graphs (up to 2 million nodes). The paper's win is asymptotic: measured
+            head-to-head, Dijkstra still wins wall-clock at practical sizes, but in the
+            paper's own metric — comparisons between path lengths — this implementation does
+            fewer comparisons than Dijkstra from about n&nbsp;=&nbsp;1M on sparse graphs. See
+            <a href="https://github.com/Sirivasv/bmssp-js/blob/main/benchmarks/HEAD-TO-HEAD.md"
+               target="_blank" rel="noopener">benchmarks/HEAD-TO-HEAD.md</a> for the data and
+            methodology.
+        </p>
     </div>
+    <footer>
+        <a href="https://github.com/Sirivasv/bmssp-js" target="_blank" rel="noopener">bmssp-js</a>
+        · MPL-2.0 · Saul Ivan Rivas Vega
+    </footer>
 </body>
-</html></svg>
+</html>
