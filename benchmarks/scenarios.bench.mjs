@@ -15,16 +15,12 @@
 import { BMSSP } from "../src/bmssp.mjs";
 import { dijkstraAdjacency } from "./dijkstra-adj.mjs";
 import { SCENARIOS } from "./generators.mjs";
-import { timeMany, markdownTable, fmt } from "./bench-util.mjs";
-
-// Count nodes whose distances differ between the two result maps.
-function countMismatches(dijkstraDist, bmsspDist, nodeIDs) {
-  let mismatches = 0;
-  for (const id of nodeIDs) {
-    if (dijkstraDist.get(id) !== bmsspDist.get(id)) mismatches += 1;
-  }
-  return mismatches;
-}
+import {
+  timeMany,
+  markdownTable,
+  fmt,
+  countMismatches,
+} from "./bench-util.mjs";
 
 export function runScenarioBenchmark(scenarios = SCENARIOS, iters = 3) {
   const rows = [];

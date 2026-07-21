@@ -21,7 +21,7 @@ import {
   getDijkstraComparisonCount,
 } from "./dijkstra-adj.mjs";
 import { sparseRandom, grid } from "./generators.mjs";
-import { markdownTable } from "./bench-util.mjs";
+import { markdownTable, countMismatches } from "./bench-util.mjs";
 
 // Sized to reproduce the crossover table in a couple of tens of seconds:
 // sparse d3 at 50k / 200k / 1M brackets the crossover; the grid shows a
@@ -65,12 +65,11 @@ export function runComparisonCountBenchmark(cases = COUNT_CASES) {
     bmssp.calculateShortestPaths(source);
     const bmsspComparisons = getComparisonCount();
 
-    let mismatches = 0;
-    for (const id of bmssp.nodeIDs) {
-      if (dijkstraDist.get(id) !== bmssp.shortestPaths.get(id)) {
-        mismatches += 1;
-      }
-    }
+    const mismatches = countMismatches(
+      dijkstraDist,
+      bmssp.shortestPaths,
+      bmssp.nodeIDs,
+    );
 
     rows.push({
       case: testCase.name,

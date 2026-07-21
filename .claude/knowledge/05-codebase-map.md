@@ -1,16 +1,14 @@
 # 05 — Codebase Map (current state)
 
-<!-- BOOKMARK-COMMIT: d7d3080 -->
-<!-- PENDING-PR-BRANCH: feat/170-bmssp-dijkstra-benchmark -->
-<!-- Last validated: 2026-07-21 (Phase C of the #170 PR). Describes the tree as it will
-     exist once that PR merges: the benchmark harness runs the BMSSP-vs-Dijkstra
-     head-to-head itself (bmssp column + verified outputs in scenarios.bench.mjs, new
-     dijkstra-adj.mjs fair baseline, opt-in comparison-count mode via `npm run
-     bench:counts`), a comparison counter in src/tieBreak.mjs, a sparse-random-l4
-     level-transition scenario, and a fresh RESULTS.md. No bump (issue-closing, not a
-     bug fix, not 1.2.0's last issue). This file also carries the previous session's
-     Phase E marker flip (1.1.0 released 2026-07-21, milestone closed) that rides this
-     branch per branch protection. -->
+<!-- BOOKMARK-COMMIT: a1a9ef5 -->
+<!-- PENDING-PR-BRANCH: test/compare-counts-mismatch-coverage -->
+<!-- Last validated: 2026-07-21 (Phase C of the coverage PR, same session as the #170
+     PR/Phase E). Describes the tree as it will exist once that PR merges: the mismatch
+     counter extracted to bench-util.mjs countMismatches (shared by scenarios + counts
+     benchmarks) and unit-tested on both branches — compare-counts.bench.mjs and
+     scenarios.bench.mjs at 100% statement+branch coverage; suite 159. User-directed,
+     closes no issue, no bump. Also carries the #170 Phase E facts: PR #198 merged as
+     a1a9ef5, no release (1.1.0 == tag), #182 reproductions comment posted. -->
 
 Snapshot of what exists in `bmssp-js` today, so you know what to build on vs. what's missing.
 
@@ -81,11 +79,11 @@ test/
   heap.test.mjs           # #41: 16 MinHeap tests incl. a seeded stress test vs. a naive queue
   baseCase.test.mjs       # #40: 13 BaseCase tests incl. seeded oracle-comparison stress
   findPivots.test.mjs     # #44: 12 FindPivots tests incl. two seeded oracle stress tests
-  benchmarks.test.mjs     # #170: 7 harness tests — dijkstra-adj vs shipped oracle, counters, tiny-scenario report shape + zero mismatches
+  benchmarks.test.mjs     # #170: 9 harness tests — dijkstra-adj vs shipped oracle, counters, countMismatches both branches, tiny-scenario report shape + zero mismatches
   README.md               # test-suite principles (everything seeded, no data files) + file map
 benchmarks/               # dependency-free benchmark harness, `npm run bench` / `npm run bench:counts`
   generators.mjs          #   seeded graph builders + SCENARIOS registry (sparse/dense/grid/chain/star/sparse-l4)
-  bench-util.mjs          #   timing (timeMany) + markdown-table helpers
+  bench-util.mjs          #   timing (timeMany), markdown-table + countMismatches helpers
   adjacency.bench.mjs     #   adjacency map (#45) vs. linear edge scan
   scenarios.bench.mjs     #   #170: head-to-head per shape — construct + dijkstra + bmssp timings, verified outputs
   dijkstra-adj.mjs        #   #170: algorithm-only Dijkstra over prebuilt adjacency + comparison counter (fair baseline)
@@ -409,12 +407,14 @@ edge-order deterministic (copies allocated in edge order); ~2m copies, ~3m edges
   **opt-in `FUZZ_XL=1` sparse n = 2M round** (~33 s, `test.skip` otherwise). Every failure
   message carries the round's seed for reproduction. **`FUZZ_ROUNDS=<x>`** multiplies all
   round counts (default 1 ≈ 0.5 s; 25 ≈ 10 s, several thousand graphs).
-- `test/benchmarks.test.mjs` (7, #170): the harness itself. `dijkstraAdjacency` equals the
+- `test/benchmarks.test.mjs` (9, #170): the harness itself. `dijkstraAdjacency` equals the
   shipped `dijkstra` on seeded graphs, reports Infinity for unreachable nodes, rejects an
   unknown source; both comparison counters count, reset, and are deterministic for a fixed
-  graph; `runScenarioBenchmark` and `runComparisonCountBenchmark` on tiny injected
-  scenarios return the expected columns with **zero mismatches**.
-- Current suite: **157 tests — 156 passing + 1 XL skipped by default**, ~100% statement
+  graph; `countMismatches` (shared via `bench-util.mjs`) unit-tested on both branches
+  (identical maps incl. Infinity → 0; wrong/missing entries counted); `runScenarioBenchmark`
+  and `runComparisonCountBenchmark` on tiny injected scenarios return the expected columns
+  with **zero mismatches**.
+- Current suite: **159 tests — 158 passing + 1 XL skipped by default**, ~100% statement
   coverage, ~7.5 s wall-clock (the #164 distance-preservation sweeps run BMSSP/Dijkstra
   from every source). No graph data files: every generated test graph comes from a
   seed; the #162 fixtures are hand-built and fully deterministic.
@@ -457,9 +457,10 @@ BMSSP-vs-Dijkstra head-to-head itself:
 | Constructor input validation | `BMSSP` constructor + `test/main.test.mjs` | #165 | ✅ merged (PR #191, no bump) |
 | Optional constant-degree transform (in/out-degree ≤ 2) | `src/constantDegree.mjs` + `test/constantDegree.test.mjs` | #164 | ✅ merged (PR #195, no bump) |
 | JSDoc on `index.mjs` exports + public-API docs page | `index.mjs` + `docs/index.html` | #166 | ✅ merged (PR #196, **minor → 1.1.0**, released 2026-07-21) |
-| BMSSP-vs-Dijkstra head-to-head in the harness | `benchmarks/` + `src/tieBreak.mjs` counter | #170 | ✅ done-pending-merge (this PR, no bump) |
+| BMSSP-vs-Dijkstra head-to-head in the harness | `benchmarks/` + `src/tieBreak.mjs` counter | #170 | ✅ merged (PR #198, no bump) |
 
 Milestone `1.1.0` (correctness hardening) is **closed** — released 2026-07-21 (npm +
-Docker Hub). Milestone `1.2.0` is the current focus: after #170 merges, #182
-(performance-cliff investigation, now armed with the harness's small-n reproductions)
-is next, then #167/#168; see [06-milestones-roadmap.md](06-milestones-roadmap.md).
+Docker Hub). Milestone `1.2.0` is the current focus: **#182 is next** (performance-cliff
+investigation, armed with the harness's small-n reproductions — see the 2026-07-21
+comment on the issue), then #167/#168; see
+[06-milestones-roadmap.md](06-milestones-roadmap.md).
