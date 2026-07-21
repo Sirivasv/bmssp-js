@@ -26,6 +26,17 @@ export function timeMany(fn, { iters = 5, warmup = 1 } = {}) {
   };
 }
 
+// Count nodes whose distances differ between two result maps — the
+// head-to-head's per-run output verification (#170). Any nonzero count in a
+// benchmark report means the two algorithms disagreed on that graph.
+export function countMismatches(expectedDist, actualDist, nodeIDs) {
+  let mismatches = 0;
+  for (const id of nodeIDs) {
+    if (expectedDist.get(id) !== actualDist.get(id)) mismatches += 1;
+  }
+  return mismatches;
+}
+
 // Render an array of row objects as a GitHub-flavored markdown table.
 export function markdownTable(headers, rows) {
   const head = `| ${headers.join(" | ")} |`;

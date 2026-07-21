@@ -8,7 +8,38 @@ import {
 } from "../benchmarks/dijkstra-adj.mjs";
 import { runScenarioBenchmark } from "../benchmarks/scenarios.bench.mjs";
 import { runComparisonCountBenchmark } from "../benchmarks/compare-counts.bench.mjs";
+import { countMismatches } from "../benchmarks/bench-util.mjs";
 import { sparseRandom, chain, star } from "../benchmarks/generators.mjs";
+
+describe("countMismatches (#170): per-run output verification", () => {
+  test("identical maps count zero, including Infinity entries", () => {
+    const nodeIDs = new Set([0, 1, 2]);
+    const a = new Map([
+      [0, 0],
+      [1, 5],
+      [2, Infinity],
+    ]);
+    const b = new Map(a);
+    expect(countMismatches(a, b, nodeIDs)).toBe(0);
+  });
+
+  test("counts every differing node, missing entries included", () => {
+    const nodeIDs = new Set([0, 1, 2, 3]);
+    const expected = new Map([
+      [0, 0],
+      [1, 5],
+      [2, 7],
+      [3, Infinity],
+    ]);
+    const actual = new Map([
+      [0, 0],
+      [1, 6], // wrong distance
+      [2, 7],
+      // 3 missing entirely -> undefined !== Infinity
+    ]);
+    expect(countMismatches(expected, actual, nodeIDs)).toBe(2);
+  });
+});
 
 describe("dijkstraAdjacency (#170): the fair prebuilt-adjacency baseline", () => {
   test("matches the shipped dijkstra on seeded random graphs", () => {

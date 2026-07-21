@@ -1,8 +1,8 @@
 # 06 — Milestones Roadmap
 
-<!-- SYNCED-FROM-GITHUB: 2026-07-21 Phase C of the #170 PR (verified live: milestone 1.1.0
-     CLOSED 6/6; 1.2.0 open with 4 open issues #167/#168/#170/#182; 2.0.0 open with 3
-     open issues #171/#172/#173; #170 is done-pending-merge in this PR) -->
+<!-- SYNCED-FROM-GITHUB: 2026-07-21 Phase E of the #170 PR (#170 closed by merged PR #198,
+     commit a1a9ef5; 1.2.0 open with 3 open issues #167/#168/#182; 2.0.0 open with 3
+     open issues #171/#172/#173; no release — no bump, package.json 1.1.0 == tag) -->
 <!-- Current package version: 1.1.0 — released 2026-07-21 (tag + GitHub Release with
      Announcements discussion #197 → npm + Docker Hub via publish.yml); tag matches -->
 <!-- Release-discussion convention (user-directed 2026-07-21): every GitHub Release also
@@ -43,15 +43,11 @@ it runs the same Phase C reconciliation directly on `main`.
 
 ## 📋 Roadmap proposals (pending user approval)
 
-From the #170 PR (Phase C, 2026-07-21):
+_None pending._
 
-1. **Comment on #182** with the harness's small-n reproductions so the investigation can
-   iterate in seconds instead of minutes: the star pathology is already 8.7× at n = 50k
-   (`star` scenario), and the `topLevel` 3→4 transition is reachable at n = 300k
-   (`sparse-random-l4`: 3.11× vs 2.79× at 50k — the window is exactly n ∈ (2^18, ~376k],
-   where t is still 6; t reaches 7 at ~n = 376k and topLevel drops back to 3). Both are
-   now standing regression sentinels in `npm run bench`.
-
+_(The #170-PR proposal — comment on **#182** with the harness's small-n reproductions —
+was approved and executed 2026-07-21: star 8.7× at n = 50k, `sparse-random-l4` 3.11× at
+n = 300k inside the topLevel 3→4 window n ∈ (2^18, ~376k].)_
 _(The #166-PR proposal — close milestone `1.1.0` — was approved and executed 2026-07-21:
 milestone #2 is closed on GitHub with 6/6 issues done.)_
 
@@ -110,17 +106,24 @@ executed 2026-07-17.)_
 - **Milestone `1.2.0` — performance & ergonomics** (in progress). **#169 merged**
   (PR #189): public `BMSSP.reconstructPath(target)` walks the existing canonical
   predecessor map, with independent path-oracle coverage and public usage docs.
-- **#170 done-pending-merge (this PR, 2026-07-21):** the harness runs the head-to-head
-  itself. `scenarios.bench.mjs` gains algorithm-only `dijkstra ms`/`bmssp ms`/`ratio`
-  columns (both sides on the instance's prebuilt adjacency via the new
-  `benchmarks/dijkstra-adj.mjs`; outputs verified, `mismatches` column must be 0) plus a
-  `sparse-random-l4` scenario (n = 300k — inside the `topLevel` 3→4 window that starts at
-  n = 2^18 + 1). Opt-in `npm run bench:counts` (`compare-counts.bench.mjs`) reproduces
-  the comparison-count crossover exactly (sparse 1.20× at 50k → 1.03× at 200k → **0.98×
-  at 1M**) via an unconditional `compareKeys` counter in `src/tieBreak.mjs` and matching
-  counters in the bench Dijkstra. 7 new harness tests + 3 counter tests (suite 157).
-  Fresh `RESULTS.md` captured; `HEAD-TO-HEAD.md` marked as the frozen 1.0.0 record.
-  No bump (not a bug fix; #167/#168/#182 still open in 1.2.0).
+- **#170 merged (PR #198, 2026-07-21, commit a1a9ef5):** the harness runs the
+  head-to-head itself. `scenarios.bench.mjs` gained algorithm-only
+  `dijkstra ms`/`bmssp ms`/`ratio` columns (both sides on the instance's prebuilt
+  adjacency via the new `benchmarks/dijkstra-adj.mjs`; outputs verified, `mismatches`
+  column must be 0) plus a `sparse-random-l4` scenario (n = 300k — inside the `topLevel`
+  3→4 window that starts at n = 2^18 + 1). Opt-in `npm run bench:counts`
+  (`compare-counts.bench.mjs`) reproduces the comparison-count crossover exactly (sparse
+  1.20× at 50k → 1.03× at 200k → **0.98× at 1M**) via an unconditional `compareKeys`
+  counter in `src/tieBreak.mjs` and matching counters in the bench Dijkstra. 7 new
+  harness tests + 3 counter tests (suite 157). Fresh `RESULTS.md` captured;
+  `HEAD-TO-HEAD.md` marked as the frozen 1.0.0 record. No bump, no release. The Phase E
+  proposal (comment on #182 with the small-n reproductions) was approved and posted the
+  same day.
+- **Coverage follow-up (user-directed, 2026-07-21, no issue, no bump):** the harness's
+  mismatch counter extracted to `bench-util.mjs` `countMismatches` (shared by
+  `scenarios.bench.mjs` and `compare-counts.bench.mjs`) and unit-tested on both branches,
+  closing the uncovered defensive lines in `compare-counts.bench.mjs` — both benchmark
+  modules now at 100% statement+branch coverage (suite 159).
 - **Semver release convention (user-directed 2026-07-17, PR #186):** bumps only on bug
   fix (patch) or milestone-closing PR (minor/major) — see "Release mechanics" below.
 - **2026-07-16 reflection session (post-release):** measured the BMSSP-vs-Dijkstra
@@ -167,16 +170,16 @@ All six issues done (build order as executed — cheapest protection first, then
 
 ## Milestone `1.2.0` (milestone #3) — performance & ergonomics — CURRENT
 
-Build order: ~~#170~~ (done-pending-merge), then **#182** (use the harness's small-n
-reproductions to investigate the two measured cliffs), then **#167 / #168** (the
-optimizations the investigation informs).
+Build order: ~~#170~~ (merged, PR #198), then **#182** (use the harness's small-n
+reproductions — see the 2026-07-21 issue comment — to investigate the two measured
+cliffs), then **#167 / #168** (the optimizations the investigation informs).
 
 | # | Issue | Labels | Notes |
 |---|---|---|---|
 | 167 | Restore Lemma 3.3's exact asymptotics in BlockList (balanced-BST bound index + linear-time selection) | enhancement · help wanted | — |
 | 168 | Adjacency and relaxation micro-optimizations | enhancement · help wanted | — |
 | 169 | Optional shortest-path reconstruction (`Pred[]` → paths) | enhancement · help wanted | ✅ merged (PR #189, no bump): public API + independent path oracle |
-| 170 | BMSSP-vs-Dijkstra benchmark comparison | enhancement · help wanted | ✅ done-pending-merge (this PR, no bump): head-to-head + count mode in the harness, verified outputs |
+| 170 | BMSSP-vs-Dijkstra benchmark comparison | enhancement · help wanted | ✅ merged (PR #198, no bump): head-to-head + count mode in the harness, verified outputs |
 | 182 | Investigate BMSSP performance cliffs: high-fanout (star) graphs and recursion-level transitions | enhancement · help wanted | — |
 
 _Note:_ #182 carries the two measured pathologies (star blowup: 67.8× at n = 500k in the
