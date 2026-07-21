@@ -1,8 +1,7 @@
 # 06 — Milestones Roadmap
 
-<!-- SYNCED-FROM-GITHUB: 2026-07-21 Phase C of the #205 PR (verified live at RKB the same
-     day: 1.2.0 CLOSED with 5/5 done; 2.0.0 open with 4 open issues #171/#172/#173/#205 —
-     #205 done-pending-merge in this PR) -->
+<!-- SYNCED-FROM-GITHUB: 2026-07-21 Phase E of the #205 PR (PR #206 merged as cbcaab1):
+     1.2.0 CLOSED; 2.0.0 open with 3 open issues #171/#172/#173 (#205 closed) — #172 next -->
 <!-- Current package version: 1.2.0 — released 2026-07-21 (tag + GitHub Release with
      Announcements discussion → npm + Docker Hub via publish.yml); tag matches -->
 <!-- Release-discussion convention (user-directed 2026-07-21): every GitHub Release also
@@ -43,23 +42,25 @@ it runs the same Phase C reconciliation directly on `main`.
 
 ## 📋 Roadmap proposals (pending user approval)
 
-From the #205 PR (Phase C, 2026-07-21):
+**From the examples/Docker PR (`chore/examples-docker-gallery`, no issue, no bump):**
 
-1. **Comment on #172 (typed / flexible graph inputs)** with the engine baseline it now
-   builds on: #205 landed the dense-index core, so the class already maps ids → dense
-   indices (sorted-id order) and stores the graph as CSR (`this.csr`) + typed labels.
-   #172's builder/typed-input forms should **construct straight into that index+CSR
-   layout** rather than the `[from,to,weight]` array, and #172 is the natural place to
-   expose an explicit vertex-set / id-normalization API (today ids are inferred from
-   edges and sorted). Note the surprising #205 result — the dense engine roughly halved
-   wall-clock (sparse-random head-to-head 2.5× → **1.38×**), so typed inputs are now the
-   main remaining constant-factor lever before #171/#173.
-2. **Reassess the #205↔#171 ordering (no GitHub write, build-order note):** #205 kept the
-   public API backward-compatible (the `bmssp(l,B,S)` wrapper still speaks ids and seeds
-   via `shortestPaths`), so #171's public multi-source entrypoint is now a **surface**
-   design over a finished engine — confirming the RKB build order #205 → #172 → #171 →
-   #173. No issue edit needed; recorded here and in #173's stabilization scope.
+1. **Comment on #173** (Stabilize the public API surface) — the new `examples/` gallery
+   now exercises exactly the three public exports (`BMSSP`, `dijkstra`,
+   `constantDegreeTransform`) as a real consumer, importing from the published package.
+   When #173 writes the migration note / public-surface decision, point it at
+   `examples/` as the canonical, runnable usage reference (and keep the gallery in lockstep
+   with any 2.0.0 surface change). _Rationale: the examples are now the de-facto public-API
+   contract users copy from; #173 should own keeping them honest._
 
+_(These are the only proposals; the PR touches examples/docs/tooling only, so it teaches
+nothing about the #172/#171 algorithm-surface work.)_
+
+_(The #205-PR proposals — engine-baseline comment on **#172** (class now holds the graph
+as index+CSR + typed labels; typed inputs should ingest straight into it and expose an
+explicit vertex-set API; #205 ~halved wall-clock so #172 is the next lever) and a
+build-order confirmation (#205 kept the API backward-compatible → #171 is surface design;
+order stays #205 → #172 → #171 → #173) — were handled 2026-07-21: the #172 comment was
+approved and posted; the ordering note needed no GitHub write.)_
 _(The #168-PR proposals — close milestone **1.2.0** (5/5 done) and open the
 **dense-index core** issue (typed-array labels + CSR adjacency; label-Map traffic ~38%
 of post-#168 self-time) — were approved and executed 2026-07-21: milestone #3 closed,
@@ -201,7 +202,7 @@ executed 2026-07-17.)_
   Suite 186 (+1 compareKeyParts agreement sweep; relaxEdge unit tests updated to the
   code contract); FUZZ_ROUNDS=25 and FUZZ_XL green. Next lever (label-Map traffic,
   ~38% self-time) proposed as a 2.0.0 dense-index issue (Roadmap proposal 2).
-- **#205 done-pending-merge (this PR, 2026-07-21; no bump — API-non-breaking):** the
+- **#205 merged (PR #206, 2026-07-21, commit cbcaab1; no bump — API-non-breaking):** the
   dense-index core, first issue of milestone 2.0.0. `buildIndex()` assigns every node id
   a dense index in **ascending-id order**, lays the graph out in **CSR** typed arrays
   (`this.csr` = offsets/targets/weights), and holds d̂/hops/preds as typed arrays
@@ -218,8 +219,21 @@ executed 2026-07-17.)_
   unchanged (0.95×/0.76×/0.65× sparse). Suite 191 (+5: 4 #205 boundary tests in
   `bmssp.test.mjs` + a `makeLabels`-defaults check; `baseCase`/`findPivots`/`tieBreak`
   unit tests rewritten to drive the index API); 100% statement coverage, lint clean,
-  FUZZ_ROUNDS=25 + FUZZ_XL green. Roadmap proposals: engine-baseline comment on #172,
-  build-order confirmation for #171/#173.
+  FUZZ_ROUNDS=25 + FUZZ_XL green. Phase E: engine-baseline comment posted on #172; the
+  build-order confirmation needed no GitHub write. **#172 is next.**
+- **Examples + Docker refresh (branch `chore/examples-docker-gallery`, 2026-07-21;
+  user-directed, no issue, no bump):** the stale single `examples/main.mjs` (it only
+  printed the raw edge list — never ran the algorithm) is replaced by a standalone gallery
+  — `01-basic` (calculateShortestPaths + reconstructPath), `02-dijkstra-oracle` (per-node
+  match table vs the exported oracle), `03-constant-degree` (transform + sourceCopy/collapse),
+  `04-larger-graph` (generated 40×40 grid, timing + oracle spot-check), `run-all` and a
+  gallery `README`. Each file imports from the **published** `bmssp` package, so users run
+  them after `npm install bmssp`. The Dockerfile now `COPY examples/`-es the whole dir,
+  carries OCI image labels + `--omit=dev`, and defaults its `CMD` to `run-all.mjs` (was the
+  trivial example); the README Docker section documents the run / single-example-override /
+  volume-mount recipes. Verified end-to-end with the local docker CLI (build + run: all four
+  examples green, oracle checks pass; override and mount forms confirmed). No src/test
+  change; docs/tooling only → no bump, no release.
 - **Semver release convention (user-directed 2026-07-17, PR #186):** bumps only on bug
   fix (patch) or milestone-closing PR (minor/major) — see "Release mechanics" below.
 - **2026-07-16 reflection session (post-release):** measured the BMSSP-vs-Dijkstra
@@ -285,7 +299,7 @@ _Note:_ both #182 shapes stay as regression sentinels in every `npm run bench` (
 ## Milestone `2.0.0` (milestone #4) — API-breaking generalization — CURRENT
 
 Build order (derived 2026-07-21 at RKB, after 1.2.0 closed): ~~#205~~
-(done-pending-merge, this PR) → **#172 → #171 → #173**. Rationale: the dense-index engine
+(merged, PR #206) → **#172 → #171 → #173**. Rationale: the dense-index engine
 (#205) decides the internal shapes every new API wraps, so it went first — the
 alternatives would build #171/#172 on the Map core and rebuild them; typed inputs (#172)
 then feed CSR directly; the public multi-source entrypoint (#171) is designed
@@ -294,8 +308,8 @@ last and takes the **major → 2.0.0** bump as the milestone-closing PR.
 
 | # | Issue | Labels | Notes |
 |---|---|---|---|
-| 205 | Dense-index core: typed-array labels + CSR adjacency | enhancement | ✅ done-pending-merge (this PR, no bump — API-non-breaking): sorted-id index + CSR + typed labels; wall-clock ~halved (sparse head-to-head 2.5× → 1.38×), counts unchanged |
-| 172 | Typed / flexible graph inputs | enhancement · help wanted | NEXT — after #205 builder forms ingest straight into index+CSR (`this.csr`); the main remaining constant-factor lever |
+| 205 | Dense-index core: typed-array labels + CSR adjacency | enhancement | ✅ merged (PR #206, no bump — API-non-breaking): sorted-id index + CSR + typed labels; wall-clock ~halved (sparse head-to-head 2.5× → 1.38×), counts unchanged |
+| 172 | Typed / flexible graph inputs | enhancement · help wanted | **NEXT** — after #205 builder forms ingest straight into index+CSR (`this.csr`) + expose an explicit vertex-set API; the main remaining constant-factor lever (baseline comment posted 2026-07-21) |
 | 171 | Public multi-source / bounded BMSSP entrypoint | enhancement · help wanted | value-in/value-out API over the dense engine; #205 kept the id-based `bmssp(l,B,S)` wrapper, so this is surface design |
 | 173 | Stabilize the public API surface for 1.0 → 2.0 | documentation · enhancement | milestone-closing: per-module public/private decision, migration note, **major → 2.0.0** |
 

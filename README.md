@@ -147,17 +147,24 @@ picks a valid start copy for an original node.
 
 ### Using the Docker image
 
-Run the bundled example:
+The published image is a pre-configured Node environment with `bmssp` installed and the
+[`examples/`](examples/) gallery bundled. Run the whole gallery — basic shortest paths,
+Dijkstra-oracle validation, the constant-degree transform, and a larger generated grid:
 
 ```bash
-docker run -it sirivasv/bmssp-js:latest
+docker run --rm sirivasv/bmssp-js:latest
 ```
 
-Or run your own tests in a pre-configured environment (replace `folder-mytest/` with your
-tests folder and `index.mjs` with your test file):
+Run a single bundled example instead:
 
 ```bash
-docker run -it -v ./folder-mytest/:/bmssp-js/folder-mytest/ sirivasv/bmssp-js:latest node /bmssp-js/folder-mytest/index.mjs
+docker run --rm sirivasv/bmssp-js:latest node examples/02-dijkstra-oracle.mjs
+```
+
+Or mount your own script and run it in the same environment (no local Node install needed):
+
+```bash
+docker run --rm -v "$PWD/mine.mjs:/bmssp-js/mine.mjs" sirivasv/bmssp-js:latest node mine.mjs
 ```
 
 Other image versions are on [Docker Hub](https://hub.docker.com/r/sirivasv/bmssp-js/tags).
