@@ -1,10 +1,11 @@
 # 06 — Milestones Roadmap
 
-<!-- SYNCED-FROM-GITHUB: 2026-07-21 (#165 closed by merged PR #191 + dependabot workflow
-     bumps #192/#193/#194 landed on main; milestones 1.1.0/1.2.0/2.0.0 open with 2/4/3 open
-     issues; #164 done-pending-merge in this PR → leaves #166 as 1.1.0's last open issue) -->
-<!-- Current package version: 1.0.1 (released 2026-07-16; the #164 PR ships no bump under
-     the semver convention — mid-milestone enhancement, milestone still open) -->
+<!-- SYNCED-FROM-GITHUB: 2026-07-21 Phase C of the #166 PR (#164 closed by merged PR #195;
+     milestones 1.1.0/1.2.0/2.0.0 open with 1/4/3 open issues on GitHub; #166 —
+     1.1.0's last open issue — is done-pending-merge in this PR) -->
+<!-- Current package version: 1.1.0 (bumped in the #166 PR — milestone-closing minor;
+     release fires in Phase E after the user confirms the merge. Last released: 1.0.1,
+     2026-07-16) -->
 
 Maps GitHub **milestones** and **issues** (Sirivasv/bmssp-js) to the paper's building blocks,
 with a dependency-aware build order. This is the "intent" side of the knowledge base (what to
@@ -40,22 +41,19 @@ it runs the same Phase C reconciliation directly on `main`.
 
 ## 📋 Roadmap proposals (pending user approval)
 
-From the #164 PR (Phase C, 2026-07-21):
+From the #166 PR (Phase C, 2026-07-21):
 
-1. **Re-scope #166** (JSDoc / API docs — 1.1.0's last open issue). Since it was filed, three
-   PRs have already shipped thorough JSDoc: `bmssp()` / `deriveParameters()` (#43),
-   `reconstructPath()` (#169), and now the whole `src/constantDegree.mjs` (#164, this PR).
-   Propose editing #166's description to name the modules still lacking JSDoc — `heap.mjs`,
-   `blockList.mjs`, `baseCase.mjs`, `findPivots.mjs`, `tieBreak.mjs` — plus a single
-   consolidated public-API doc, so the issue reflects the actual remaining work. **#166 is
-   now the last open 1.1.0 issue, so its PR closes the milestone → minor bump to `1.1.0`.**
-2. **Note the new public export on #173** (2.0.0 "Stabilize the public API surface"). The
-   public surface grew in #164: `index.mjs` now exports `constantDegreeTransform` alongside
-   `BMSSP` and `dijkstra`. Propose adding a line to #173 so the 1.0→2.0 API-stabilization
-   work explicitly covers the transform's signature and return shape.
+1. **Close milestone `1.1.0` (milestone #2) on GitHub** once this PR merges — #166 was its
+   last open issue and milestones don't auto-close. (`gh api -X PATCH
+   repos/Sirivasv/bmssp-js/milestones/2 -f state=closed`.)
 
 _Phase C writes proposed GitHub edits here (and in the PR body); Phase E executes the
 approved ones — one confirmation each — and clears them from this list._
+_(The #164-PR proposals — re-scope **#166** and the new-export note on **#173** — were
+approved 2026-07-21 and found **already executed on GitHub**: #166's live body already
+scopes the remaining work to `index.mjs` JSDoc + the `docs/` page (all `src/` modules
+verified to carry JSDoc), and #173's body already carries the 2026-07-21
+`constantDegreeTransform` update. No writes were needed.)_
 _(The #165-PR proposals — none — needed no execution.)_
 _(The #188-PR proposals — re-scope **#169** and add the measured optimization note to
 **#168** — were executed 2026-07-17.)_
@@ -89,6 +87,14 @@ executed 2026-07-17.)_
   preserving, correctness-independent, verified degree-bounded and oracle-equal from every
   source across the five seeded shapes (incl. the star hub). No bump. **Only #166 (JSDoc)
   now remains — its PR closes the milestone (minor → `1.1.0`).**
+- **Phase A reconciliation (2026-07-21, this session):** PR #195 (the #164 branch) merged
+  as `main` HEAD `a1dac45`; `05`'s bookmark fast-path flipped. No pending release found
+  (`package.json` 1.0.1 == latest tag).
+- **#166 done-pending-merge (this PR, 2026-07-21):** JSDoc on `index.mjs`'s three public
+  re-exports and a full rewrite of `docs/index.html` into a public-API reference (the old
+  page was a generic landing page linking to the wrong repo). No `src/`/`test/` changes.
+  **Last open 1.1.0 issue → minor bump to `1.1.0` in this PR**; on merge: release 1.1.0
+  (Phase E) and close the milestone (Roadmap proposal 1).
 - **Phase A reconciliation (2026-07-21):** the #165 PR (#191) and three dependabot workflow
   bumps (#192/#193/#194, `.github/workflows/**` only) had landed on `main` without a
   post-merge session-start marker flip. The #164 PR folds that in: `05`'s bookmark now sits
@@ -128,9 +134,9 @@ executed 2026-07-17.)_
 - Each sub-piece (#40/#41/#42/#44/#45) shipped with focused unit tests. ✅
 - `npm run lint` clean; ESM + Prettier style preserved. ✅
 
-## Milestone `1.1.0` (milestone #2) — correctness hardening — NEXT
+## Milestone `1.1.0` (milestone #2) — correctness hardening — ✅ COMPLETE PENDING #166 MERGE
 
-Recommended order (cheapest protection first, then the deep work):
+All six issues done (build order as executed — cheapest protection first, then the deep work):
 
 | Order | # | Issue | Labels | Notes |
 |---|---|---|---|---|
@@ -138,10 +144,14 @@ Recommended order (cheapest protection first, then the deep work):
 | 2 | 162 | Edge-case tests: disconnected graphs and unreachable nodes | enhancement · help wanted | ✅ merged (PR #187, no bump) |
 | 3 | 163 | Deterministic tie-breaking for equal-length paths (Assumption 2.1) | enhancement · help wanted | ✅ merged (PR #188, no bump): composite keys in `src/tieBreak.mjs`, all six tie manifestations resolved by construction |
 | 4 | 165 | Input validation for the BMSSP constructor | good first issue · help wanted | ✅ merged (PR #191, no bump): validates graph shape, node IDs, and weights; preserves empty graphs |
-| 5 | 164 | Optional constant-degree transform (in/out-degree ≤ 2) | enhancement · help wanted | ✅ done-pending-merge (this PR, no bump): `src/constantDegree.mjs`, opt-in + distance-preserving, re-exported |
-| 6 | 166 | JSDoc / API docs for the new modules | documentation · good first issue | **1.1.0's last open issue → its PR closes the milestone (minor).** `bmssp()`/`deriveParameters()`/`reconstructPath()`/`constantDegree.mjs` already ship JSDoc; see Roadmap proposal 1 to re-scope to `heap`/`blockList`/`baseCase`/`findPivots`/`tieBreak` + a consolidated API doc |
+| 5 | 164 | Optional constant-degree transform (in/out-degree ≤ 2) | enhancement · help wanted | ✅ merged (PR #195, no bump): `src/constantDegree.mjs`, opt-in + distance-preserving, re-exported |
+| 6 | 166 | JSDoc / API docs for the new modules | documentation · good first issue | ✅ done-pending-merge (this PR, **minor → `1.1.0`**): JSDoc on `index.mjs`'s re-exports + `docs/index.html` rewritten as the public-API reference (`BMSSP`, `dijkstra`, `constantDegreeTransform`; internals stay out). **Closes milestone 1.1.0** |
 
-## Milestone `1.2.0` (milestone #3) — performance & ergonomics
+## Milestone `1.2.0` (milestone #3) — performance & ergonomics — NEXT
+
+Suggested build order: **#170 first** (harness integration turns the one-off HEAD-TO-HEAD
+measurement into a repeatable tool), then **#182** (use that tool to investigate the two
+measured cliffs), then **#167 / #168** (the optimizations the investigation informs).
 
 | # | Issue | Labels | Notes |
 |---|---|---|---|
