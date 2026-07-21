@@ -1,6 +1,7 @@
 import { baseCase } from "./baseCase.mjs";
 import { findPivots } from "./findPivots.mjs";
 import { BlockList } from "./blockList.mjs";
+import { normalizeGraphInput } from "./graph.mjs";
 import {
   compareKeys,
   compareKeyParts,
@@ -15,9 +16,14 @@ import {
 
 class BMSSP {
   constructor(inputGraph) {
-    if (!Array.isArray(inputGraph)) {
-      throw new Error("Input graph must be an array of edges");
-    }
+    // #172: accept several input shapes (edge array, adjacency map/object, or
+    // a Graph builder) and reduce them to a canonical { edges, vertices }.
+    // `vertices` is the EXPLICIT vertex universe — declared nodes, including
+    // isolated ones; edge endpoints are folded in below. An edge-array input
+    // yields an empty `vertices`, reproducing the pre-#172 "infer from edges"
+    // behavior exactly.
+    const { edges: inputEdges, vertices: declaredVertices } =
+      normalizeGraphInput(inputGraph);
 
     // Main graph represented as an array of edges
     this.graph = [];
@@ -38,7 +44,7 @@ class BMSSP {
     this.preds = new Map();
     this.ties = makeTies(this.hops, this.preds);
 
-    for (let [index, edge] of inputGraph.entries()) {
+    for (let [index, edge] of inputEdges.entries()) {
       if (!Array.isArray(edge) || edge.length !== 3) {
         throw new Error(`Edge at index ${index} must be [from, to, weight]`);
       }
@@ -59,6 +65,17 @@ class BMSSP {
       // Add node IDs to the set
       this.nodeIDs.add(edge[0]);
       this.nodeIDs.add(edge[1]);
+    }
+
+    // #172: fold in explicitly declared vertices (isolated nodes included).
+    // Same finiteness contract as edge endpoints; buildIndex/buildAdjacency
+    // then give every declared node an index, an empty CSR range and an
+    // empty neighbor list.
+    for (const id of declaredVertices) {
+      if (!Number.isFinite(id)) {
+        throw new Error("Declared vertex IDs must be finite numbers");
+      }
+      this.nodeIDs.add(id);
     }
 
     // Build the adjacency map from the copied edges

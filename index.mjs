@@ -1,22 +1,32 @@
-// Public API of the `bmssp` package (ESM-only). Exactly three exports:
-// the BMSSP class, the reference `dijkstra`, and the opt-in
-// `constantDegreeTransform`. Algorithm-internal modules (the block list,
-// the indexed heap, BaseCase, FindPivots, the tie-break helpers) are
-// deliberately NOT re-exported — they are implementation details of the
-// recursion, not supported public API.
+// Public API of the `bmssp` package (ESM-only). Four exports: the BMSSP
+// class, the reference `dijkstra`, the opt-in `constantDegreeTransform`, and
+// the `Graph` input builder. Algorithm-internal modules (the block list, the
+// indexed heap, BaseCase, FindPivots, the tie-break helpers) are deliberately
+// NOT re-exported — they are implementation details of the recursion, not
+// supported public API.
 
 /**
  * BMSSP — the paper's Algorithm 3 behind a small class API.
  *
- * `new BMSSP(graph)` takes an array of `[from, to, weight]` edges with
- * finite numeric node IDs and finite, non-negative weights (an empty array
- * is valid; malformed edges throw with the offending index).
+ * `new BMSSP(graph)` accepts any of the #172 input shapes: an array of
+ * `[from, to, weight]` edges, an adjacency `Map`/object
+ * (`{ from: [[to, weight], ...] }`), or a `Graph` builder instance. Node IDs
+ * must be finite numbers and weights finite and non-negative; an empty graph
+ * is valid and malformed edges throw with the offending index.
  * `calculateShortestPaths(source)` computes canonical distances into the
  * `shortestPaths` Map (`Infinity` for unreachable nodes), and
  * `reconstructPath(target)` returns the canonical shortest path as an
  * array of node IDs. Full JSDoc lives on the class in `src/bmssp.mjs`.
  */
 export { BMSSP } from "./src/bmssp.mjs";
+
+/**
+ * Graph — a small mutable input builder (#172). Declare vertices (including
+ * isolated ones via `addVertex`) and directed weighted edges (`addEdge`),
+ * then pass the instance to `new BMSSP(graph)`. Mutators chain
+ * (`new Graph().addEdge(0, 1, 50).addVertex(9)`). See `src/graph.mjs`.
+ */
+export { Graph } from "./src/graph.mjs";
 
 /**
  * Reference Dijkstra implementation — the oracle the BMSSP test suite is

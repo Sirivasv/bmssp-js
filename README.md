@@ -39,6 +39,7 @@ with every building block shipped, tested, and released individually:
 | Exact Lemma 3.3 asymptotics: balanced-BST bound index + linear-time selection ([#167](https://github.com/Sirivasv/bmssp-js/issues/167)) | `src/boundIndex.mjs` + `src/select.mjs` | ✅ done |
 | Relaxation micro-optimizations: allocation-free hot loops, −13–23% wall-clock ([#168](https://github.com/Sirivasv/bmssp-js/issues/168)) | `src/tieBreak.mjs` + the algorithm modules | ✅ done — **1.2.0** |
 | Dense-index core: typed-array labels + CSR adjacency, ~½ the wall-clock ([#205](https://github.com/Sirivasv/bmssp-js/issues/205)) | `src/bmssp.mjs` (CSR) + `src/tieBreak.mjs` (typed labels) | ✅ done |
+| Typed / flexible graph inputs: `Graph` builder + adjacency Map/object + explicit vertex universe ([#172](https://github.com/Sirivasv/bmssp-js/issues/172)) | `src/graph.mjs` + `BMSSP` constructor | ✅ done |
 
 > **Honest note:** the paper's win is asymptotic, and this repo optimizes for correctness
 > and readability first — but the constant factors have come down a lot. Measured
@@ -118,6 +119,35 @@ when the target is unreachable (or before any run) and throws for a node outside
 A reference `dijkstra` implementation is also exported. See the `examples/` directory for
 more, or the [public API reference](https://sirivasv.github.io/bmssp-js/) for the complete
 documented surface.
+
+### Flexible graph inputs
+
+The constructor also accepts an **adjacency map/object** or a small **`Graph` builder** — all
+equivalent to the edge-array form (node IDs stay finite numbers). The builder is also the way
+to declare an **isolated vertex** (one with no incident edges), which the plain edge list
+can't express:
+
+```javascript
+import { BMSSP, Graph } from "bmssp";
+
+// Adjacency object ({ from: [[to, weight], ...] }) or a Map with the same shape:
+new BMSSP({ 0: [[1, 50], [2, 25]], 1: [[2, 75]] });
+
+// Or the chainable builder — addVertex declares nodes (incl. isolated ones):
+const g = new Graph()
+  .addEdge(0, 1, 50)
+  .addEdge(0, 2, 25)
+  .addEdge(1, 2, 75)
+  .addVertex(9); // an isolated vertex: present, but unreachable (Infinity)
+
+const graph = new BMSSP(g);
+graph.calculateShortestPaths(0);
+console.log(graph.shortestPaths.get(2)); // 25
+console.log(graph.shortestPaths.get(9)); // Infinity
+```
+
+(Plain-object keys are strings in JavaScript, so the object form coerces them to numbers;
+use a `Map` or the `Graph` builder if you want to keep numeric keys explicit.)
 
 ### Optional: constant-degree transform
 
@@ -202,7 +232,7 @@ graphs in a few seconds), and set `FUZZ_XL=1` for an additional 2-million-node r
 | [`1.0.0`](https://github.com/Sirivasv/bmssp-js/milestones) | First end-to-end functional BMSSP (issues #40–#45) | ✅ done |
 | `1.1.0` | Correctness hardening — fuzz tests, edge cases, tie-breaking, input validation, constant-degree transform, API docs | ✅ done |
 | `1.2.0` | Performance & ergonomics — exact Lemma 3.3 asymptotics, BMSSP-vs-Dijkstra benchmarks, cliff investigation, relaxation micro-optimizations | ✅ done |
-| `2.0.0` | API generalization — dense-index engine (done), typed/flexible inputs, public multi-source/bounded entry point | 🔨 current |
+| `2.0.0` | API generalization — dense-index engine (done), typed/flexible inputs (done), public multi-source/bounded entry point | 🔨 current |
 
 ## Contributing (humans and AI agents welcome)
 
