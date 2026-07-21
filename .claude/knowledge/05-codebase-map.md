@@ -1,18 +1,19 @@
 # 05 — Codebase Map (current state)
 
-<!-- BOOKMARK-COMMIT: 6cab602 -->
-<!-- PENDING-PR-BRANCH: feat/171-multi-source-entrypoint -->
-<!-- Last validated: 2026-07-21 (Phase C of the #171 PR, branch
-     feat/171-multi-source-entrypoint, based on main 6cab602). This PR adds the public
-     multi-source / bounded entrypoint (milestone 2.0.0, mid-milestone → no bump):
-     BMSSP.calculateShortestPathsFrom(sources, { bound }) + the normalizeSources helper —
-     a thin, ergonomic surface over the existing bmssp(topLevel, B, S) wrapper that hides the
-     recursion level and the seed-the-Map ritual. Flexible `sources` (Map | object | [id,dist]
-     pairs | bare id array), bound defaults to Infinity, finite-bound runs prune the mirror to
-     the completed set U. Additive only — calculateShortestPaths / bmssp / reconstructPath
-     unchanged; node-ID + tie-break semantics untouched. Body describes post-merge reality;
-     markers fast-path on the next session's Phase A. Also folds in the #172-PR Phase E marker
-     flip (BOOKMARK 6cab602) that had been left as a local bookkeeping edit. -->
+<!-- BOOKMARK-COMMIT: d56bc86 -->
+<!-- PENDING-PR-BRANCH: feat/173-stabilize-public-api -->
+<!-- Last validated: 2026-07-21 (Phase C of the #173 PR, branch feat/173-stabilize-public-api,
+     based on main d56bc86). This PR is the milestone-closing 2.0.0 work: public-API
+     STABILIZATION (documentation + contract lockdown, no behavior change). Adds @public/
+     @internal JSDoc across the BMSSP class, a contract test (test/publicApi.test.mjs) pinning
+     the 4 exports + supported members, MIGRATION.md (1.0→2.0, no breaking changes), two new
+     examples (05-flexible-inputs, 06-multi-source), and a rewritten docs/index.html (4 exports
+     + calculateShortestPathsFrom + advanced bmssp). User-confirmed decisions: document-only
+     boundary (no #-privatization), keep this.graph/this.adjacency public (direct-CSR perf
+     lever deferred to a new post-2.0 issue), keep raw bmssp(l,B,S) as advanced public API.
+     **major → 2.0.0** (npm version major applied). Body describes post-merge reality; markers
+     fast-path on the next session's Phase A. Also folds in the #171-PR RKB marker flip
+     (BOOKMARK d56bc86) that had been left as a local bookkeeping edit. -->
 
 
 Snapshot of what exists in `bmssp-js` today, so you know what to build on vs. what's missing.
@@ -91,6 +92,7 @@ test/
   graph.test.mjs          # #172: 18 tests — Graph builder (chain/idempotent/copies/eager validation), adjacency Map/object inputs, object-key coercion, isolated vertices (empty & null neighbor lists, declared, as source), cross-shape oracle equivalence (seeded 2k), unrecognized-input + malformed-adjacency throws
   pathReconstruction.test.mjs # #169: 3 public-API tests — Dijkstra path oracle, unreachable/pre-run/source switching, target validation
   multiSource.test.mjs     # #171: 19 tests — calculateShortestPathsFrom: single-source equivalence, nearest-of-many + custom-d0 multi-source oracle, bounded pruning, all input shapes, reconstructPath/state-reset integration, validation
+  publicApi.test.mjs       # #173: 9 CONTRACT tests — pins the 4 exports + BMSSP/Graph supported members + constantDegreeTransform/dijkstra shapes; export/rename drift fails CI
   blockList.test.mjs      # #42: 25 BlockList tests incl. seeded random stress, #182 many-chunk/M=1 regression tests + #167 machinery tests
   boundIndex.test.mjs     # #167: 8 BoundIndex tests — sequence ops, monotone findFirst, AVL invariants under seeded churn
   select.test.mjs         # #167: 9 partitionByRank tests — every-rank contract, worst-case orderings, duplicates, determinism
@@ -117,11 +119,15 @@ examples/                 # standalone, copy-pasteable gallery — each file imp
   02-dijkstra-oracle.mjs  #   validate BMSSP against the exported `dijkstra` oracle (per-node table)
   03-constant-degree.mjs  #   the opt-in constantDegreeTransform (sourceCopy/collapse)
   04-larger-graph.mjs     #   a generated 40×40 grid — timing + oracle spot-check
-  run-all.mjs             #   runs all four in order (the Docker image's default CMD)
+  05-flexible-inputs.mjs  #   #172 surface: edge array / adjacency Map / object / Graph all equal + isolated vertex
+  06-multi-source.mjs     #   #171 surface: calculateShortestPathsFrom — nearest-of-many, custom d0, bounded pruning
+  run-all.mjs             #   runs all six in order (the Docker image's default CMD)
   README.md               #   gallery index + Docker run/override/mount recipes
-docs/index.html           # public-API reference (GitHub Pages via static.yml) — rewritten in
-                          # #166 from a stale landing page (wrong repo link, stray </svg>);
-                          # documents the three exports only, internals explicitly excluded
+docs/index.html           # public-API reference (GitHub Pages via static.yml); since #173
+                          # documents all FOUR exports (BMSSP, Graph, dijkstra,
+                          # constantDegreeTransform) + calculateShortestPathsFrom + advanced bmssp
+MIGRATION.md              # #173: 1.0 → 2.0 migration note (no breaking changes; the locked
+                          # public surface + what's now explicitly @internal), linked from README
 ```
 
 Tooling: Jest (`npm test`, needs `--experimental-vm-modules`, already in the `test` script),
@@ -244,6 +250,24 @@ distances are treated as the sources' true (complete) distances (the paper's pre
 trivially met by the common all-zero seeding). **Additive only** — `calculateShortestPaths`,
 `bmssp`, and `reconstructPath` are untouched, and node-ID / `[length, hops, id]` tie-break
 semantics are unchanged.
+
+**Public-API stabilization (#173, milestone-closing → 2.0.0).** A **documentation + contract
+lockdown**, no behavior change (user-confirmed: document-only boundary, no `#`-privatization).
+The class carries a class-level JSDoc enumerating the **supported public surface** — the
+constructor, `calculateShortestPaths`, `calculateShortestPathsFrom`, `bmssp(l,B,S)` (advanced
+primitive), `reconstructPath`, `getEdges`, and the public fields `shortestPaths` / `nodeIDs`
+/ `hops` / `preds` / `adjacency` / `graph` — with `@public`/`@internal` tags on the method
+JSDoc. Everything else (the dense-index engine: `csr`, `labels`, `ids`, `indexOf`,
+`bmsspIndex`, `syncLabelsIn/Out`, `boundToEngine`/`keyToPublic`, `normalizeSources`,
+`buildIndex`, `deriveParameters`, `k`/`t`/`topLevel`/`ties`) is `@internal` — may change in a
+minor. `index.mjs` exports exactly four names (`BMSSP`, `Graph`, `dijkstra`,
+`constantDegreeTransform`); the algorithm-internal modules stay unexported. `MIGRATION.md`
+records the 1.0→2.0 story (**no breaking changes** — #205/#172/#171 all landed additively, so
+2.0.0 is a stability commitment + feature consolidation), and `test/publicApi.test.mjs` pins
+the surface so export/rename drift fails CI. **Deferred (user-directed):** `this.graph` /
+`this.adjacency` stay public, so the #172/#206 direct-CSR construction perf lever is deferred
+to a new post-2.0 issue (Roadmap proposal); the raw `bmssp(l,B,S)` wrapper stays a documented
+advanced entrypoint.
 
 **`bmsspIndex(l, boundKey, S)` (#43):** level 0 delegates to `baseCase`. At level ≥ 1:
 `findPivots` shrinks the frontier; pivots seed a `BlockList(M = 2^((l-1)·t), boundKey,
@@ -647,6 +671,15 @@ every accepted shape. See §"Flexible inputs (#172)" for the per-shape contract.
   valid as a source reaching only itself); cross-shape **oracle equivalence** on a seeded
   2k sparse graph; and the failure modes — unrecognized top-level input, malformed
   adjacency entry, non-finite declared vertex, and the unchanged indexed edge-array messages.
+- `test/publicApi.test.mjs` (9, #173): the **CONTRACT test** locking the 2.0.0 public
+  surface. Asserts `index.mjs` exports exactly `{ BMSSP, Graph, constantDegreeTransform,
+  dijkstra }` and their kinds; the `BMSSP` prototype has every documented public method
+  (`calculateShortestPaths`, `calculateShortestPathsFrom`, `bmssp`, `reconstructPath`,
+  `getEdges`) and an instance carries the public fields (`shortestPaths`/`nodeIDs`/`hops`/
+  `preds`/`adjacency`/`graph`), with an end-to-end behavior smoke check; the `Graph` builder's
+  public methods + chaining/`toNormalized` shape; `constantDegreeTransform`'s locked return
+  keys; and `dijkstra`'s signature. Adding/removing/renaming any of these fails CI — the teeth
+  behind the document-only boundary.
 - `test/edgeCases.test.mjs` (9, #162): deterministic hand-built disconnection fixtures,
   each checked against a hand-computed full distance map **and** the Dijkstra oracle
   (Infinity entries included): self-loop-only source, sink source (adjacency keeps an
@@ -675,9 +708,9 @@ every accepted shape. See §"Flexible inputs (#172)" for the per-shape contract.
   (identical maps incl. Infinity → 0; wrong/missing entries counted); `runScenarioBenchmark`
   and `runComparisonCountBenchmark` on tiny injected scenarios return the expected columns
   with **zero mismatches**.
-- Current suite: **228 tests — 227 passing + 1 XL skipped by default** (#171 added the
-  19-test `multiSource.test.mjs`; #172 the 18-test `graph.test.mjs`; `bmssp.mjs`, `index.mjs`
-  and `graph.mjs` at 100%),
+- Current suite: **237 tests — 236 passing + 1 XL skipped by default** (#173 added the
+  9-test contract `publicApi.test.mjs`; #171 the 19-test `multiSource.test.mjs`; #172 the
+  18-test `graph.test.mjs`; `bmssp.mjs`, `index.mjs` and `graph.mjs` at 100%),
   ~100% statement coverage, ~7.5 s wall-clock (the #164 distance-preservation sweeps run
   BMSSP/Dijkstra from every source). No graph data files: every generated test graph comes
   from a seed; the #162 fixtures are hand-built and fully deterministic. The #205 dense-index
@@ -736,12 +769,14 @@ BMSSP-vs-Dijkstra head-to-head itself:
 | Relaxation micro-optimizations (allocation-free relaxEdge, unpacked routing, heap measurement) | `src/tieBreak.mjs` + `src/bmssp.mjs` + `src/baseCase.mjs` + `src/findPivots.mjs` | #168 | ✅ merged (PR #203, **minor → 1.2.0**, released 2026-07-21) |
 | Dense-index core: typed-array labels + CSR adjacency | `src/tieBreak.mjs` (makeLabels) + `src/bmssp.mjs` (buildIndex/CSR) + `src/baseCase.mjs` + `src/findPivots.mjs` | #205 | ✅ merged (PR #206, no bump — API-non-breaking) |
 | Typed / flexible graph inputs (Graph builder + adjacency Map/object + explicit vertex universe) | `src/graph.mjs` (new) + `src/bmssp.mjs` (constructor) + `index.mjs` (Graph export) + `test/graph.test.mjs` | #172 | ✅ merged (PR #208, no bump — mid-2.0.0) |
-| Public multi-source / bounded entrypoint (`calculateShortestPathsFrom`) | `src/bmssp.mjs` + `test/multiSource.test.mjs` | #171 | ✅ done-pending-merge (this PR, no bump — mid-2.0.0) |
+| Public multi-source / bounded entrypoint (`calculateShortestPathsFrom`) | `src/bmssp.mjs` + `test/multiSource.test.mjs` | #171 | ✅ merged (PR #209, no bump — mid-2.0.0) |
+| Public-API stabilization + 1.0→2.0 migration note | `src/bmssp.mjs` (JSDoc) + `MIGRATION.md` + `docs/index.html` + `examples/` + `test/publicApi.test.mjs` | #173 | ✅ done-pending-merge (this PR, **major → 2.0.0** — milestone-closing) |
 
 Milestones `1.1.0` (correctness hardening) and `1.2.0` (performance & ergonomics) are
 both **closed** — 1.2.0 released 2026-07-21 (npm + Docker Hub). Milestone `2.0.0`
-(API-breaking generalization) is current: **#205** (dense-index core, PR #206) and **#172**
-(typed/flexible inputs, PR #208) merged, and **#171** (public multi-source/bounded
-entrypoint) done-pending-merge (this PR, no bump), leaving **#173** — the last open issue,
-which closes the milestone with the **major → 2.0.0** bump (API stabilization + migration
-note + docs). See [06-milestones-roadmap.md](06-milestones-roadmap.md).
+(API-breaking generalization) is being closed by **this PR**: **#205** (dense-index core,
+PR #206), **#172** (typed/flexible inputs, PR #208), and **#171** (public multi-source/bounded
+entrypoint, PR #209) all merged (no bumps), and **#173** (this PR) stabilizes the public API
+surface and takes the **major → 2.0.0** bump. In practice the three generalizations landed
+additively, so 2.0.0 has **no breaking changes** on the documented surface — it is a stability
+commitment (see `MIGRATION.md`). See [06-milestones-roadmap.md](06-milestones-roadmap.md).

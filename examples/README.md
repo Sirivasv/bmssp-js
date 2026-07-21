@@ -20,6 +20,8 @@ node run-all.mjs
 | [`02-dijkstra-oracle.mjs`](02-dijkstra-oracle.mjs) | Validating BMSSP against the exported reference `dijkstra` oracle |
 | [`03-constant-degree.mjs`](03-constant-degree.mjs) | The opt-in, distance-preserving `constantDegreeTransform` |
 | [`04-larger-graph.mjs`](04-larger-graph.mjs) | Building a larger grid graph programmatically and timing a run |
+| [`05-flexible-inputs.mjs`](05-flexible-inputs.mjs) | The four accepted input shapes (edge array / adjacency `Map` / object / `Graph` builder) and isolated vertices |
+| [`06-multi-source.mjs`](06-multi-source.mjs) | `calculateShortestPathsFrom()` — nearest-of-many, custom initial distances, and bounded runs |
 | [`run-all.mjs`](run-all.mjs) | Runs every example above in order |
 
 ## Running without installing (Docker)

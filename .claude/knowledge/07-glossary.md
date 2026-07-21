@@ -375,9 +375,21 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
   sentinels in every `npm run bench` (`star`, `sparse-random-l4`).
 - **Docs page (#166)** — `docs/index.html`, the GitHub-Pages-published public-API reference
   (deployed by `static.yml` on `docs/**` changes). Documents the `index.mjs`
-  exports — `BMSSP` (constructor contract, `calculateShortestPaths`, `reconstructPath`),
-  `dijkstra`, `constantDegreeTransform` — and explicitly keeps algorithm internals out.
-  Static, dependency-free HTML. **Note:** the #172 `Graph` export + flexible-input surface
-  and the #171 `calculateShortestPathsFrom` multi-source/bounded entrypoint are **not yet on
-  this page** — they reach npm only with the 2.0.0 release, and the docs pass is folded into
-  #173 (migration note + public-surface doc); tracked in the Roadmap proposals.
+  exports. **Rewritten in #173** to document all **four** exports — `BMSSP` (flexible-input
+  constructor, `calculateShortestPaths`, `calculateShortestPathsFrom`, advanced `bmssp`,
+  `reconstructPath`, `getEdges`), `Graph`, `dijkstra`, `constantDegreeTransform` — with the
+  supported-surface contract stated up front (links to `MIGRATION.md` + the `examples/`
+  gallery) and algorithm internals + the dense-index engine members explicitly excluded.
+  Static, dependency-free HTML; the stale "~1M comparison crossover" line was corrected to
+  <50k.
+- **`MIGRATION.md` (#173)** — the 1.0 → 2.0 migration note at the repo root, linked from
+  `README.md`. Records that 2.0.0 has **no breaking changes** on the documented public surface
+  (#205/#172/#171 all landed additively → 2.0.0 is a stability commitment + feature
+  consolidation), lists the locked public API (4 exports + the supported `BMSSP` members), and
+  enumerates what is now explicitly `@internal` (the engine members + unexported modules).
+- **Public-API contract (#173)** — the 2.0.0 supported surface, enforced two ways: JSDoc
+  `@public`/`@internal` tags on the `BMSSP` class (documentation) and `test/publicApi.test.mjs`
+  (a contract test pinning the 4 exports + supported members, so export/rename drift fails CI).
+  User-confirmed **document-only** enforcement — no `#`-privatization (tests drive internals),
+  `this.graph`/`this.adjacency` kept public (direct-CSR perf lever deferred), raw `bmssp(l,B,S)`
+  kept as an advanced public entrypoint.

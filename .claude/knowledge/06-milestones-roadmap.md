@@ -1,11 +1,13 @@
 # 06 — Milestones Roadmap
 
-<!-- SYNCED-FROM-GITHUB: 2026-07-21 (Phase C of the #171 PR, branch
-     feat/171-multi-source-entrypoint, based on main 6cab602): 1.2.0 CLOSED; 2.0.0 open,
-     2 closed (#205, #172) + 2 open (#171/#173). #171 done-pending-merge this PR (no bump,
-     mid-2.0.0), leaving #173 as the milestone-closing issue (major → 2.0.0). -->
-<!-- Current package version: 1.2.0 — released 2026-07-21 (tag + GitHub Release with
-     Announcements discussion → npm + Docker Hub via publish.yml); tag matches -->
+<!-- SYNCED-FROM-GITHUB: 2026-07-21 (Phase C of the #173 PR, branch feat/173-stabilize-public-api,
+     based on main d56bc86): 1.2.0 CLOSED; 2.0.0 open, 3 closed (#205, #172, #171) + 1 open
+     (#173). #173 done-pending-merge this PR (public-API stabilization, **major → 2.0.0**) —
+     the milestone-closing issue; on merge + release, milestone 2.0.0 closes. -->
+<!-- Current package version: 2.0.0 — BUMPED in the #173 PR (npm version major), NOT yet
+     released. Latest tag is 1.2.0. On merge, Phase 2 tags 2.0.0 + GitHub Release (with
+     Announcements discussion) → npm + Docker Hub via publish.yml. Until then this is a
+     bumped-but-untagged version (Phase A step 5 surfaces it). -->
 <!-- Release-discussion convention (user-directed 2026-07-21): every GitHub Release also
      creates a linked discussion — pass --discussion-category "Announcements" to
      gh release create (the UI's "Create a discussion for this release" checkbox) -->
@@ -44,27 +46,40 @@ it runs the same Phase C reconciliation directly on `main`.
 
 ## 📋 Roadmap proposals (pending user approval)
 
-**#171 PR (this PR) — one proposal:**
+**#173 PR (this PR, milestone-closing) — proposals:**
 
-1. **Comment on #173** (API stabilization, the milestone-closing issue) recording the
-   #171-derived decisions it must resolve, now that the public multi-source surface exists:
-   - #171 shipped `calculateShortestPathsFrom` as **additive** (write-to-Map, returns nothing)
-     rather than taking the "may change existing signatures" latitude the #171 body mentioned —
-     so #173 owns every remaining breaking decision. Decide the **public/private split** for
-     the now-plain-method interior (`bmssp(l,B,S)`, `bmsspIndex`, `syncLabelsIn/Out`,
-     `boundToEngine`/`keyToPublic`, `normalizeSources`) — should the raw `bmssp` wrapper stay
-     public or move behind a private boundary?
-   - Document `calculateShortestPathsFrom` in the **migration note + `docs/index.html`** as a
-     public export alongside `Graph` (#172): its flexible `sources` shapes and the
-     **bounded-run pruning semantic** (finite `B` exposes only the completed set `U`).
-   - Consider whether to surface the richer `{ bound, vertices }` result #171 **discarded**
-     (write-to-Map was chosen for parallelism with `calculateShortestPaths`) — e.g. an
-     optional return or a companion method — as part of finalizing the 2.0 surface.
+1. **Close milestone `2.0.0`** — #173 is its last open issue; on this PR's merge + the 2.0.0
+   release, the milestone is complete (4/4: #205, #172, #171, #173).
+2. **Create a new issue: "Direct-CSR construction — skip the edge-list round-trip."** The
+   #172/#206 perf lever, deferred again by #173's user-confirmed decision to keep
+   `this.graph` / `this.adjacency` public (tests + `main.test.mjs` depend on them). Building
+   the index/CSR straight from the input — bypassing the `[from,to,weight]` copy — needs those
+   fields to become lazy/derived or private, i.e. a breaking change. So it is a **3.0 / future-
+   major** candidate (or a carefully non-breaking lazy-getter approach in a minor). Needs a
+   home milestone — see proposal 4.
+3. **(Optional) Create a small enhancement issue: "Richer multi-source return."** #171 chose
+   write-to-Map / returns-nothing for `calculateShortestPathsFrom`; the internal wrapper still
+   produces `{ bound, vertices }`. Surfacing it (an optional return or companion method) is a
+   purely additive future enhancement — file only if the user wants it tracked.
+4. **Decide the next milestone direction with the user.** 2.0.0 is the last defined milestone;
+   the core algorithm is feature-complete. Natural next buckets: a **performance** milestone
+   (direct-CSR construction + further engine work) and/or an **ergonomics/polish** one. Propose
+   creating one milestone (name/number TBD with the user) to host proposals 2–3, rather than
+   leaving them unmilestoned.
 
-   _(No new issues and no milestone re-slicing: 2.0.0 is on track with **#173 the only issue
-   left**; #171's substrate is exactly what #173 stabilizes.)_
+_These are Phase E gated GitHub writes — execute only after the user confirms the merge, one
+confirmation per edit._
 
 _Previously executed proposals (kept for provenance):_
+
+_(The #171-PR proposal (PR #209) — a single comment on **#173** recording the #171-derived
+decisions it must resolve now that the public multi-source surface exists (the public/private
+split for the now-plain-method interior incl. whether the raw `bmssp(l,B,S)` wrapper stays
+public; documenting `calculateShortestPathsFrom` + its flexible `sources` shapes and
+bounded-run pruning semantic in the migration note / `docs/index.html` alongside `Graph`; and
+whether to surface the richer `{ bound, vertices }` result #171 discarded) — was approved and
+executed 2026-07-21: comment posted on #173. No new issues and no milestone re-slicing —
+2.0.0 is on track with **#173 the only issue left**.)_
 
 _(The #172-PR proposals (PR #208) — scope-summary comment on closed **#172** (flexible-input
 surface shipped; direct-CSR construction perf lever deferred because `this.graph` /
@@ -267,8 +282,8 @@ executed 2026-07-17.)_
   because `this.graph` (and `this.adjacency`) are public, tested fields that must be
   populated regardless; removing them to build CSR directly is a breaking change better
   owned by **#173** (API stabilization). See Roadmap proposals.
-- **#171 done-pending-merge (this PR, no bump — mid-2.0.0):** public multi-source /
-  bounded entrypoint. `BMSSP.calculateShortestPathsFrom(sources, { bound })` is a thin,
+- **#171 merged (PR #209, 2026-07-21, commit d56bc86; no bump — mid-2.0.0):** public
+  multi-source / bounded entrypoint. `BMSSP.calculateShortestPathsFrom(sources, { bound })` is a thin,
   ergonomic surface over the existing `bmssp(topLevel, B, S)` wrapper — it hides the
   recursion level and the "seed `this.shortestPaths` first" ritual the fuzz suite uses
   directly. `sources` accepts a `Map<id,dist>`, object `{id:dist}`, array of `[id,dist]`
@@ -282,7 +297,23 @@ executed 2026-07-17.)_
   `multiSource.test.mjs` (single-source equivalence, nearest-of-many + custom-`d0`
   multi-source oracle, bounded pruning, all input shapes, integration, validation); suite
   228 (227 + 1 XL skip), `bmssp.mjs` 100%, lint clean. **#173 is the only 2.0.0 issue
-  left** (milestone-closing, major → 2.0.0). One Roadmap proposal (comment on #173).
+  left** (milestone-closing, major → 2.0.0). Roadmap proposal (comment on #173 recording the
+  API-stabilization decisions #171 hands off) was approved and posted 2026-07-21.
+- **#173 done-pending-merge (this PR, major → 2.0.0 — milestone-closing):** public-API
+  stabilization, a **documentation + contract lockdown** with no behavior change.
+  User-confirmed decisions (2026-07-21): **document-only** boundary (JSDoc `@public`/
+  `@internal`, no `#`-privatization — the fuzz/baseCase/findPivots/tieBreak suites drive
+  internals); **keep `this.graph`/`this.adjacency` public** (direct-CSR construction perf
+  lever deferred to a new post-2.0 issue — Roadmap proposal 2); **keep raw `bmssp(l,B,S)`**
+  as a documented *advanced* public entrypoint. Deliverables: class-level JSDoc enumerating
+  the supported surface + `@public`/`@internal` tags; `MIGRATION.md` (1.0→2.0, **no breaking
+  changes** — #205/#172/#171 were additive, so 2.0.0 is a stability commitment + feature
+  consolidation); rewritten `docs/index.html` (all four exports + `calculateShortestPathsFrom`
+  + advanced `bmssp`; stale ~1M crossover claim corrected to <50k); two new examples
+  (`05-flexible-inputs`, `06-multi-source`) wired into `run-all`; and `test/publicApi.test.mjs`
+  (9 contract tests pinning the surface). **major → 2.0.0** (`npm version major`). Suite 237
+  (236 + 1 XL skip), lint clean. Roadmap proposals: close milestone 2.0.0, file the deferred
+  direct-CSR perf issue, and decide the next-milestone direction with the user (Phase E).
 - **Examples + Docker refresh (PR #207 merged, 2026-07-21, commit 50faa4a;
   user-directed, no issue, no bump):** the stale single `examples/main.mjs` (it only
   printed the raw edge list — never ran the algorithm) is replaced by a standalone gallery
@@ -361,8 +392,8 @@ _Note:_ both #182 shapes stay as regression sentinels in every `npm run bench` (
 ## Milestone `2.0.0` (milestone #4) — API-breaking generalization — CURRENT
 
 Build order (derived 2026-07-21 at RKB, after 1.2.0 closed): ~~#205~~
-(merged, PR #206) → ~~#172~~ (merged, PR #208) → ~~#171~~ (done-pending-merge, this PR) →
-**#173**. Rationale:
+(merged, PR #206) → ~~#172~~ (merged, PR #208) → ~~#171~~ (merged, PR #209) →
+~~#173~~ (done-pending-merge, this PR, **major → 2.0.0**). Rationale:
 the dense-index engine (#205) decides the internal shapes every new API wraps, so it went
 first; typed/flexible inputs (#172) generalized the constructor surface over it; the public
 multi-source entrypoint (#171) is designed value-in/value-out over the finished engine and
@@ -373,8 +404,8 @@ the surface last and takes the **major → 2.0.0** bump as the milestone-closing
 |---|---|---|---|
 | 205 | Dense-index core: typed-array labels + CSR adjacency | enhancement | ✅ merged (PR #206, no bump — API-non-breaking): sorted-id index + CSR + typed labels; wall-clock ~halved (sparse head-to-head 2.5× → 1.38×), counts unchanged |
 | 172 | Typed / flexible graph inputs | enhancement · help wanted | ✅ merged (PR #208, no bump): `Graph` builder + adjacency Map/object inputs + explicit declarable vertex universe, reduced via `normalizeGraphInput`; node-ID semantics unchanged. Deferred the direct-CSR construction perf lever to #173 (coupled to public `this.graph`) |
-| 171 | Public multi-source / bounded BMSSP entrypoint | enhancement · help wanted | ✅ done-pending-merge (this PR, no bump): `calculateShortestPathsFrom(sources, { bound })` — additive surface over the `bmssp(l,B,S)` wrapper, flexible `sources` shapes + finite-bound pruning to the completed set `U`. Breaking-signature latitude deferred to #173 |
-| 173 | Stabilize the public API surface for 1.0 → 2.0 | documentation · enhancement | **NEXT / milestone-closing**: per-module public/private decision (incl. whether the raw `bmssp(l,B,S)` wrapper stays public, and whether `this.graph`/`this.adjacency` stay public — the deferred #172 direct-CSR lever), migration note + `Graph`/`calculateShortestPathsFrom` docs, **major → 2.0.0** |
+| 171 | Public multi-source / bounded BMSSP entrypoint | enhancement · help wanted | ✅ merged (PR #209, no bump): `calculateShortestPathsFrom(sources, { bound })` — additive surface over the `bmssp(l,B,S)` wrapper, flexible `sources` shapes + finite-bound pruning to the completed set `U`. Breaking-signature latitude deferred to #173 |
+| 173 | Stabilize the public API surface for 1.0 → 2.0 | documentation · enhancement | ✅ done-pending-merge (this PR, **major → 2.0.0** — milestone-closing): document-only boundary (`@public`/`@internal` JSDoc + `test/publicApi.test.mjs` contract test), `MIGRATION.md` (no breaking changes), rewritten `docs/index.html`, `05-flexible-inputs`/`06-multi-source` examples. Kept `this.graph`/`this.adjacency` + raw `bmssp` public; direct-CSR perf lever deferred to a new post-2.0 issue |
 
 _Note after #43:_ `bmssp(l, B, S)` already **is** a bounded multi-source call internally —
 #171 is mostly about designing the public API around it (initial per-source distances,
