@@ -1,7 +1,8 @@
 # 07 — Glossary
 
-<!-- Updated on: 2026-07-20 (terms last extended in the #165 PR: the constructor input
-     contract for graph shape, node IDs, weights, and empty graphs) -->
+<!-- Updated on: 2026-07-21 (terms last extended in the #164 PR: the constant-degree
+     transform — port copies, zero-weight cycle, constantDegreeTransform and its
+     sourceCopy/collapse/copiesOf/originalOf surface) -->
 
 > **Lifecycle: dynamic — updated in Phase C of every PR.** When a PR introduces new symbols
 > or terms (module names, data-structure fields, paper notation newly used in code), add
@@ -57,6 +58,13 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
   (`B' < B`, returns only vertices below `B'`).
 - **Constant-degree transform** — reduces any graph to in/out-degree ≤ 2 by splitting each
   vertex into a zero-weight cycle. Needed for the paper's bounds; optional in practice.
+  Implemented in `src/constantDegree.mjs` (#164) — see "`constantDegreeTransform`" below.
+- **Port copy** (#164) — one copy of a vertex created per incident edge endpoint by the
+  constant-degree transform. Each port copy hosts exactly one original edge endpoint, so
+  threading the copies onto a zero-weight cycle caps in/out-degree at 2.
+- **Zero-weight cycle** (#164) — the directed cycle of a vertex's port copies added by the
+  transform; costs nothing to traverse, so all copies of a vertex share one distance, making
+  the transform distance-preserving.
 - **BaseCase / FindPivots / BMSSP** — Algorithm 2 / Algorithm 1 / Algorithm 3. See §02.
 - **BlockList (`D`)** — Lemma 3.3 semi-sorted structure. See §03-B.
 - **Oracle** — the reference `dijkstra()` in `src/dijkstra.mjs`; ground truth for tests.
@@ -70,6 +78,16 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
   `[from, to, weight]` arrays. Both node IDs and the weight must be finite numbers, and the
   weight must be non-negative; failures identify the offending edge index. `[]` remains a
   valid empty graph, whose `calculateShortestPaths()` call rejects every start node.
+- **`constantDegreeTransform(graph)`** (#164) — `src/constantDegree.mjs`, the opt-in
+  constant-degree transform. Validates `graph` exactly like the BMSSP constructor, then
+  returns `{ edges, copiesOf, originalOf, sourceCopy, collapse }`: `edges` is the rewritten
+  in/out-degree-≤-2 graph (fresh integer copy IDs from 0, ~2m copies / ~3m edges, O(m));
+  `copiesOf` maps an original ID to its port copies and `originalOf` is the inverse;
+  `sourceCopy(orig)` returns a canonical start copy (any works — the zero-weight cycle
+  equalizes them); `collapse(distances)` folds a transformed distance map back onto original
+  IDs (min over a vertex's copies). **Public** — re-exported from `index.mjs` (unlike the
+  algorithm-internal modules). Correctness-independent: BMSSP never calls it. Usage:
+  `const t = constantDegreeTransform(g); …run from t.sourceCopy(s)…; t.collapse(dist)`.
 - **`adjacency`** (#45) — `Map<nodeId, Array<[to, weight]>>` field on the `BMSSP` class:
   a node's outgoing edges, so lookups are O(1) instead of scanning the whole edge array.
   Every known node has an entry (empty array for sinks). Built in the constructor.

@@ -33,6 +33,7 @@ with every building block shipped, tested, and released individually:
 | Deterministic tie-breaking — Assumption 2.1 realized ([#163](https://github.com/Sirivasv/bmssp-js/issues/163)) | `src/tieBreak.mjs` | ✅ done |
 | Shortest-path reconstruction ([#169](https://github.com/Sirivasv/bmssp-js/issues/169)) | `BMSSP.reconstructPath()` | ✅ done |
 | Constructor input validation ([#165](https://github.com/Sirivasv/bmssp-js/issues/165)) | `BMSSP` constructor | ✅ done |
+| Opt-in constant-degree transform, in/out-degree ≤ 2 ([#164](https://github.com/Sirivasv/bmssp-js/issues/164)) | `constantDegreeTransform()` | ✅ done |
 
 > **Honest note:** the paper's win is asymptotic, and this repo optimizes for correctness
 > and readability, not raw speed. Measured head-to-head (algorithm time only, graph
@@ -96,6 +97,32 @@ when the target is unreachable (or before any run) and throws for a node outside
 A reference `dijkstra` implementation is also exported. See the `examples/` directory for
 more.
 
+### Optional: constant-degree transform
+
+The paper's bound assumes every vertex has in-degree and out-degree ≤ 2. That preprocessing
+is **not** required for correctness here — BMSSP is validated on arbitrary graphs — but it is
+available opt-in via `constantDegreeTransform`, which rewrites any graph into that shape by
+splitting each vertex into a zero-weight cycle of "port" copies. The rewrite is
+distance-preserving, so you run on the transformed graph and fold the result back onto your
+original node IDs:
+
+```javascript
+import { BMSSP, constantDegreeTransform } from "bmssp";
+
+const t = constantDegreeTransform([
+  [0, 1, 50],
+  [0, 2, 25],
+  [1, 2, 75],
+]);
+
+const g = new BMSSP(t.edges); // every node now has in/out-degree ≤ 2
+g.calculateShortestPaths(t.sourceCopy(0)); // start from a copy of original node 0
+console.log(t.collapse(g.shortestPaths)); // Map(3) { 0 => 0, 1 => 50, 2 => 25 }
+```
+
+`collapse` maps the transformed graph's distances back to the original node IDs; `sourceCopy`
+picks a valid start copy for an original node.
+
 ### Using the Docker image
 
 Run the bundled example:
@@ -141,7 +168,7 @@ graphs in a few seconds), and set `FUZZ_XL=1` for an additional 2-million-node r
 | Milestone | Theme | Status |
 | --- | --- | --- |
 | [`1.0.0`](https://github.com/Sirivasv/bmssp-js/milestones) | First end-to-end functional BMSSP (issues #40–#45) | ✅ done |
-| `1.1.0` | Correctness hardening — fuzz tests, edge cases, tie-breaking, input validation | 🔨 current focus |
+| `1.1.0` | Correctness hardening — fuzz tests, edge cases, tie-breaking, input validation, constant-degree transform | 🔨 current focus |
 | `1.2.0` | Performance & ergonomics — exact Lemma 3.3 asymptotics, path reconstruction, BMSSP-vs-Dijkstra benchmarks | 🔨 in progress |
 | `2.0.0` | API generalization — public multi-source/bounded entry point, flexible inputs | planned |
 
