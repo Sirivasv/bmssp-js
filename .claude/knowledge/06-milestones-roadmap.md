@@ -1,8 +1,8 @@
 # 06 — Milestones Roadmap
 
-<!-- SYNCED-FROM-GITHUB: 2026-07-19 (#163 closed by merged PR #188; milestones
-     1.1.0/1.2.0/2.0.0 open with 3/5/3 open issues; #169 done-pending-merge in this PR) -->
-<!-- Current package version: 1.0.1 (released 2026-07-16; the #169 PR ships no bump under
+<!-- SYNCED-FROM-GITHUB: 2026-07-20 (#169 closed by merged PR #189; milestones
+     1.1.0/1.2.0/2.0.0 open with 3/4/3 open issues; #165 done-pending-merge in this PR) -->
+<!-- Current package version: 1.0.1 (released 2026-07-16; the #165 PR ships no bump under
      the semver convention — mid-milestone enhancement, milestone still open) -->
 
 Maps GitHub **milestones** and **issues** (Sirivasv/bmssp-js) to the paper's building blocks,
@@ -39,12 +39,10 @@ it runs the same Phase C reconciliation directly on `main`.
 
 ## 📋 Roadmap proposals (pending user approval)
 
-From the #169 PR (Phase C, 2026-07-19): **none.** The live #169 description was already
-re-scoped after #163 to exactly the public `reconstructPath(target)` API and path-oracle
-tests implemented here. The other learning from #163 — composite-key allocation and
-comparison overhead — is already recorded by the maintainer on #168. This PR does not
-change the remaining milestone slicing, dependencies, or release cadence, so no further
-GitHub edit is warranted.
+From the #165 PR (Phase C, 2026-07-20): **none.** The implementation follows the live issue
+exactly and preserves the empty-graph behavior already clarified by the maintainer after
+#162. It does not change the scope or dependencies of #164 or #166, the remaining 1.1.0
+work, so no further GitHub edit is warranted.
 
 _Phase C writes proposed GitHub edits here (and in the PR body); Phase E executes the
 approved ones — one confirmation each — and clears them from this list._
@@ -71,16 +69,18 @@ executed 2026-07-17.)_
   and dates preserved), `main` + all 21 tags force-pushed with ruleset 7764713
   temporarily disabled. **All commit SHAs before 2026-07-17 changed**; old SHAs in
   closed PRs/issues no longer resolve. Repo-local git config now signs future commits.
-- **Milestone `1.1.0` — correctness hardening** (in progress). #162 merged (PR #187) and
-  #163 merged (PR #188): `src/tieBreak.mjs` composite `[length, hops, id]`
+- **Milestone `1.1.0` — correctness hardening** (in progress). #162 merged (PR #187),
+  #163 merged (PR #188), and **#165 done-pending-merge** (this PR): constructor input
+  validation rejects malformed edges, non-numeric node IDs, and invalid weights while
+  preserving empty-graph construction. `src/tieBreak.mjs` composite `[length, hops, id]`
   keys realize Assumption 2.1 end-to-end — canonical relaxation (d̂/hops/preds in
   lockstep), strict pull separators, all pre-#163 tie guards removed (incl. the stall
   escape hatch), strict Lemma 3.1 restored, full edge-order determinism proven by test.
-  No bump. Next: **#165** (input validation), then #164, #166.
-- **Milestone `1.2.0` — performance & ergonomics** (in progress). **#169
-  done-pending-merge** (this PR): public `BMSSP.reconstructPath(target)` walks the existing
-  canonical predecessor map, with independent path-oracle coverage and public usage docs.
-  No bump; four other issues remain after this PR.
+  No bump. Next: #164, then #166.
+- **Milestone `1.2.0` — performance & ergonomics** (in progress). **#169 merged**
+  (PR #189): public `BMSSP.reconstructPath(target)` walks the existing canonical
+  predecessor map, with independent path-oracle coverage and public usage docs. Four
+  issues remain.
 - **Semver release convention (user-directed 2026-07-17, PR #186):** bumps only on bug
   fix (patch) or milestone-closing PR (minor/major) — see "Release mechanics" below.
 - **2026-07-16 reflection session (post-release):** measured the BMSSP-vs-Dijkstra
@@ -121,7 +121,7 @@ Recommended order (cheapest protection first, then the deep work):
 | 1 | 161 | Property/fuzz tests: BMSSP vs Dijkstra on random graphs | enhancement · help wanted | ✅ merged (PR #184, 1.0.1) |
 | 2 | 162 | Edge-case tests: disconnected graphs and unreachable nodes | enhancement · help wanted | ✅ merged (PR #187, no bump) |
 | 3 | 163 | Deterministic tie-breaking for equal-length paths (Assumption 2.1) | enhancement · help wanted | ✅ merged (PR #188, no bump): composite keys in `src/tieBreak.mjs`, all six tie manifestations resolved by construction |
-| 4 | 165 | Input validation for the BMSSP constructor | good first issue · help wanted | — |
+| 4 | 165 | Input validation for the BMSSP constructor | good first issue · help wanted | ✅ done-pending-merge (this PR, no bump): validates graph shape, node IDs, and weights; preserves empty graphs |
 | 5 | 164 | Optional constant-degree transform (in/out-degree ≤ 2) | enhancement · help wanted | — |
 | 6 | 166 | JSDoc / API docs for the new modules | documentation · good first issue | `bmssp()` / `deriveParameters()` ship with JSDoc already |
 
@@ -131,7 +131,7 @@ Recommended order (cheapest protection first, then the deep work):
 |---|---|---|---|
 | 167 | Restore Lemma 3.3's exact asymptotics in BlockList (balanced-BST bound index + linear-time selection) | enhancement · help wanted | — |
 | 168 | Adjacency and relaxation micro-optimizations | enhancement · help wanted | — |
-| 169 | Optional shortest-path reconstruction (`Pred[]` → paths) | enhancement · help wanted | ✅ done-pending-merge (this PR, no bump): public API + independent path oracle |
+| 169 | Optional shortest-path reconstruction (`Pred[]` → paths) | enhancement · help wanted | ✅ merged (PR #189, no bump): public API + independent path oracle |
 | 170 | BMSSP-vs-Dijkstra benchmark comparison | enhancement · help wanted | — |
 | 182 | Investigate BMSSP performance cliffs: high-fanout (star) graphs and recursion-level transitions | enhancement · help wanted | — |
 

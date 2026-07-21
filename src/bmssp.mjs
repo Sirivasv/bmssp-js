@@ -11,6 +11,10 @@ import {
 
 class BMSSP {
   constructor(inputGraph) {
+    if (!Array.isArray(inputGraph)) {
+      throw new Error("Input graph must be an array of edges");
+    }
+
     // Main graph represented as an array of edges
     this.graph = [];
     // Set to store unique node IDs
@@ -29,7 +33,21 @@ class BMSSP {
     this.preds = new Map();
     this.ties = makeTies(this.hops, this.preds);
 
-    for (let edge of inputGraph) {
+    for (let [index, edge] of inputGraph.entries()) {
+      if (!Array.isArray(edge) || edge.length !== 3) {
+        throw new Error(`Edge at index ${index} must be [from, to, weight]`);
+      }
+
+      const [from, to, weight] = edge;
+      if (!Number.isFinite(from) || !Number.isFinite(to)) {
+        throw new Error(`Edge at index ${index} must have numeric node IDs`);
+      }
+      if (!Number.isFinite(weight) || weight < 0) {
+        throw new Error(
+          `Edge at index ${index} must have a non-negative numeric weight`,
+        );
+      }
+
       // Create a deep copy of each edge array
       this.graph.push([...edge]);
 
