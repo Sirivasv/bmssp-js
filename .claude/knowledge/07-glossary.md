@@ -1,9 +1,9 @@
 # 07 — Glossary
 
-<!-- Updated on: 2026-07-21 (#167 PR: BoundIndex, partitionByRank, introselect; the
-     "Bound index shortcut" entry rewritten as resolved; comparison-count crossover
-     entry updated to the post-#167 <50k figure. Previous update the same day: #166 PR
-     added the "Docs page" repo term) -->
+<!-- Updated on: 2026-07-21 (#168 PR: compareKeyParts + RELAX_* codes; relaxEdge,
+     re-enqueue-signal and indexed-vs-lazy-heap entries updated to the new contract /
+     measurement. Previous update the same day: #167 PR added BoundIndex,
+     partitionByRank, introselect) -->
 
 > **Lifecycle: dynamic — updated in Phase C of every PR.** When a PR introduces new symbols
 > or terms (module names, data-structure fields, paper notation newly used in code), add
@@ -141,7 +141,10 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
   swap; what makes `has`/`getValue` O(1) and `decreaseKey` O(log n).
 - **Indexed vs. lazy heap** — `MinHeap` is the paper-literal *indexed* variant (true
   `DecreaseKey`); `src/dijkstra.mjs` internally uses the *lazy* variant (push duplicates,
-  skip stale pops). Both are correct; §03-A discusses the trade-off.
+  skip stale pops). Both are correct; §03-A discusses the trade-off. **Resolved by
+  measurement in #168:** lazy wins an isolated BaseCase micro-benchmark, but BaseCase
+  heaps are capped at k+1 ≈ 4 entries and never register in end-to-end profiles, so the
+  indexed paper-literal `MinHeap` is kept.
 - **`baseCase(B, S, dHat, adjacency, k)`** (#40) — `src/baseCase.mjs`, Algorithm 2:
   bounded mini-Dijkstra from the singleton complete source in `S`, settling at most `k+1`
   vertices, relaxing the shared `dHat` (`d̂[·]`) **in place** (canonically, with an optional
@@ -192,13 +195,25 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
   "#vertices" tie-break — zero-weight extensions strictly increase it), `id` = pred id in
   relaxation / own id in frontier order (O(1) stand-in for the paper's vertex-sequence
   comparison). Realizes Assumption 2.1: all frontier comparisons strict.
-- **Canonical label / relaxation** (#163) — `relaxEdge(u, v, w, dHat, ties, bound?)`
-  updates `d̂`/`hops`/`preds` together iff the candidate path key beats the stored one;
-  the fixed point is the lexicographic minimum over all paths, so labels, predecessor
-  pointers and completed sets are invariant under edge/iteration order (tested in
-  `test/tieBreak.test.mjs` against an O(n²) lexicographic Dijkstra oracle).
-- **Re-enqueue signal** (#163) — `relaxEdge`'s `improved: false` result: the candidate
-  exactly matches `v`'s stored label, meaning `u` is the recorded label-setter and `v` was
+- **Canonical label / relaxation** (#163, allocation-free since #168) —
+  `relaxEdge(u, v, w, dHat, ties, bound?)` updates `d̂`/`hops`/`preds` together iff the
+  candidate path key beats the stored one; the fixed point is the lexicographic minimum
+  over all paths, so labels, predecessor pointers and completed sets are invariant under
+  edge/iteration order (tested in `test/tieBreak.test.mjs` against an O(n²)
+  lexicographic Dijkstra oracle). Since #168 it returns one of three integer codes —
+  `RELAX_IMPROVED` / `RELAX_EQUAL` / `RELAX_LOST` — and allocates nothing; a caller
+  that enqueues `v` materializes its key with `orderKey` on that path only.
+- **`compareKeyParts(length, hops, id, key)`** (#168) — `src/tieBreak.mjs`: compareKeys
+  with the left key unpacked into its components, so the hot relax/routing loops can
+  test a stored label against a band bound without building a throwaway array. Same
+  lexicographic order, counts as one comparison (agreement with `compareKeys` swept in
+  `test/tieBreak.test.mjs`).
+- **`RELAX_LOST` / `RELAX_EQUAL` / `RELAX_IMPROVED`** (#168) — `relaxEdge`'s result
+  codes (−1 / 0 / 1): candidate lost or bound-gated (labels untouched) / candidate
+  exactly matches v's canonical label (the re-enqueue signal) / labels updated.
+  Compare against the constants, not truthiness — `RELAX_EQUAL` is 0.
+- **Re-enqueue signal** (#163; `RELAX_EQUAL` since #168) — the candidate exactly
+  matches `v`'s stored label, meaning `u` is the recorded label-setter and `v` was
   labeled by a deeper call without being completed. The caller re-enqueues `v` unless it
   is already settled/completed — the paper's `≤` relaxation made canonical, firing from
   exactly one predecessor.

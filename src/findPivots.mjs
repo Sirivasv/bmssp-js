@@ -1,4 +1,10 @@
-import { compareKeys, toBound, makeTies, relaxEdge } from "./tieBreak.mjs";
+import {
+  compareKeyParts,
+  toBound,
+  makeTies,
+  relaxEdge,
+  RELAX_LOST,
+} from "./tieBreak.mjs";
 
 /**
  * FindPivots(B, S) — Algorithm 1 of "Breaking the Sorting Barrier for Directed
@@ -75,12 +81,21 @@ function findPivots(B, S, dHat, adjacency, k, ties = makeTies()) {
   for (let i = 1; i <= rounds; i += 1) {
     const nextLayer = new Set();
     for (const u of layer) {
-      for (const [v, weight] of adjacency.get(u) ?? []) {
+      const edges = adjacency.get(u);
+      if (edges === undefined) continue;
+      for (let j = 0; j < edges.length; j += 1) {
+        const edge = edges[j];
+        const v = edge[0];
         // Canonical relaxation: d̂ updates are not gated by B (paper), and
         // both improvements and exact canonical equality admit v to the
-        // next layer when its key is below B
-        const relaxed = relaxEdge(u, v, weight, dHat, ties);
-        if (relaxed !== null && compareKeys(relaxed.key, boundKey) < 0) {
+        // next layer when its key is below B. Non-lost ⇒ v's stored label
+        // is the candidate, so the W gate compares the unpacked stored
+        // components — no key allocation (#168).
+        const result = relaxEdge(u, v, edge[1], dHat, ties);
+        if (
+          result !== RELAX_LOST &&
+          compareKeyParts(dHat.get(v), ties.hops.get(v) ?? 0, v, boundKey) < 0
+        ) {
           nextLayer.add(v);
         }
       }

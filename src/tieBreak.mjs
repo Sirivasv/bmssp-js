@@ -79,6 +79,26 @@ function compareKeys(a, b) {
 }
 
 /**
+ * Lexicographic comparison of an UNPACKED key (length, hops, id) against a
+ * packed one — identical order to compareKeys without materializing the
+ * left-hand array (#168: the hot relax/routing loops call this instead of
+ * allocating a throwaway key per test). Counts as one comparison.
+ * @param {number} length - Left key's length component
+ * @param {number} hops - Left key's hops component
+ * @param {*} id - Left key's id component
+ * @param {[number, number, *]} key - Right key, packed
+ * @returns {number} Negative when (length, hops, id) < key, positive when
+ *   greater, 0 when equal
+ */
+function compareKeyParts(length, hops, id, key) {
+  comparisonCount += 1;
+  if (length !== key[0]) return length < key[0] ? -1 : 1;
+  if (hops !== key[1]) return hops < key[1] ? -1 : 1;
+  if (id !== key[2]) return id < key[2] ? -1 : 1;
+  return 0;
+}
+
+/**
  * Normalize a bound to a composite key. A scalar B becomes the infimum of
  * all keys of length B, preserving the strict "distance < B" contract;
  * a composite bound (an array) passes through unchanged.
@@ -130,6 +150,11 @@ function orderKey(v, dHat, ties) {
  * tied alternative parents; callers filter already-completed vertices to
  * keep the re-enqueue finite, exactly like the paper.
  *
+ * Allocation-free since #168: the result is one of the three RELAX_* codes,
+ * and a caller that needs v's (possibly updated) order key materializes it
+ * with orderKey(v, dHat, ties) — only on the rare paths that enqueue v,
+ * instead of on every attempt.
+ *
  * @param {*} u - Edge tail (its labels are read)
  * @param {*} v - Edge head (its labels may be updated)
  * @param {number} weight - Edge weight, >= 0
@@ -137,38 +162,59 @@ function orderKey(v, dHat, ties) {
  * @param {{ hops: Map<*, number>, preds: Map<*, *> }} ties - Updated in place
  * @param {[number, number, *]} [bound] - Optional gate: skip (no d̂ update)
  *   unless the resulting order key would be strictly below this bound
- * @returns {{ key: [number, number, *], improved: boolean }|null} v's order
- *   key [d̂[v], hops[v], v] with `improved: true` when the labels were
- *   updated, `improved: false` when the candidate exactly matches v's
- *   canonical label; null when the candidate loses (or the bound gates it)
+ * @returns {number} RELAX_IMPROVED when the labels were updated,
+ *   RELAX_EQUAL when the candidate exactly matches v's canonical label
+ *   (the re-enqueue signal), RELAX_LOST when the candidate loses or the
+ *   bound gates it (labels untouched)
  */
 function relaxEdge(u, v, weight, dHat, ties, bound) {
   const length = dHat.get(u) + weight;
   const hopCount = (ties.hops.get(u) ?? 0) + 1;
-  if (bound !== undefined && compareKeys([length, hopCount, v], bound) >= 0) {
-    return null;
+  if (bound !== undefined && compareKeyParts(length, hopCount, v, bound) >= 0) {
+    return RELAX_LOST;
   }
-  const currentPathKey = [
-    dHat.get(v) ?? Infinity,
-    ties.hops.get(v) ?? 0,
-    ties.preds.has(v) ? ties.preds.get(v) : NO_PRED,
-  ];
-  const cmp = compareKeys([length, hopCount, u], currentPathKey);
-  if (cmp > 0) return null;
-  if (cmp === 0) return { key: [length, hopCount, v], improved: false };
+  // Candidate path key [length, hopCount, u] vs. v's current path key
+  // [d̂[v], hops[v], preds[v] ?? NO_PRED] — compareKeys inlined on the
+  // unpacked components (one counted comparison, no arrays)
+  comparisonCount += 1;
+  let cmp;
+  const currentLength = dHat.get(v) ?? Infinity;
+  if (length !== currentLength) {
+    cmp = length < currentLength ? -1 : 1;
+  } else {
+    const currentHops = ties.hops.get(v) ?? 0;
+    if (hopCount !== currentHops) {
+      cmp = hopCount < currentHops ? -1 : 1;
+    } else {
+      const currentPred = ties.preds.has(v) ? ties.preds.get(v) : NO_PRED;
+      cmp = u !== currentPred ? (u < currentPred ? -1 : 1) : 0;
+    }
+  }
+  if (cmp > 0) return RELAX_LOST;
+  if (cmp === 0) return RELAX_EQUAL;
   dHat.set(v, length);
   ties.hops.set(v, hopCount);
   ties.preds.set(v, u);
-  return { key: [length, hopCount, v], improved: true };
+  return RELAX_IMPROVED;
 }
+
+// relaxEdge result codes (#168): distinct, and only RELAX_LOST is falsy-like
+// in comparisons — callers must compare against the constants, not truthiness
+const RELAX_LOST = -1;
+const RELAX_EQUAL = 0;
+const RELAX_IMPROVED = 1;
 
 export {
   compareKeys,
+  compareKeyParts,
   toBound,
   makeTies,
   orderKey,
   relaxEdge,
   NO_PRED,
+  RELAX_LOST,
+  RELAX_EQUAL,
+  RELAX_IMPROVED,
   resetComparisonCount,
   getComparisonCount,
 };

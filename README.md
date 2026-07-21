@@ -37,6 +37,7 @@ with every building block shipped, tested, and released individually:
 | BMSSP-vs-Dijkstra head-to-head in the benchmark harness ([#170](https://github.com/Sirivasv/bmssp-js/issues/170)) | `npm run bench` / `npm run bench:counts` | ✅ done |
 | Performance-cliff investigation; quadratic `BatchPrepend` fixed ([#182](https://github.com/Sirivasv/bmssp-js/issues/182)) | `src/blockList.mjs` | ✅ done — **1.1.1** |
 | Exact Lemma 3.3 asymptotics: balanced-BST bound index + linear-time selection ([#167](https://github.com/Sirivasv/bmssp-js/issues/167)) | `src/boundIndex.mjs` + `src/select.mjs` | ✅ done |
+| Relaxation micro-optimizations: allocation-free hot loops, −13–23% wall-clock ([#168](https://github.com/Sirivasv/bmssp-js/issues/168)) | `src/tieBreak.mjs` + the algorithm modules | ✅ done — **1.2.0** |
 
 > **Honest note:** the paper's win is asymptotic, and this repo optimizes for correctness
 > and readability, not raw speed. Measured head-to-head (algorithm time only, graph
@@ -45,8 +46,8 @@ with every building block shipped, tested, and released individually:
 > Dijkstra still wins on wall-clock at every practical size, though the gap narrows as
 > sparse graphs grow (2.5× at 50k nodes → 1.57× at 2M). But in the paper's own metric —
 > **comparisons between path lengths** — BMSSP does **fewer comparisons than Dijkstra
-> from under n = 50k on sparse graphs** (`npm run bench:counts` measures 0.97× at 50k →
-> 0.77× at 200k → **0.66× at 1M**), and the advantage grows with size: the "sorting
+> from under n = 50k on sparse graphs** (`npm run bench:counts` measures 0.95× at 50k →
+> 0.76× at 200k → **0.65× at 1M**), and the advantage grows with size: the "sorting
 > barrier" is measurably broken; what remains is JS constant factors. That crossover
 > used to sit at ~n = 1M until [#167](https://github.com/Sirivasv/bmssp-js/issues/167)
 > replaced the block structure's sort-based internals with the paper's exact machinery
@@ -188,8 +189,8 @@ graphs in a few seconds), and set `FUZZ_XL=1` for an additional 2-million-node r
 | --- | --- | --- |
 | [`1.0.0`](https://github.com/Sirivasv/bmssp-js/milestones) | First end-to-end functional BMSSP (issues #40–#45) | ✅ done |
 | `1.1.0` | Correctness hardening — fuzz tests, edge cases, tie-breaking, input validation, constant-degree transform, API docs | ✅ done |
-| `1.2.0` | Performance & ergonomics — exact Lemma 3.3 asymptotics, BMSSP-vs-Dijkstra benchmarks, performance-cliff investigation | 🔨 current focus |
-| `2.0.0` | API generalization — public multi-source/bounded entry point, flexible inputs | planned |
+| `1.2.0` | Performance & ergonomics — exact Lemma 3.3 asymptotics, BMSSP-vs-Dijkstra benchmarks, cliff investigation, relaxation micro-optimizations | ✅ done |
+| `2.0.0` | API generalization — public multi-source/bounded entry point, flexible inputs | 🔨 next |
 
 ## Contributing (humans and AI agents welcome)
 

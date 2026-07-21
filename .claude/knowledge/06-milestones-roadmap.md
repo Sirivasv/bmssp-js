@@ -1,10 +1,11 @@
 # 06 — Milestones Roadmap
 
-<!-- SYNCED-FROM-GITHUB: 2026-07-21 Phase C of the #167 PR (verified live at Phase A the
-     same day: 1.2.0 open with 2 open issues #167/#168 — #167 done-pending-merge in this
-     PR; 2.0.0 open with 3 open issues #171/#172/#173) -->
-<!-- Current package version: 1.1.1 — released 2026-07-21 (tag + GitHub Release with
-     Announcements discussion → npm + Docker Hub via publish.yml); tag matches -->
+<!-- SYNCED-FROM-GITHUB: 2026-07-21 Phase C of the #168 PR (verified live at RKB the
+     same day: 1.2.0 open with 1 open issue #168 — done-pending-merge in this PR;
+     2.0.0 open with 3 open issues #171/#172/#173) -->
+<!-- Current package version: 1.2.0 (bumped in the #168 PR — milestone-closing minor;
+     release fires in Phase E after the user confirms the merge. Last released: 1.1.1,
+     2026-07-21, with Announcements discussion) -->
 <!-- Release-discussion convention (user-directed 2026-07-21): every GitHub Release also
      creates a linked discussion — pass --discussion-category "Announcements" to
      gh release create (the UI's "Create a discussion for this release" checkbox) -->
@@ -43,16 +44,23 @@ it runs the same Phase C reconciliation directly on `main`.
 
 ## 📋 Roadmap proposals (pending user approval)
 
-From the #167 PR (Phase C, 2026-07-21):
+From the #168 PR (Phase C, 2026-07-21):
 
-1. **Comment on #168** with the post-#167 baseline its work should start from: the
-   BlockList is no longer a comparison-count factor at all (introselect does ~2–3n
-   comparisons where sorts did n log n — the count crossover moved from ~n = 1M to
-   before n = 50k: 0.97× at 50k, 0.66× at 1M), and wall-clock profiles now put the
-   dominant costs squarely in #168's stated targets — `relaxEdge` allocation, `U`/`W`
-   Set churn, and the per-level O(m + n) relax pass. Also note #168 is now 1.2.0's
-   last open issue, so its PR takes the **minor → 1.2.0** bump and release.
+1. **Close milestone `1.2.0`** once this PR merges — #168 is its last open issue
+   (5/5 done: #167/#168/#169/#170/#182).
+2. **Open a new 2.0.0 issue: "Dense-index core: typed-array labels + CSR adjacency".**
+   Post-#168 profiles put ~38% of self-time in `relaxEdge`'s label-Map traffic (5–6
+   `Map` ops per edge attempt) and ~24% in `bmssp()`'s Set bookkeeping. The next real
+   wall-clock lever is mapping node IDs to dense indices once and holding d̂/hops/preds
+   in typed arrays with CSR adjacency — but that reshapes the public label contracts
+   (`shortestPaths` Map, `bmssp(l, B, S)`'s in-place d̂ seeding for multi-source
+   callers), so it belongs in the 2.0.0 API-breaking milestone alongside #172
+   (typed/flexible graph inputs), not in a micro-optimization PR.
 
+_(The #167-PR proposal — the post-#167 baseline comment on **#168** (BlockList no longer
+a count factor, crossover now <50k; relaxEdge allocation / Set churn / per-level relax
+pass are the remaining targets; #168 is the milestone-closing issue) — was approved and
+executed 2026-07-21.)_
 _(The #182-PR proposals — findings comments on **#167** (remaining scope = BST bound
 index + linear-time selection; batchPrepend quadratic fixed) and **#168** (per-level
 O(m + n) relax pass dominates; relaxEdge allocation + Set churn targets; +24% level
@@ -148,7 +156,7 @@ executed 2026-07-17.)_
   5× at 4M is that step plus GC/memory amplification. **Bug fix → patch bump 1.1.1**
   (batchPrepend violated its documented Lemma 3.3 amortized bound); **1.1.1 released
   2026-07-21**. Findings posted on #167/#168 (approved proposals, executed same day).
-- **#167 done-pending-merge (this PR, 2026-07-21):** BlockList's two documented
+- **#167 merged (PR #202, 2026-07-21, commit 1af81c2; no bump):** BlockList's two documented
   shortcuts replaced to meet Lemma 3.3's exact per-operation bounds — the plain-array
   bound index by `src/boundIndex.mjs` (`BoundIndex`, a positional AVL tree searched
   through the monotone block bounds; O(log #blocks) search/split/drop) and the
@@ -165,7 +173,26 @@ executed 2026-07-17.)_
   all pre-existing tests unchanged; extended FUZZ_ROUNDS=25 and FUZZ_XL runs green.
   No bump (not a bug fix; #168 still open in 1.2.0). Addendum added to
   `HEAD-TO-HEAD.md`; `RESULTS.md` recaptured; stale crossover blurbs updated in the
-  harness and `benchmarks/README.md`.
+  harness and `benchmarks/README.md`. The Phase E proposal (baseline comment on #168)
+  was approved and posted the same day.
+- **#168 done-pending-merge (this PR, 2026-07-21; minor → 1.2.0):** relaxation
+  micro-optimizations. `relaxEdge` reworked allocation-free (returns `RELAX_LOST` /
+  `RELAX_EQUAL` / `RELAX_IMPROVED` codes; the old per-attempt `{ key, improved }`
+  object + up to three throwaway key arrays are gone — callers materialize a key with
+  `orderKey` only on enqueue paths), new `compareKeyParts(length, hops, id, key)` lets
+  the band routing in `bmssp()`/`findPivots` compare unpacked stored labels without
+  allocating, and the three hot edge loops became indexed loops (no per-edge iterator +
+  destructuring). Clean A/B vs post-#167 main: **−13–23% wall-clock** (sparse 50k ~111
+  → ~87 ms, star ~147 → ~127 ms, sparse-l4 300k ~1123 → ~862 ms), comparison counts
+  down ~1–3% (1.2.0 capture: sparse 0.95×/0.76×/0.65× at 50k/200k/1M). **Heap
+  strategy resolved by measurement:** lazy duplicate-and-skip wins an isolated
+  BaseCase micro-benchmark but BaseCase heaps are capped at k+1 ≈ 4 entries and never
+  register end-to-end — the paper-literal indexed `MinHeap` is kept. The "skip the
+  per-level re-relax pass" idea was rejected as paper-infidelity: that pass is the `≤`
+  reuse mechanism (Remark 3.4) surfacing ≥-Bi neighbors the child deliberately drops.
+  Suite 186 (+1 compareKeyParts agreement sweep; relaxEdge unit tests updated to the
+  code contract); FUZZ_ROUNDS=25 and FUZZ_XL green. Next lever (label-Map traffic,
+  ~38% self-time) proposed as a 2.0.0 dense-index issue (Roadmap proposal 2).
 - **Semver release convention (user-directed 2026-07-17, PR #186):** bumps only on bug
   fix (patch) or milestone-closing PR (minor/major) — see "Release mechanics" below.
 - **2026-07-16 reflection session (post-release):** measured the BMSSP-vs-Dijkstra
@@ -212,14 +239,14 @@ All six issues done (build order as executed — cheapest protection first, then
 
 ## Milestone `1.2.0` (milestone #3) — performance & ergonomics — CURRENT
 
-Build order: ~~#170~~ (merged, PR #198), ~~#182~~ (merged, PR #200, 1.1.1), ~~#167~~
-(done-pending-merge, this PR), then **#168** — 1.2.0's last open issue, whose PR takes
-the **minor → 1.2.0** bump and release.
+Build order (as executed): ~~#170~~ (merged, PR #198), ~~#182~~ (merged, PR #200, 1.1.1),
+~~#167~~ (merged, PR #202), ~~#168~~ (done-pending-merge, this PR, **minor → 1.2.0**) —
+all five issues done; the milestone closes in Phase E.
 
 | # | Issue | Labels | Notes |
 |---|---|---|---|
-| 167 | Restore Lemma 3.3's exact asymptotics in BlockList (balanced-BST bound index + linear-time selection) | enhancement · help wanted | ✅ done-pending-merge (this PR, no bump): `BoundIndex` AVL sequence + `partitionByRank` introselect; count crossover moved ~1M → <50k (0.66× at 1M); wall-clock at-or-better |
-| 168 | Adjacency and relaxation micro-optimizations | enhancement · help wanted | #182 findings: per-level O(m+n) relax pass dominates; relaxEdge allocation + Set churn are the targets. **Milestone-closing → minor 1.2.0** |
+| 167 | Restore Lemma 3.3's exact asymptotics in BlockList (balanced-BST bound index + linear-time selection) | enhancement · help wanted | ✅ merged (PR #202, no bump): `BoundIndex` AVL sequence + `partitionByRank` introselect; count crossover moved ~1M → <50k (0.66× at 1M); wall-clock at-or-better |
+| 168 | Adjacency and relaxation micro-optimizations | enhancement · help wanted | ✅ done-pending-merge (this PR, **minor → 1.2.0**): allocation-free relaxEdge (RELAX_* codes) + compareKeyParts routing + indexed edge loops → −13–23% wall-clock, counts down ~1–3%; heap strategy measured, indexed MinHeap kept; dense-index core proposed as a 2.0.0 issue |
 | 169 | Optional shortest-path reconstruction (`Pred[]` → paths) | enhancement · help wanted | ✅ merged (PR #189, no bump): public API + independent path oracle |
 | 170 | BMSSP-vs-Dijkstra benchmark comparison | enhancement · help wanted | ✅ merged (PR #198, no bump): head-to-head + count mode in the harness, verified outputs |
 | 182 | Investigate BMSSP performance cliffs: high-fanout (star) graphs and recursion-level transitions | enhancement · help wanted | ✅ merged (PR #200, **patch → 1.1.1**, released 2026-07-21): star = quadratic batchPrepend, fixed (61 s → ~3.1 s at 500k); level step = inherent +24%, documented (HEAD-TO-HEAD addendum) |
