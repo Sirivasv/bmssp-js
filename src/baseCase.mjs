@@ -5,6 +5,7 @@ import {
   makeTies,
   orderKey,
   relaxEdge,
+  RELAX_LOST,
 } from "./tieBreak.mjs";
 
 /**
@@ -76,18 +77,25 @@ function baseCase(B, S, dHat, adjacency, k, ties = makeTies()) {
   while (!heap.isEmpty() && settled.size < cap + 1) {
     const { key: u } = heap.extractMin();
     settled.add(u);
-    for (const [v, weight] of adjacency.get(u) ?? []) {
+    const edges = adjacency.get(u);
+    if (edges === undefined) continue;
+    for (let i = 0; i < edges.length; i += 1) {
+      const edge = edges[i];
+      const v = edge[0];
       // Canonical relaxation, gated by the bound (the paper's `< B`). An
       // exact-equality result means u is v's recorded label-setter (v was
       // labeled by an earlier phase without being completed) and v must be
       // (re-)enqueued — unless this very call already settled it, which is
       // what keeps zero-weight plateaus finite.
-      const relaxed = relaxEdge(u, v, weight, dHat, ties, boundKey);
-      if (relaxed === null || settled.has(v)) continue;
+      const result = relaxEdge(u, v, edge[1], dHat, ties, boundKey);
+      if (result === RELAX_LOST || settled.has(v)) continue;
+      // Non-lost ⇒ v's stored label IS the candidate; materialize its key
+      // only here, on the enqueue path (#168)
+      const key = orderKey(v, dHat, ties);
       if (heap.has(v)) {
-        heap.decreaseKey(v, relaxed.key);
+        heap.decreaseKey(v, key);
       } else {
-        heap.insert(v, relaxed.key);
+        heap.insert(v, key);
       }
     }
   }

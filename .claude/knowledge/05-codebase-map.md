@@ -1,14 +1,14 @@
 # 05 — Codebase Map (current state)
 
-<!-- BOOKMARK-COMMIT: 16e53f2 -->
-<!-- PENDING-PR-BRANCH: feat/167-exact-lemma33-asymptotics -->
-<!-- Last validated: 2026-07-21 (Phase C of the #167 PR). Describes the tree as it will
-     exist once that PR merges: BlockList's two documented shortcuts replaced to meet
-     Lemma 3.3's exact bounds — the plain-array bound index by an AVL sequence tree
-     (src/boundIndex.mjs) and the sort-based splits/chunking/pulls by deterministic
-     linear-time selection (src/select.mjs, median of medians). Behavior-preserving:
-     all pre-existing tests unchanged. No version bump (not a bug fix; #168 still open
-     in milestone 1.2.0). -->
+<!-- BOOKMARK-COMMIT: 1af81c2 -->
+<!-- PENDING-PR-BRANCH: feat/168-relaxation-micro-optimizations -->
+<!-- Last validated: 2026-07-21 (Phase C of the #168 PR). Describes the tree as it will
+     exist once that PR merges: relaxation micro-optimizations — allocation-free
+     relaxEdge (RELAX_* codes), compareKeyParts for unpacked band routing, indexed edge
+     loops. Wall-clock −13–23% (sparse-l4 ~1123→~862 ms); counts −1–3%. Heap strategy
+     measured: indexed kept (lazy wins only an isolated micro-benchmark; end-to-end
+     noise). Milestone-closing PR → minor bump 1.2.0 (release in Phase E after the
+     user confirms the merge). -->
 
 
 Snapshot of what exists in `bmssp-js` today, so you know what to build on vs. what's missing.
@@ -183,18 +183,27 @@ full data + methodology in `benchmarks/HEAD-TO-HEAD.md`, latest capture in
 the same prebuilt adjacency): Dijkstra wins every shape/size; sparse-graph ratio narrows
 with n (1.0.0 record: 2.54× at 50k → **1.57× at 2M**). **Comparison counts (the paper's
 metric) crossed over at ~n = 1M sparse in the 1.0.0/1.1.1 records; after #167's
-selection-based BlockList they cross before n = 50k** — 0.97× at 50k, 0.77× at 200k,
-**0.66× at 1M** (grid 700×700 down to 1.12×): replacing the sort-based splits/pulls
-removed a major comparison cost, and #167's wall-clock is also at-or-better than 1.1.1
-on every shape (star ~134 ms vs ~144 ms at 50k, sparse ~100 ms vs ~96 ms — within noise).
-The two #182 pathologies were profiled 2026-07-21 (HEAD-TO-HEAD addendum): the **star
-blowup was quadratic `batchPrepend` bookkeeping — fixed in 1.1.1** (500k: 61 s → ~3.1 s);
-the **`topLevel` 3→4 step is an inherent ~+24%** (one extra full relax pass per level,
-measured at the exact n = 2^18 straddle) — the recorded 5× at 4M is that step plus
-GC/memory amplification at 12M edges. Note `topLevel` is **3 from n = 10k to 2M** (4 only
-in n ∈ (2^18, ~376k]) — scale tests buy volume/memory pressure, not recursion depth. The
-default suite runs in ~7.5 s; the opt-in `FUZZ_XL=1` 2M-node round takes ~33 s (#163's
-composite keys added ~10% over the ~30 s scalar baseline — candidate for #168).
+selection-based BlockList they cross before n = 50k** — with #168's routing rework the
+1.2.0 capture reads **0.95× at 50k, 0.76× at 200k, 0.65× at 1M** (grid 700×700 1.10×).
+**#168 (1.2.0) cut wall-clock a further −13–23%** over post-#167 in clean A/B (sparse 50k
+~111 → ~87 ms, star ~147 → ~127 ms, sparse-l4 300k ~1123 → ~862 ms): allocation-free
+`relaxEdge` + unpacked band routing (`compareKeyParts`) + indexed edge loops. Post-#168
+profiles put remaining self-time in `relaxEdge`'s label-Map traffic (~38%, the 5–6
+Map ops per attempt — a dense-index/typed-array core would be the next lever, but it
+changes the public label contracts: proposed for 2.0.0) and `bmssp()`'s Set bookkeeping
+(~24%). **Heap strategy (#168, measured):** the lazy duplicate-and-skip variant wins an
+isolated BaseCase micro-benchmark (~29–33 ms vs ~37–52 ms per 10k bounded runs at
+n = 100k) but BaseCase's heaps are capped at k+1 ≈ 4 entries and never register in
+end-to-end profiles — the paper-literal indexed `MinHeap` is kept. The two #182
+pathologies were profiled 2026-07-21 (HEAD-TO-HEAD addendum): the **star blowup was
+quadratic `batchPrepend` bookkeeping — fixed in 1.1.1** (500k: 61 s → ~3.1 s); the
+**`topLevel` 3→4 step is an inherent ~+24%** (one extra full relax pass per level,
+measured at the exact n = 2^18 straddle; that pass is the paper's `≤`-reuse mechanism
+for surfacing ≥-Bi neighbors — not removable as a micro-optimization) — the recorded 5×
+at 4M is that step plus GC/memory amplification at 12M edges. Note `topLevel` is **3
+from n = 10k to 2M** (4 only in n ∈ (2^18, ~376k]) — scale tests buy volume/memory
+pressure, not recursion depth. The default suite runs in ~7.5 s; the opt-in `FUZZ_XL=1`
+2M-node round takes ~33 s.
 
 ## `src/blockList.mjs` — Lemma 3.3 structure `D` (#42)
 
@@ -359,18 +368,25 @@ and direct multi-source callers may pass such sources); `bmssp()` filters them a
 
 ```js
 compareKeys(a, b)                  // lexicographic compare of [length, hops, id] triples
+compareKeyParts(length, hops, id, key) // #168: same order, left side unpacked — the hot
+                                   // loops' allocation-free compare; counts as one comparison
 toBound(B)                         // scalar B → [B, -Infinity, -Infinity] (infimum of length-B
                                    // keys, so key < toBound(B) ⇔ the strict scalar contract);
                                    // composite bounds pass through
 makeTies(hops?, preds?)            // bundle the canonical label maps (fresh by default)
 orderKey(v, dHat, ties)            // frontier key [d̂[v], hops[v] ?? 0, v]
-relaxEdge(u, v, w, dHat, ties, bound?) // canonical relaxation → { key, improved } | null:
-                                   // improved=true updated d̂/hops/preds together;
-                                   // improved=false = candidate exactly matches v's stored
-                                   // label (u is the recorded setter) — the re-enqueue signal
-resetComparisonCount() / getComparisonCount() // #170: unconditional compareKeys call counter
-                                   // (the paper's cost metric); read by the benchmark harness
-export { compareKeys, toBound, makeTies, orderKey, relaxEdge, NO_PRED,
+relaxEdge(u, v, w, dHat, ties, bound?) // canonical relaxation → RELAX_IMPROVED (d̂/hops/preds
+                                   // updated together) | RELAX_EQUAL (candidate exactly
+                                   // matches v's stored label; u is the recorded setter —
+                                   // the re-enqueue signal) | RELAX_LOST (labels untouched).
+                                   // Allocation-free since #168; callers that enqueue v
+                                   // materialize its key with orderKey only on that path
+resetComparisonCount() / getComparisonCount() // #170: unconditional comparison counter over
+                                   // compareKeys + compareKeyParts + relaxEdge's inlined
+                                   // label compare (the paper's cost metric); read by the
+                                   // benchmark harness
+export { compareKeys, compareKeyParts, toBound, makeTies, orderKey, relaxEdge,
+         NO_PRED, RELAX_LOST, RELAX_EQUAL, RELAX_IMPROVED,
          resetComparisonCount, getComparisonCount };
                                    // NOT re-exported from index.mjs — internal to the algorithm
 ```
@@ -449,8 +465,10 @@ edge-order deterministic (copies allocated in edge order); ~2m copies, ~3m edges
   bound runs, and AVL invariants (parent pointers, stored heights, |balance| ≤ 1)
   verified recursively under append-only growth (height ≤ 17 at n = 2048) and two
   seeded random-churn stresses against a reference array.
-- `test/tieBreak.test.mjs` (19, #163 + 3 counter tests from #170): unit tests for
-  `compareKeys`/`toBound`/`relaxEdge`
+- `test/tieBreak.test.mjs` (20, #163 + 3 counter tests from #170 + the #168
+  `compareKeyParts`-vs-`compareKeys` agreement sweep): unit tests for
+  `compareKeys`/`toBound`/`relaxEdge` (asserting the #168 RELAX_* code contract with
+  label state read from the maps)
   (lexicographic order, scalar-bound infimum, canonical pred choice, zero-weight-cycle
   quiescence, the equality re-enqueue signal), then the system-level properties:
   **edge-order determinism** (full runs AND bounded partial calls return identical
@@ -502,7 +520,7 @@ edge-order deterministic (copies allocated in edge order); ~2m copies, ~3m edges
   (identical maps incl. Infinity → 0; wrong/missing entries counted); `runScenarioBenchmark`
   and `runComparisonCountBenchmark` on tiny injected scenarios return the expected columns
   with **zero mismatches**.
-- Current suite: **185 tests — 184 passing + 1 XL skipped by default**, ~100% statement
+- Current suite: **186 tests — 185 passing + 1 XL skipped by default**, ~100% statement
   coverage, ~7.5 s wall-clock (the #164 distance-preservation sweeps run BMSSP/Dijkstra
   from every source). No graph data files: every generated test graph comes from a
   seed; the #162 fixtures are hand-built and fully deterministic.
@@ -551,9 +569,11 @@ BMSSP-vs-Dijkstra head-to-head itself:
 | JSDoc on `index.mjs` exports + public-API docs page | `index.mjs` + `docs/index.html` | #166 | ✅ merged (PR #196, **minor → 1.1.0**, released 2026-07-21) |
 | BMSSP-vs-Dijkstra head-to-head in the harness | `benchmarks/` + `src/tieBreak.mjs` counter | #170 | ✅ merged (PR #198, no bump) |
 | Performance-cliff investigation + quadratic batchPrepend fix | `src/blockList.mjs` + HEAD-TO-HEAD addendum | #182 | ✅ merged (PR #200, **patch → 1.1.1**, released 2026-07-21) |
-| Exact Lemma 3.3 asymptotics (BST bound index + linear selection) | `src/boundIndex.mjs` + `src/select.mjs` + `src/blockList.mjs` | #167 | ✅ done-pending-merge (this PR, no bump) |
+| Exact Lemma 3.3 asymptotics (BST bound index + linear selection) | `src/boundIndex.mjs` + `src/select.mjs` + `src/blockList.mjs` | #167 | ✅ merged (PR #202, no bump) |
+| Relaxation micro-optimizations (allocation-free relaxEdge, unpacked routing, heap measurement) | `src/tieBreak.mjs` + `src/bmssp.mjs` + `src/baseCase.mjs` + `src/findPivots.mjs` | #168 | ✅ done-pending-merge (this PR, **minor → 1.2.0**) |
 
 Milestone `1.1.0` (correctness hardening) is **closed** — released 2026-07-21 (npm +
-Docker Hub). Milestone `1.2.0` is the current focus: after #167 merges, **#168** is its
-last open issue (adjacency/relaxation micro-optimizations; the PR closing it takes the
-**minor → 1.2.0** bump); see [06-milestones-roadmap.md](06-milestones-roadmap.md).
+Docker Hub). This PR closes **#168**, milestone `1.2.0`'s last open issue → **minor bump
+1.2.0** (release + milestone close in Phase E after the merge). Next up: milestone
+`2.0.0` (#171/#172/#173 + the proposed dense-index core issue); see
+[06-milestones-roadmap.md](06-milestones-roadmap.md).

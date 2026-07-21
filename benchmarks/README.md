@@ -87,8 +87,8 @@ path lengths**. Every BMSSP-side comparison funnels through
 Dijkstra baseline counts its heap sifts, stale-pop checks and relaxations the
 same way. Counts are deterministic, so one run per side is exact. On sparse
 graphs the bmssp/dijkstra ratio falls as n grows and — since #167's
-selection-based BlockList — is **already below 1.0 at n = 50k** (2026-07-21
-capture: 0.97× at 50k → 0.77× at 200k → 0.66× at 1M), the measured form of
+selection-based BlockList — is **already below 1.0 at n = 50k** (`1.2.0`
+capture: 0.95× at 50k → 0.76× at 200k → 0.65× at 1M), the measured form of
 the paper's asymptotic claim. Before #167, sort-based splits/pulls pushed the
 crossover out to ~n = 1M (`1.0.0` record: 1.18× at 50k → 1.01× at 200k →
 0.96× at 1M → 0.91× at 2M).
@@ -110,9 +110,10 @@ harness reruns it on every `npm run bench` (fresh capture:
 - **BMSSP's asymptotics are real and visible:** on sparse graphs the
   wall-clock gap narrows with n (2.5× at 50k → 1.57× at 2M in the 1.0.0
   record), and in the paper's own metric the harness's count mode shows the
-  ratio below 1.0 from n = 50k on: **0.97× at 50k → 0.77× at 200k → 0.66×
-  at 1M** (since #167; ~1M crossover before it). The sorting barrier is
-  measurably broken; the remaining loss is constant factors.
+  ratio below 1.0 from n = 50k on: **0.95× at 50k → 0.76× at 200k → 0.65×
+  at 1M** (since #167; ~1M crossover before it; #168 shaved a further
+  ~1–3%). The sorting barrier is measurably broken; the remaining loss is
+  constant factors — #168 cut −13–23% of wall-clock from the hot loops.
 - **Shapes that blunt BMSSP's edge, per the harness:** `dense-random`
   (relaxation-bound, ~4.7×), `chain` (depth, not sorting, is the cost —
   ~7.4× against the prebuilt-adjacency baseline), `star` (extreme fanout,

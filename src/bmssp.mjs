@@ -3,10 +3,12 @@ import { findPivots } from "./findPivots.mjs";
 import { BlockList } from "./blockList.mjs";
 import {
   compareKeys,
+  compareKeyParts,
   toBound,
   makeTies,
   orderKey,
   relaxEdge,
+  RELAX_LOST,
 } from "./tieBreak.mjs";
 
 class BMSSP {
@@ -224,19 +226,26 @@ class BMSSP {
       // without completing (the paper's `≤` relaxation, deterministic here:
       // only the recorded label-setter triggers it); vertices already
       // completed at this level are filtered so re-enqueues stay finite.
+      // A non-lost relaxation leaves v's stored label equal to the
+      // candidate, so the band tests compare the unpacked stored components
+      // and a key array is built only for the enqueue itself (#168).
       const K = [];
       for (const u of Ui) {
-        for (const [v, weight] of this.adjacency.get(u) ?? []) {
-          const relaxed = relaxEdge(u, v, weight, dHat, ties);
-          if (relaxed === null || U.has(v)) continue;
-          const key = relaxed.key;
-          if (compareKeys(key, BiKey) >= 0 && compareKeys(key, boundKey) < 0) {
-            D.insert(v, key);
-          } else if (
-            compareKeys(key, BiPrimeKey) >= 0 &&
-            compareKeys(key, BiKey) < 0
-          ) {
-            K.push([v, key]);
+        const edges = this.adjacency.get(u);
+        if (edges === undefined) continue;
+        for (let i = 0; i < edges.length; i += 1) {
+          const edge = edges[i];
+          const v = edge[0];
+          const result = relaxEdge(u, v, edge[1], dHat, ties);
+          if (result === RELAX_LOST || U.has(v)) continue;
+          const length = dHat.get(v);
+          const hopCount = ties.hops.get(v) ?? 0;
+          if (compareKeyParts(length, hopCount, v, BiKey) >= 0) {
+            if (compareKeyParts(length, hopCount, v, boundKey) < 0) {
+              D.insert(v, [length, hopCount, v]);
+            }
+          } else if (compareKeyParts(length, hopCount, v, BiPrimeKey) >= 0) {
+            K.push([v, [length, hopCount, v]]);
           }
         }
       }
@@ -244,9 +253,13 @@ class BMSSP {
       // go back in front of everything else
       for (const x of Si) {
         if (U.has(x)) continue;
-        const key = orderKey(x, dHat, ties);
-        if (compareKeys(key, BiPrimeKey) >= 0 && compareKeys(key, BiKey) < 0) {
-          K.push([x, key]);
+        const length = dHat.get(x) ?? Infinity;
+        const hopCount = ties.hops.get(x) ?? 0;
+        if (
+          compareKeyParts(length, hopCount, x, BiKey) < 0 &&
+          compareKeyParts(length, hopCount, x, BiPrimeKey) >= 0
+        ) {
+          K.push([x, [length, hopCount, x]]);
         }
       }
       if (K.length > 0) D.batchPrepend(K);
@@ -256,7 +269,10 @@ class BMSSP {
     const finalKey =
       compareKeys(lastBoundKey, boundKey) < 0 ? lastBoundKey : boundKey;
     for (const x of W) {
-      if (compareKeys(orderKey(x, dHat, ties), finalKey) < 0) U.add(x);
+      const length = dHat.get(x) ?? Infinity;
+      if (compareKeyParts(length, ties.hops.get(x) ?? 0, x, finalKey) < 0) {
+        U.add(x);
+      }
     }
     return finish(finalKey, U);
   }

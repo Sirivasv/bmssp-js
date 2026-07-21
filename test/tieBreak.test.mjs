@@ -1,10 +1,14 @@
 import { describe, test, expect } from "@jest/globals";
 import {
   compareKeys,
+  compareKeyParts,
   toBound,
   makeTies,
   orderKey,
   relaxEdge,
+  RELAX_LOST,
+  RELAX_EQUAL,
+  RELAX_IMPROVED,
   resetComparisonCount,
   getComparisonCount,
 } from "../src/tieBreak.mjs";
@@ -105,6 +109,26 @@ describe("compareKeys — lexicographic composite order", () => {
       compareKeys([5, 1, 1], [Infinity, -Infinity, -Infinity]),
     ).toBeLessThan(0);
   });
+
+  test("compareKeyParts agrees with compareKeys on every component branch (#168)", () => {
+    const keys = [
+      [1, 9, 9],
+      [2, 0, 0],
+      [1, 2, 9],
+      [1, 3, 0],
+      [1, 2, 3],
+      [1, 2, 4],
+      [Infinity, 0, 1],
+      [Infinity, -Infinity, -Infinity],
+    ];
+    for (const a of keys) {
+      for (const b of keys) {
+        expect(Math.sign(compareKeyParts(a[0], a[1], a[2], b))).toBe(
+          Math.sign(compareKeys(a, b)),
+        );
+      }
+    }
+  });
 });
 
 describe("toBound — scalar bounds keep strict semantics", () => {
@@ -130,10 +154,11 @@ describe("relaxEdge — canonical relaxation", () => {
     ]);
     const ties = makeTies();
     const result = relaxEdge(0, 1, 5, dHat, ties);
-    expect(result).toEqual({ key: [5, 1, 1], improved: true });
+    expect(result).toBe(RELAX_IMPROVED);
     expect(dHat.get(1)).toBe(5);
     expect(ties.hops.get(1)).toBe(1);
     expect(ties.preds.get(1)).toBe(0);
+    expect(orderKey(1, dHat, ties)).toEqual([5, 1, 1]);
   });
 
   test("equal-length candidates win only on fewer hops, then smaller pred", () => {
@@ -154,20 +179,16 @@ describe("relaxEdge — canonical relaxation", () => {
       new Map([[5, 7]]),
     );
     // Same length (3 + 3 = 6), same hops (3), pred 9 > current pred 7: no
-    expect(relaxEdge(9, 5, 3, dHat, ties)).toBeNull();
+    expect(relaxEdge(9, 5, 3, dHat, ties)).toBe(RELAX_LOST);
     expect(ties.preds.get(5)).toBe(7);
     // Same length, same hops, pred 3 < current pred 7: canonical update
-    expect(relaxEdge(3, 5, 3, dHat, ties)).toEqual({
-      key: [6, 2, 5],
-      improved: true,
-    });
+    expect(relaxEdge(3, 5, 3, dHat, ties)).toBe(RELAX_IMPROVED);
+    expect(orderKey(5, dHat, ties)).toEqual([6, 2, 5]);
     expect(ties.preds.get(5)).toBe(3);
     // Re-relaxation from the now-canonical pred reports exact equality —
     // the caller's re-enqueue signal — without touching the labels
-    expect(relaxEdge(3, 5, 3, dHat, ties)).toEqual({
-      key: [6, 2, 5],
-      improved: false,
-    });
+    expect(relaxEdge(3, 5, 3, dHat, ties)).toBe(RELAX_EQUAL);
+    expect(orderKey(5, dHat, ties)).toEqual([6, 2, 5]);
     expect(ties.preds.get(5)).toBe(3);
   });
 
@@ -188,13 +209,11 @@ describe("relaxEdge — canonical relaxation", () => {
     );
     // 1 -> 0 with weight 0: candidate [2, 3, 1] vs current [2, 1, 5] — the
     // extra hops lose outright
-    expect(relaxEdge(1, 0, 0, dHat, ties)).toBeNull();
+    expect(relaxEdge(1, 0, 0, dHat, ties)).toBe(RELAX_LOST);
     // 0 -> 1 with weight 0 reproduces 1's canonical label exactly: reported
     // as equality, no update — so the cycle is quiescent, never looping
-    expect(relaxEdge(0, 1, 0, dHat, ties)).toEqual({
-      key: [2, 2, 1],
-      improved: false,
-    });
+    expect(relaxEdge(0, 1, 0, dHat, ties)).toBe(RELAX_EQUAL);
+    expect(orderKey(1, dHat, ties)).toEqual([2, 2, 1]);
     expect(ties.hops.get(1)).toBe(2);
   });
 
@@ -207,7 +226,7 @@ describe("relaxEdge — canonical relaxation", () => {
     // Vertex 2 is an externally seeded hop-0 source at distance 5; an
     // equal-length, equal-hops... any candidate has hops >= 1 > 0, and even
     // a shorter-hop tie would face the -Infinity pred sentinel
-    expect(relaxEdge(4, 2, 5, dHat, ties)).toBeNull();
+    expect(relaxEdge(4, 2, 5, dHat, ties)).toBe(RELAX_LOST);
     expect(dHat.get(2)).toBe(5);
   });
 
@@ -217,13 +236,11 @@ describe("relaxEdge — canonical relaxation", () => {
       [1, Infinity],
     ]);
     const ties = makeTies();
-    expect(relaxEdge(0, 1, 5, dHat, ties, toBound(5))).toBeNull();
+    expect(relaxEdge(0, 1, 5, dHat, ties, toBound(5))).toBe(RELAX_LOST);
     expect(dHat.get(1)).toBe(Infinity);
     expect(ties.preds.has(1)).toBe(false);
-    expect(relaxEdge(0, 1, 5, dHat, ties, toBound(5.1))).toEqual({
-      key: [5, 1, 1],
-      improved: true,
-    });
+    expect(relaxEdge(0, 1, 5, dHat, ties, toBound(5.1))).toBe(RELAX_IMPROVED);
+    expect(orderKey(1, dHat, ties)).toEqual([5, 1, 1]);
   });
 
   test("orderKey defaults: missing labels read as hop-0, distance Infinity", () => {
