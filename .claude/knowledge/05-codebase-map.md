@@ -1,14 +1,16 @@
 # 05 — Codebase Map (current state)
 
-<!-- BOOKMARK-COMMIT: a1dac45cc2aa4f48e708fe2e0e05a964c0f858a5 -->
-<!-- PENDING-PR-BRANCH: docs/166-public-api-docs -->
-<!-- Last validated: 2026-07-21 (Phase C of the #166 PR). Describes the tree as it will
-     exist once that PR merges: JSDoc on index.mjs's three public re-exports and a full
-     rewrite of docs/index.html into a public-API reference (was a stale landing page
-     pointing at the wrong repo). No src/ or test/ changes. #166 is milestone 1.1.0's last
-     open issue → this PR closes the milestone → minor bump to 1.1.0 (semver convention,
-     06 "Release mechanics"). This rewrite also folds in the session's Phase A fast path:
-     the #164 PR merged as PR #195 (merge commit a1dac45 == the bookmark). -->
+<!-- BOOKMARK-COMMIT: d7d3080 -->
+<!-- PENDING-PR-BRANCH: feat/170-bmssp-dijkstra-benchmark -->
+<!-- Last validated: 2026-07-21 (Phase C of the #170 PR). Describes the tree as it will
+     exist once that PR merges: the benchmark harness runs the BMSSP-vs-Dijkstra
+     head-to-head itself (bmssp column + verified outputs in scenarios.bench.mjs, new
+     dijkstra-adj.mjs fair baseline, opt-in comparison-count mode via `npm run
+     bench:counts`), a comparison counter in src/tieBreak.mjs, a sparse-random-l4
+     level-transition scenario, and a fresh RESULTS.md. No bump (issue-closing, not a
+     bug fix, not 1.2.0's last issue). This file also carries the previous session's
+     Phase E marker flip (1.1.0 released 2026-07-21, milestone closed) that rides this
+     branch per branch protection. -->
 
 Snapshot of what exists in `bmssp-js` today, so you know what to build on vs. what's missing.
 
@@ -79,16 +81,19 @@ test/
   heap.test.mjs           # #41: 16 MinHeap tests incl. a seeded stress test vs. a naive queue
   baseCase.test.mjs       # #40: 13 BaseCase tests incl. seeded oracle-comparison stress
   findPivots.test.mjs     # #44: 12 FindPivots tests incl. two seeded oracle stress tests
+  benchmarks.test.mjs     # #170: 7 harness tests — dijkstra-adj vs shipped oracle, counters, tiny-scenario report shape + zero mismatches
   README.md               # test-suite principles (everything seeded, no data files) + file map
-benchmarks/               # dependency-free benchmark harness, `npm run bench`
-  generators.mjs          #   seeded graph builders + SCENARIOS registry (sparse/dense/grid/chain/star)
+benchmarks/               # dependency-free benchmark harness, `npm run bench` / `npm run bench:counts`
+  generators.mjs          #   seeded graph builders + SCENARIOS registry (sparse/dense/grid/chain/star/sparse-l4)
   bench-util.mjs          #   timing (timeMany) + markdown-table helpers
   adjacency.bench.mjs     #   adjacency map (#45) vs. linear edge scan
-  scenarios.bench.mjs     #   construct + Dijkstra timings per graph shape
-  run.mjs                 #   runs all benchmarks, prints markdown report
+  scenarios.bench.mjs     #   #170: head-to-head per shape — construct + dijkstra + bmssp timings, verified outputs
+  dijkstra-adj.mjs        #   #170: algorithm-only Dijkstra over prebuilt adjacency + comparison counter (fair baseline)
+  compare-counts.bench.mjs#   #170: comparison-count mode (COUNT_CASES: sparse 50k/200k/1M + grid 700)
+  run.mjs                 #   runs all benchmarks, prints markdown report; --counts adds count tables
   README.md               #   methodology + "when to use which" guidance
-  RESULTS.md              #   captured sample run
-  HEAD-TO-HEAD.md         #   measured BMSSP-vs-Dijkstra (1.0.0): wall-clock + comparison counts
+  RESULTS.md              #   captured `npm run bench:counts` report (2026-07-21)
+  HEAD-TO-HEAD.md         #   frozen 1.0.0 measurement record (up to n = 4M): wall-clock + comparison counts
 examples/
   main.mjs                # tiny usage example (constructs BMSSP, prints .graph)
 docs/index.html           # public-API reference (GitHub Pages via static.yml) — rewritten in
@@ -289,7 +294,10 @@ relaxEdge(u, v, w, dHat, ties, bound?) // canonical relaxation → { key, improv
                                    // improved=true updated d̂/hops/preds together;
                                    // improved=false = candidate exactly matches v's stored
                                    // label (u is the recorded setter) — the re-enqueue signal
-export { compareKeys, toBound, makeTies, orderKey, relaxEdge, NO_PRED };
+resetComparisonCount() / getComparisonCount() // #170: unconditional compareKeys call counter
+                                   // (the paper's cost metric); read by the benchmark harness
+export { compareKeys, toBound, makeTies, orderKey, relaxEdge, NO_PRED,
+         resetComparisonCount, getComparisonCount };
                                    // NOT re-exported from index.mjs — internal to the algorithm
 ```
 
@@ -355,7 +363,8 @@ edge-order deterministic (copies allocated in edge order); ~2m copies, ~3m edges
   `test/findPivots.test.mjs` (12): per-module contracts incl. seeded stress — see the
   module sections above. (Since #163 the baseCase partial-run tests assert the composite
   contract: strictly below `boundKey`, `≤` the scalar bound.)
-- `test/tieBreak.test.mjs` (16, #163): unit tests for `compareKeys`/`toBound`/`relaxEdge`
+- `test/tieBreak.test.mjs` (19, #163 + 3 counter tests from #170): unit tests for
+  `compareKeys`/`toBound`/`relaxEdge`
   (lexicographic order, scalar-bound infimum, canonical pred choice, zero-weight-cycle
   quiescence, the equality re-enqueue signal), then the system-level properties:
   **edge-order determinism** (full runs AND bounded partial calls return identical
@@ -400,20 +409,36 @@ edge-order deterministic (copies allocated in edge order); ~2m copies, ~3m edges
   **opt-in `FUZZ_XL=1` sparse n = 2M round** (~33 s, `test.skip` otherwise). Every failure
   message carries the round's seed for reproduction. **`FUZZ_ROUNDS=<x>`** multiplies all
   round counts (default 1 ≈ 0.5 s; 25 ≈ 10 s, several thousand graphs).
-- Current suite: **147 tests — 146 passing + 1 XL skipped by default**, 100% statement
-  coverage, ~7 s wall-clock (the #164 distance-preservation sweeps run BMSSP/Dijkstra from
-  every source). No graph data files: every generated test graph comes from a
+- `test/benchmarks.test.mjs` (7, #170): the harness itself. `dijkstraAdjacency` equals the
+  shipped `dijkstra` on seeded graphs, reports Infinity for unreachable nodes, rejects an
+  unknown source; both comparison counters count, reset, and are deterministic for a fixed
+  graph; `runScenarioBenchmark` and `runComparisonCountBenchmark` on tiny injected
+  scenarios return the expected columns with **zero mismatches**.
+- Current suite: **157 tests — 156 passing + 1 XL skipped by default**, ~100% statement
+  coverage, ~7.5 s wall-clock (the #164 distance-preservation sweeps run BMSSP/Dijkstra
+  from every source). No graph data files: every generated test graph comes from a
   seed; the #162 fixtures are hand-built and fully deterministic.
 
-## Benchmarks (`benchmarks/`, `npm run bench`)
+## Benchmarks (`benchmarks/`, `npm run bench` / `npm run bench:counts`)
 
-Deterministic (seeded) micro-benchmarks. `adjacency.bench.mjs` shows the #45 map is
-~thousands× faster per-node than a linear scan. `scenarios.bench.mjs` times construction +
-a Dijkstra run across five graph shapes. **`HEAD-TO-HEAD.md` records the measured
-BMSSP-vs-Dijkstra comparison** (2026-07-16): wall-clock tables by shape and size, the
-sparse scaling trend, and the comparison-count crossover (~n = 1M). #170 tracks folding
-both measurements into the harness itself (algorithm-only `bmssp` column + optional
-comparison-count mode); the raw baseline is also on #170 as a comment.
+Deterministic (seeded) micro-benchmarks; since #170 the harness runs the full
+BMSSP-vs-Dijkstra head-to-head itself:
+
+- `adjacency.bench.mjs`: the #45 map is ~thousands× faster per-node than a linear scan.
+- `scenarios.bench.mjs`: per shape, algorithm-only `dijkstra ms` / `bmssp ms` / `ratio`
+  columns — both sides consume the BMSSP instance's prebuilt adjacency (`dijkstra-adj.mjs`
+  is the fair baseline) and outputs are verified node-by-node (`mismatches` must be 0).
+  Scenario registry adds `sparse-random-l4` (n = 300k, degree 3): `topLevel` steps 3→4 at
+  exactly n = 2^18 + 1 and stays 4 until t reaches 7 (~n = 376k), so 300k sits inside the
+  #182 level-transition window (3.11× vs 2.79× at 50k on 2026-07-21 capture).
+- `compare-counts.bench.mjs` (opt-in, `npm run bench:counts` or `--counts`): comparisons
+  between path lengths — BMSSP counted via `tieBreak`'s unconditional `compareKeys`
+  counter, Dijkstra via matching counters in `dijkstra-adj.mjs`. One exact run per side
+  (counts are deterministic). 2026-07-21 capture reproduces the crossover: sparse 1.20× at
+  50k → 1.03× at 200k → **0.98× at 1M**; grid 700×700 stays 1.27×.
+- **`HEAD-TO-HEAD.md` is the frozen 1.0.0 measurement record** (2026-07-16, sizes to
+  n = 4M incl. star-500k 67.8× and the 4M cliff); `RESULTS.md` is the latest captured
+  harness report.
 
 ## Gaps to fill (the actual work)
 
@@ -431,10 +456,10 @@ comparison-count mode); the raw baseline is also on #170 as a comment.
 | Public shortest-path reconstruction | `BMSSP.reconstructPath()` + `test/pathReconstruction.test.mjs` | #169 | ✅ done (PR #189, no bump) |
 | Constructor input validation | `BMSSP` constructor + `test/main.test.mjs` | #165 | ✅ merged (PR #191, no bump) |
 | Optional constant-degree transform (in/out-degree ≤ 2) | `src/constantDegree.mjs` + `test/constantDegree.test.mjs` | #164 | ✅ merged (PR #195, no bump) |
-| JSDoc on `index.mjs` exports + public-API docs page | `index.mjs` + `docs/index.html` | #166 | ✅ done-pending-merge (this PR, **minor → 1.1.0**) |
+| JSDoc on `index.mjs` exports + public-API docs page | `index.mjs` + `docs/index.html` | #166 | ✅ merged (PR #196, **minor → 1.1.0**, released 2026-07-21) |
+| BMSSP-vs-Dijkstra head-to-head in the harness | `benchmarks/` + `src/tieBreak.mjs` counter | #170 | ✅ done-pending-merge (this PR, no bump) |
 
-Milestone `1.1.0` (correctness hardening) **completes with this PR** — #166 was its last
-open issue, so this PR bumps **minor → 1.1.0** and its merge triggers the 1.1.0 release
-(Phase E) plus closing the milestone on GitHub (proposed). Milestone `1.2.0` becomes the
-current focus (#167, #168, #170, #182 open); see
-[06-milestones-roadmap.md](06-milestones-roadmap.md).
+Milestone `1.1.0` (correctness hardening) is **closed** — released 2026-07-21 (npm +
+Docker Hub). Milestone `1.2.0` is the current focus: after #170 merges, #182
+(performance-cliff investigation, now armed with the harness's small-n reproductions)
+is next, then #167/#168; see [06-milestones-roadmap.md](06-milestones-roadmap.md).

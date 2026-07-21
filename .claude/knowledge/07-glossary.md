@@ -213,25 +213,46 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
 - **Dyadic-float regime** (#161) — fuzz weight regime using multiples of `1/256` (dyadic
   rationals) of bounded magnitude: every path sum is exact in float64, so float-weight
   testing keeps bit-exact oracle equality instead of needing tolerances.
-- **Benchmark harness** — `benchmarks/` (run via `npm run bench`): seeded graph
-  **generators** + a `SCENARIOS` registry (sparse-random / dense-random / grid / chain /
-  star), `timeMany` timing, and two benchmarks (adjacency-vs-scan, per-shape Dijkstra). Will
-  host the BMSSP-vs-Dijkstra comparison once #43 lands.
+- **Benchmark harness** — `benchmarks/` (run via `npm run bench`, or `npm run
+  bench:counts` for the count tables): seeded graph **generators** + a `SCENARIOS`
+  registry (sparse-random / dense-random / grid / chain / star / sparse-random-l4),
+  `timeMany` timing, and three benchmarks: adjacency-vs-scan, the per-shape
+  BMSSP-vs-Dijkstra head-to-head (#170), and the opt-in comparison-count mode (#170).
 - **Scenario** — a named, seeded graph shape in the benchmark registry used to probe where
   BMSSP's asymptotics would help vs. where Dijkstra dominates. See `benchmarks/README.md`.
-- **Head-to-head** — the measured BMSSP-vs-Dijkstra comparison
-  (`benchmarks/HEAD-TO-HEAD.md`, 2026-07-16). **Algorithm-only timing**: construction and
-  adjacency building are excluded for both sides; the Dijkstra variant consumes the BMSSP
-  instance's own prebuilt `adjacency` Map (the exported `dijkstra()` builds its own per
-  call — that's loading, not algorithm). Harness integration tracked in #170.
+- **`sparse-random-l4`** (#170) — the level-transition scenario: sparse degree-3 at
+  n = 300k, inside the `topLevel` 3→4 window `n ∈ (2^18, ~376k]` (where `t` is still 6;
+  at ~376k `t` reaches 7 and `topLevel` drops back to 3). A standing regression sentinel
+  for #182's transition cliff.
+- **Head-to-head** — the measured BMSSP-vs-Dijkstra comparison. **Algorithm-only
+  timing**: construction and adjacency building are excluded for both sides; the Dijkstra
+  baseline consumes the BMSSP instance's own prebuilt `adjacency` Map (the exported
+  `dijkstra()` builds its own per call — that's loading, not algorithm). Since #170 the
+  harness runs it per shape with node-by-node output verification (`mismatches` column);
+  `benchmarks/HEAD-TO-HEAD.md` is the frozen 1.0.0 record (2026-07-16, up to n = 4M),
+  `benchmarks/RESULTS.md` the latest capture.
+- **`dijkstraAdjacency(adjacency, nodeIDs, source)`** (#170) — `benchmarks/dijkstra-adj.mjs`,
+  the fair baseline: the oracle's lazy-heap Dijkstra reworked to consume a prebuilt
+  `Map<from, [to, weight][]>`, with distance-comparison counters
+  (`resetDijkstraComparisonCount` / `getDijkstraComparisonCount`). Bench-only — not part
+  of the package API.
+- **Comparison counter (#170)** — `resetComparisonCount()` / `getComparisonCount()` in
+  `src/tieBreak.mjs`: an unconditional per-call counter in `compareKeys`. Because the heap
+  and BlockList receive `compareKeys` as their comparator and the algorithm modules call
+  it directly, this one counter measures every BMSSP path-length comparison. Internal
+  (not re-exported from `index.mjs`).
 - **Comparison-count crossover** — head-to-head result in the paper's comparison-addition
   model: counting every comparison between two distance values (heap sifts, BlockList
   searches/sorts, relaxations), BMSSP does **fewer** comparisons than Dijkstra past
-  ~n = 1M on sparse graphs (0.91× at n = 2M) even though Dijkstra still wins wall-clock —
-  the sorting barrier measurably broken, with constant factors as the remaining gap.
+  ~n = 1M on sparse graphs (0.91× at n = 2M in the 1.0.0 record) even though Dijkstra
+  still wins wall-clock — the sorting barrier measurably broken, with constant factors as
+  the remaining gap. Since #170, `npm run bench:counts` reproduces it exactly
+  (`compare-counts.bench.mjs` `COUNT_CASES`: 1.20× at 50k → 1.03× at 200k → 0.98× at 1M).
 - **Performance cliffs (#182)** — two measured regimes where the head-to-head ratio breaks
-  from its ~1.6–2× pattern: star graphs (superlinear blowup, 67.8× at n = 500k) and the
-  `topLevel = ⌈log₂n / t⌉` 3→4 transition (5× at n = 4M on sparse). Milestone 1.2.0.
+  from its ~1.6–2× pattern: star graphs (superlinear blowup, 67.8× at n = 500k; already
+  8.7× at n = 50k in the harness) and the `topLevel = ⌈log₂n / t⌉` 3→4 transition (5× at
+  n = 4M on sparse; 3.11× at n = 300k via `sparse-random-l4`). Milestone 1.2.0. Both run
+  as regression sentinels in every `npm run bench` since #170.
 - **Docs page (#166)** — `docs/index.html`, the GitHub-Pages-published public-API reference
   (deployed by `static.yml` on `docs/**` changes). Documents exactly the three `index.mjs`
   exports — `BMSSP` (constructor contract, `calculateShortestPaths`, `reconstructPath`),

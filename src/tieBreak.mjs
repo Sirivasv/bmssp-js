@@ -42,6 +42,28 @@
 // source's own label never loses an equal-(length, hops) comparison.
 const NO_PRED = -Infinity;
 
+// Running count of compareKeys calls — the paper's cost metric ("comparisons
+// between path lengths"). Every BMSSP-side comparison funnels through
+// compareKeys (the heap and BlockList receive it as their comparator, and
+// baseCase/findPivots/bmssp call it directly), so this one counter covers the
+// whole algorithm. The benchmark harness (#170) reads it to measure the
+// sorting barrier; one unconditional increment keeps the hot path branch-free.
+let comparisonCount = 0;
+
+/** Reset the compareKeys call counter to zero (benchmark instrumentation). */
+function resetComparisonCount() {
+  comparisonCount = 0;
+}
+
+/**
+ * Number of compareKeys calls since the last reset (benchmark
+ * instrumentation).
+ * @returns {number}
+ */
+function getComparisonCount() {
+  return comparisonCount;
+}
+
 /**
  * Lexicographic comparison of two composite keys.
  * @param {[number, number, *]} a - [length, hops, id]
@@ -49,6 +71,7 @@ const NO_PRED = -Infinity;
  * @returns {number} Negative when a < b, positive when a > b, 0 when equal
  */
 function compareKeys(a, b) {
+  comparisonCount += 1;
   if (a[0] !== b[0]) return a[0] < b[0] ? -1 : 1;
   if (a[1] !== b[1]) return a[1] < b[1] ? -1 : 1;
   if (a[2] !== b[2]) return a[2] < b[2] ? -1 : 1;
@@ -139,4 +162,13 @@ function relaxEdge(u, v, weight, dHat, ties, bound) {
   return { key: [length, hopCount, v], improved: true };
 }
 
-export { compareKeys, toBound, makeTies, orderKey, relaxEdge, NO_PRED };
+export {
+  compareKeys,
+  toBound,
+  makeTies,
+  orderKey,
+  relaxEdge,
+  NO_PRED,
+  resetComparisonCount,
+  getComparisonCount,
+};
