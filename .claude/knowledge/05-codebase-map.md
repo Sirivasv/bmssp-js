@@ -1,15 +1,17 @@
 # 05 — Codebase Map (current state)
 
-<!-- BOOKMARK-COMMIT: f7052c5 -->
-<!-- PENDING-PR-BRANCH: feat/205-dense-index-core -->
-<!-- Last validated: 2026-07-21 (Phase C of the #205 PR). Describes the tree as it will
-     exist once that PR merges: the dense-index engine — node ids mapped to dense
-     indices once (sorted-id order), the graph in CSR arrays, and d̂/hops/preds in typed
-     arrays (src/tieBreak.mjs makeLabels). The algorithm modules run entirely on indices;
-     the BMSSP class keeps a thin id<->index boundary (public Maps unchanged). Wall-clock
-     roughly halved (sparse 50k ~104->~53 ms, l4 300k ~982->~424 ms); counts unchanged.
-     First 2.0.0-milestone issue, mid-milestone → NO bump (the API stayed
-     backward-compatible; #173 takes the major bump). -->
+<!-- BOOKMARK-COMMIT: cbcaab1 -->
+<!-- PENDING-PR-BRANCH: chore/examples-docker-gallery -->
+<!-- Last validated: 2026-07-21 (Phase C of the examples/Docker PR, branch
+     chore/examples-docker-gallery, based on main cbcaab1). This PR rewrites the examples/
+     directory into a standalone gallery (01-basic, 02-dijkstra-oracle, 03-constant-degree,
+     04-larger-graph, run-all + README), modernizes the Dockerfile (COPY examples/ dir,
+     OCI labels, run-all as default CMD), and refreshes the README Docker section. No src/
+     test change; no version bump (docs/tooling, no bug fix, no milestone close). Verified
+     end-to-end inside Docker (docker build + run: all four examples + oracle checks pass;
+     single-example override and volume-mount forms confirmed). Not tied to a GitHub issue
+     (user-directed). Body describes post-merge reality; markers flip on the next session's
+     Phase A fast path. -->
 
 
 Snapshot of what exists in `bmssp-js` today, so you know what to build on vs. what's missing.
@@ -100,8 +102,15 @@ benchmarks/               # dependency-free benchmark harness, `npm run bench` /
   README.md               #   methodology + "when to use which" guidance
   RESULTS.md              #   captured `npm run bench:counts` report (2026-07-21)
   HEAD-TO-HEAD.md         #   frozen 1.0.0 measurement record (up to n = 4M): wall-clock + comparison counts
-examples/
-  main.mjs                # tiny usage example (constructs BMSSP, prints .graph)
+examples/                 # standalone, copy-pasteable gallery — each file imports from the
+                          # PUBLISHED `bmssp` package (not relative src), so users run them
+                          # after `npm install bmssp`; also bundled into the Docker image
+  01-basic.mjs            #   calculateShortestPaths() + reconstructPath() on a tiny digraph
+  02-dijkstra-oracle.mjs  #   validate BMSSP against the exported `dijkstra` oracle (per-node table)
+  03-constant-degree.mjs  #   the opt-in constantDegreeTransform (sourceCopy/collapse)
+  04-larger-graph.mjs     #   a generated 40×40 grid — timing + oracle spot-check
+  run-all.mjs             #   runs all four in order (the Docker image's default CMD)
+  README.md               #   gallery index + Docker run/override/mount recipes
 docs/index.html           # public-API reference (GitHub Pages via static.yml) — rewritten in
                           # #166 from a stale landing page (wrong repo link, stray </svg>);
                           # documents the three exports only, internals explicitly excluded
@@ -622,10 +631,10 @@ BMSSP-vs-Dijkstra head-to-head itself:
 | Performance-cliff investigation + quadratic batchPrepend fix | `src/blockList.mjs` + HEAD-TO-HEAD addendum | #182 | ✅ merged (PR #200, **patch → 1.1.1**, released 2026-07-21) |
 | Exact Lemma 3.3 asymptotics (BST bound index + linear selection) | `src/boundIndex.mjs` + `src/select.mjs` + `src/blockList.mjs` | #167 | ✅ merged (PR #202, no bump) |
 | Relaxation micro-optimizations (allocation-free relaxEdge, unpacked routing, heap measurement) | `src/tieBreak.mjs` + `src/bmssp.mjs` + `src/baseCase.mjs` + `src/findPivots.mjs` | #168 | ✅ merged (PR #203, **minor → 1.2.0**, released 2026-07-21) |
-| Dense-index core: typed-array labels + CSR adjacency | `src/tieBreak.mjs` (makeLabels) + `src/bmssp.mjs` (buildIndex/CSR) + `src/baseCase.mjs` + `src/findPivots.mjs` | #205 | ✅ done-pending-merge (this PR, no bump — API-non-breaking) |
+| Dense-index core: typed-array labels + CSR adjacency | `src/tieBreak.mjs` (makeLabels) + `src/bmssp.mjs` (buildIndex/CSR) + `src/baseCase.mjs` + `src/findPivots.mjs` | #205 | ✅ merged (PR #206, no bump — API-non-breaking) |
 
 Milestones `1.1.0` (correctness hardening) and `1.2.0` (performance & ergonomics) are
 both **closed** — 1.2.0 released 2026-07-21 (npm + Docker Hub). Milestone `2.0.0`
-(API-breaking generalization) is current: **#205** (dense-index core) done-pending-merge
-in this PR, then **#172 → #171 → #173** (build order in `06`; #173 closes the milestone
-with the **major → 2.0.0** bump). See [06-milestones-roadmap.md](06-milestones-roadmap.md).
+(API-breaking generalization) is current: **#205** (dense-index core) merged (PR #206,
+no bump), then **#172 → #171 → #173** (build order in `06`; #172 is next, #173 closes the
+milestone with the **major → 2.0.0** bump). See [06-milestones-roadmap.md](06-milestones-roadmap.md).
