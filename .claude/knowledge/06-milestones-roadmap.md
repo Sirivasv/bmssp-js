@@ -1,11 +1,13 @@
 # 06 — Milestones Roadmap
 
-<!-- SYNCED-FROM-GITHUB: 2026-07-21 Phase C of the #166 PR (#164 closed by merged PR #195;
-     milestones 1.1.0/1.2.0/2.0.0 open with 1/4/3 open issues on GitHub; #166 —
-     1.1.0's last open issue — is done-pending-merge in this PR) -->
-<!-- Current package version: 1.1.0 (bumped in the #166 PR — milestone-closing minor;
-     release fires in Phase E after the user confirms the merge. Last released: 1.0.1,
-     2026-07-16) -->
+<!-- SYNCED-FROM-GITHUB: 2026-07-21 Phase C of the #170 PR (verified live: milestone 1.1.0
+     CLOSED 6/6; 1.2.0 open with 4 open issues #167/#168/#170/#182; 2.0.0 open with 3
+     open issues #171/#172/#173; #170 is done-pending-merge in this PR) -->
+<!-- Current package version: 1.1.0 — released 2026-07-21 (tag + GitHub Release with
+     Announcements discussion #197 → npm + Docker Hub via publish.yml); tag matches -->
+<!-- Release-discussion convention (user-directed 2026-07-21): every GitHub Release also
+     creates a linked discussion — pass --discussion-category "Announcements" to
+     gh release create (the UI's "Create a discussion for this release" checkbox) -->
 
 Maps GitHub **milestones** and **issues** (Sirivasv/bmssp-js) to the paper's building blocks,
 with a dependency-aware build order. This is the "intent" side of the knowledge base (what to
@@ -41,11 +43,17 @@ it runs the same Phase C reconciliation directly on `main`.
 
 ## 📋 Roadmap proposals (pending user approval)
 
-From the #166 PR (Phase C, 2026-07-21):
+From the #170 PR (Phase C, 2026-07-21):
 
-1. **Close milestone `1.1.0` (milestone #2) on GitHub** once this PR merges — #166 was its
-   last open issue and milestones don't auto-close. (`gh api -X PATCH
-   repos/Sirivasv/bmssp-js/milestones/2 -f state=closed`.)
+1. **Comment on #182** with the harness's small-n reproductions so the investigation can
+   iterate in seconds instead of minutes: the star pathology is already 8.7× at n = 50k
+   (`star` scenario), and the `topLevel` 3→4 transition is reachable at n = 300k
+   (`sparse-random-l4`: 3.11× vs 2.79× at 50k — the window is exactly n ∈ (2^18, ~376k],
+   where t is still 6; t reaches 7 at ~n = 376k and topLevel drops back to 3). Both are
+   now standing regression sentinels in `npm run bench`.
+
+_(The #166-PR proposal — close milestone `1.1.0` — was approved and executed 2026-07-21:
+milestone #2 is closed on GitHub with 6/6 issues done.)_
 
 _Phase C writes proposed GitHub edits here (and in the PR body); Phase E executes the
 approved ones — one confirmation each — and clears them from this list._
@@ -90,19 +98,29 @@ executed 2026-07-17.)_
 - **Phase A reconciliation (2026-07-21, this session):** PR #195 (the #164 branch) merged
   as `main` HEAD `a1dac45`; `05`'s bookmark fast-path flipped. No pending release found
   (`package.json` 1.0.1 == latest tag).
-- **#166 done-pending-merge (this PR, 2026-07-21):** JSDoc on `index.mjs`'s three public
-  re-exports and a full rewrite of `docs/index.html` into a public-API reference (the old
-  page was a generic landing page linking to the wrong repo). No `src/`/`test/` changes.
-  **Last open 1.1.0 issue → minor bump to `1.1.0` in this PR**; on merge: release 1.1.0
-  (Phase E) and close the milestone (Roadmap proposal 1).
+- **#166 merged (PR #196, 2026-07-21):** JSDoc on `index.mjs`'s three public re-exports
+  and a full rewrite of `docs/index.html` into a public-API reference (the old page was a
+  generic landing page linking to the wrong repo). No `src/`/`test/` changes. Last open
+  1.1.0 issue → carried the minor bump; **1.1.0 released same day** (tag + GitHub Release
+  with Announcements discussion #197 → npm + Docker Hub) and **milestone 1.1.0 closed**.
 - **Phase A reconciliation (2026-07-21):** the #165 PR (#191) and three dependabot workflow
   bumps (#192/#193/#194, `.github/workflows/**` only) had landed on `main` without a
   post-merge session-start marker flip. The #164 PR folds that in: `05`'s bookmark now sits
   at `b36c059` and the "pending" framing for #165 is cleared.
 - **Milestone `1.2.0` — performance & ergonomics** (in progress). **#169 merged**
   (PR #189): public `BMSSP.reconstructPath(target)` walks the existing canonical
-  predecessor map, with independent path-oracle coverage and public usage docs. Four
-  issues remain.
+  predecessor map, with independent path-oracle coverage and public usage docs.
+- **#170 done-pending-merge (this PR, 2026-07-21):** the harness runs the head-to-head
+  itself. `scenarios.bench.mjs` gains algorithm-only `dijkstra ms`/`bmssp ms`/`ratio`
+  columns (both sides on the instance's prebuilt adjacency via the new
+  `benchmarks/dijkstra-adj.mjs`; outputs verified, `mismatches` column must be 0) plus a
+  `sparse-random-l4` scenario (n = 300k — inside the `topLevel` 3→4 window that starts at
+  n = 2^18 + 1). Opt-in `npm run bench:counts` (`compare-counts.bench.mjs`) reproduces
+  the comparison-count crossover exactly (sparse 1.20× at 50k → 1.03× at 200k → **0.98×
+  at 1M**) via an unconditional `compareKeys` counter in `src/tieBreak.mjs` and matching
+  counters in the bench Dijkstra. 7 new harness tests + 3 counter tests (suite 157).
+  Fresh `RESULTS.md` captured; `HEAD-TO-HEAD.md` marked as the frozen 1.0.0 record.
+  No bump (not a bug fix; #167/#168/#182 still open in 1.2.0).
 - **Semver release convention (user-directed 2026-07-17, PR #186):** bumps only on bug
   fix (patch) or milestone-closing PR (minor/major) — see "Release mechanics" below.
 - **2026-07-16 reflection session (post-release):** measured the BMSSP-vs-Dijkstra
@@ -134,7 +152,7 @@ executed 2026-07-17.)_
 - Each sub-piece (#40/#41/#42/#44/#45) shipped with focused unit tests. ✅
 - `npm run lint` clean; ESM + Prettier style preserved. ✅
 
-## Milestone `1.1.0` (milestone #2) — correctness hardening — ✅ COMPLETE PENDING #166 MERGE
+## Milestone `1.1.0` (milestone #2) — correctness hardening — ✅ CLOSED (released 2026-07-21)
 
 All six issues done (build order as executed — cheapest protection first, then the deep work):
 
@@ -145,28 +163,28 @@ All six issues done (build order as executed — cheapest protection first, then
 | 3 | 163 | Deterministic tie-breaking for equal-length paths (Assumption 2.1) | enhancement · help wanted | ✅ merged (PR #188, no bump): composite keys in `src/tieBreak.mjs`, all six tie manifestations resolved by construction |
 | 4 | 165 | Input validation for the BMSSP constructor | good first issue · help wanted | ✅ merged (PR #191, no bump): validates graph shape, node IDs, and weights; preserves empty graphs |
 | 5 | 164 | Optional constant-degree transform (in/out-degree ≤ 2) | enhancement · help wanted | ✅ merged (PR #195, no bump): `src/constantDegree.mjs`, opt-in + distance-preserving, re-exported |
-| 6 | 166 | JSDoc / API docs for the new modules | documentation · good first issue | ✅ done-pending-merge (this PR, **minor → `1.1.0`**): JSDoc on `index.mjs`'s re-exports + `docs/index.html` rewritten as the public-API reference (`BMSSP`, `dijkstra`, `constantDegreeTransform`; internals stay out). **Closes milestone 1.1.0** |
+| 6 | 166 | JSDoc / API docs for the new modules | documentation · good first issue | ✅ merged (PR #196, **minor → `1.1.0`**, released 2026-07-21): JSDoc on `index.mjs`'s re-exports + `docs/index.html` rewritten as the public-API reference (`BMSSP`, `dijkstra`, `constantDegreeTransform`; internals stay out). **Closed milestone 1.1.0** |
 
-## Milestone `1.2.0` (milestone #3) — performance & ergonomics — NEXT
+## Milestone `1.2.0` (milestone #3) — performance & ergonomics — CURRENT
 
-Suggested build order: **#170 first** (harness integration turns the one-off HEAD-TO-HEAD
-measurement into a repeatable tool), then **#182** (use that tool to investigate the two
-measured cliffs), then **#167 / #168** (the optimizations the investigation informs).
+Build order: ~~#170~~ (done-pending-merge), then **#182** (use the harness's small-n
+reproductions to investigate the two measured cliffs), then **#167 / #168** (the
+optimizations the investigation informs).
 
 | # | Issue | Labels | Notes |
 |---|---|---|---|
 | 167 | Restore Lemma 3.3's exact asymptotics in BlockList (balanced-BST bound index + linear-time selection) | enhancement · help wanted | — |
 | 168 | Adjacency and relaxation micro-optimizations | enhancement · help wanted | — |
 | 169 | Optional shortest-path reconstruction (`Pred[]` → paths) | enhancement · help wanted | ✅ merged (PR #189, no bump): public API + independent path oracle |
-| 170 | BMSSP-vs-Dijkstra benchmark comparison | enhancement · help wanted | — |
+| 170 | BMSSP-vs-Dijkstra benchmark comparison | enhancement · help wanted | ✅ done-pending-merge (this PR, no bump): head-to-head + count mode in the harness, verified outputs |
 | 182 | Investigate BMSSP performance cliffs: high-fanout (star) graphs and recursion-level transitions | enhancement · help wanted | — |
 
-_Note:_ the seeded **benchmark harness already exists** (`benchmarks/`, `npm run bench`),
-and the measured head-to-head lives in `benchmarks/HEAD-TO-HEAD.md`. #170 is now scoped to
-harness integration (algorithm-only `bmssp` column + optional comparison-count mode; full
-baseline recorded as a comment on the issue, 2026-07-16). #182 (new, 2026-07-16) carries
-the two measured pathologies: star-graph blowup (67.8× at n = 500k) and the `topLevel`
-3→4 transition cliff (5× at n = 4M); likely overlaps #167/#168.
+_Note:_ #182 carries the two measured pathologies (star blowup: 67.8× at n = 500k in the
+1.0.0 record, already 8.7× at n = 50k in the harness; the `topLevel` 3→4 transition: 5× at
+n = 4M in the record, 3.11× at n = 300k via `sparse-random-l4`); likely overlaps
+#167/#168. Since #170 the harness reruns both as regression sentinels on every
+`npm run bench`, and `npm run bench:counts` reproduces the comparison-count crossover
+(below 1.0 between n = 200k and n = 1M).
 
 ## Milestone `2.0.0` (milestone #4) — API-breaking generalization
 

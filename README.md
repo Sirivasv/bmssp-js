@@ -34,15 +34,19 @@ with every building block shipped, tested, and released individually:
 | Shortest-path reconstruction ([#169](https://github.com/Sirivasv/bmssp-js/issues/169)) | `BMSSP.reconstructPath()` | ✅ done |
 | Constructor input validation ([#165](https://github.com/Sirivasv/bmssp-js/issues/165)) | `BMSSP` constructor | ✅ done |
 | Opt-in constant-degree transform, in/out-degree ≤ 2 ([#164](https://github.com/Sirivasv/bmssp-js/issues/164)) | `constantDegreeTransform()` | ✅ done |
+| BMSSP-vs-Dijkstra head-to-head in the benchmark harness ([#170](https://github.com/Sirivasv/bmssp-js/issues/170)) | `npm run bench` / `npm run bench:counts` | ✅ done |
 
 > **Honest note:** the paper's win is asymptotic, and this repo optimizes for correctness
 > and readability, not raw speed. Measured head-to-head (algorithm time only, graph
-> loading excluded — see [benchmarks/HEAD-TO-HEAD.md](benchmarks/HEAD-TO-HEAD.md)):
+> loading excluded — rerun it yourself with `npm run bench`; methodology and the deep
+> 1.0.0 record in [benchmarks/HEAD-TO-HEAD.md](benchmarks/HEAD-TO-HEAD.md)):
 > Dijkstra still wins on wall-clock at every practical size, though the gap narrows as
 > sparse graphs grow (2.5× at 50k nodes → 1.57× at 2M). But in the paper's own metric —
 > **comparisons between path lengths** — BMSSP does **fewer comparisons than Dijkstra
-> from about n = 1M on sparse graphs** (0.91× at n = 2M), and the advantage grows with
-> size: the "sorting barrier" is measurably broken; what remains is JS constant factors.
+> from about n = 1M on sparse graphs** (`npm run bench:counts` measures the ratio falling
+> 1.20× at 50k → 1.03× at 200k → 0.98× at 1M; 0.91× at 2M in the record), and the
+> advantage grows with size: the "sorting barrier" is measurably broken; what remains is
+> JS constant factors.
 > Where inputs violate the paper's distinct-path-lengths assumption (e.g. zero-weight
 > edges), a principled deterministic tie-break
 > ([#163](https://github.com/Sirivasv/bmssp-js/issues/163)) realizes that assumption in
@@ -145,14 +149,17 @@ Other image versions are on [Docker Hub](https://hub.docker.com/r/sirivasv/bmssp
 
 ```bash
 npm install
-npm test          # Jest suite — every graph seeded, every failure reproducible (~3 s)
-npm run lint      # Prettier + ESLint
-npm run bench     # seeded micro-benchmarks (see benchmarks/README.md)
+npm test              # Jest suite — every graph seeded, every failure reproducible (~7 s)
+npm run lint          # Prettier + ESLint
+npm run bench         # BMSSP-vs-Dijkstra head-to-head per graph shape, outputs verified
+npm run bench:counts  # …plus comparison-count tables (the paper's own cost metric)
 ```
 
-The measured BMSSP-vs-Dijkstra head-to-head — wall-clock and comparison counts, with
-methodology — lives in [benchmarks/HEAD-TO-HEAD.md](benchmarks/HEAD-TO-HEAD.md)
-([#170](https://github.com/Sirivasv/bmssp-js/issues/170) tracks harness integration).
+The benchmark harness runs the measured BMSSP-vs-Dijkstra head-to-head on every
+`npm run bench` ([#170](https://github.com/Sirivasv/bmssp-js/issues/170)); methodology,
+the deep 1.0.0 record (up to n = 4M) and the "when to use which" guidance live in
+[benchmarks/HEAD-TO-HEAD.md](benchmarks/HEAD-TO-HEAD.md) and
+[benchmarks/README.md](benchmarks/README.md).
 
 The test suite's core contract: for every node, BMSSP's distances must equal the Dijkstra
 oracle's. A seeded property/fuzz suite (`test/fuzz.test.mjs`) hammers that contract across

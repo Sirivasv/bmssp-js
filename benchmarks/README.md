@@ -1,22 +1,26 @@
 # bmssp-js benchmarks
 
 Deterministic, dependency-free micro-benchmarks for `bmssp-js`. They exist to
-(1) justify the adjacency map added in issue #45, and (2) stand up the harness
-that drives the **BMSSP vs. Dijkstra** comparison across graph shapes — the
-"when to use which" question. The measured 1.0.0 head-to-head (wall-clock *and*
-comparison counts) lives in [`HEAD-TO-HEAD.md`](./HEAD-TO-HEAD.md).
+(1) justify the adjacency map added in issue #45, and (2) run the **BMSSP vs.
+Dijkstra** head-to-head across graph shapes (#170) — the "when to use which"
+question, in both wall-clock time and the paper's own metric, comparison
+counts. The measured 1.0.0 baseline record lives in
+[`HEAD-TO-HEAD.md`](./HEAD-TO-HEAD.md); the latest captured harness report is
+[`RESULTS.md`](./RESULTS.md).
 
 ## Running
 
 ```bash
-node benchmarks/run.mjs            # print a markdown report
-node benchmarks/run.mjs > RESULTS.md
-npm run bench                      # same, via package script
+npm run bench                      # adjacency + head-to-head timings
+npm run bench:counts               # …plus the comparison-count tables (slower)
+node benchmarks/run.mjs [--counts] # same, direct
+node benchmarks/run.mjs --counts > benchmarks/RESULTS.md   # capture a report
 ```
 
 All graphs come from seeded generators (`generators.mjs`), so numbers are
 reproducible on a given machine. Timings use `process.hrtime.bigint()` with a
-warm-up run and the median of several iterations.
+warm-up run and the median of several iterations; comparison counts are exact
+and machine-independent (one run per side).
 
 ## What each file is
 
@@ -25,9 +29,12 @@ warm-up run and the median of several iterations.
 | `generators.mjs` | Seeded graph builders + the named `SCENARIOS` registry |
 | `bench-util.mjs` | Timing (`timeMany`) and markdown-table helpers |
 | `adjacency.bench.mjs` | Adjacency map (#45) vs. linear edge scan |
-| `scenarios.bench.mjs` | Construct + Dijkstra timings per graph shape |
-| `run.mjs` | Runs everything, prints the report |
+| `scenarios.bench.mjs` | Head-to-head per graph shape: construct, Dijkstra and BMSSP timings, verified outputs (#170) |
+| `dijkstra-adj.mjs` | Algorithm-only Dijkstra over a prebuilt adjacency map + comparison counter — the fair baseline (#170) |
+| `compare-counts.bench.mjs` | Comparison-count mode: the sorting barrier measured in the paper's cost metric (#170) |
+| `run.mjs` | Runs everything, prints the report (`--counts` adds the count tables) |
 | `HEAD-TO-HEAD.md` | Measured BMSSP-vs-Dijkstra results (1.0.0), methodology + tables |
+| `RESULTS.md` | Latest captured harness report (`npm run bench:counts` output) |
 
 ---
 
@@ -52,16 +59,16 @@ whole algorithm. #45 is a prerequisite, not an optimization.
 > Exact numbers vary by machine; run `npm run bench` for yours. The captured
 > report lives in [`RESULTS.md`](./RESULTS.md).
 
-## Result 2 — graph-shape scenarios (Dijkstra baseline)
+## Result 2 — graph-shape scenarios (BMSSP vs Dijkstra, #170)
 
-`scenarios.bench.mjs` times construction (which now includes building the #45
-map) and one single-source Dijkstra run per shape — the Dijkstra baseline
-column of the head-to-head. The real BMSSP recursion landed in `1.0.0` (#43);
-integrating an algorithm-only `bmssp` column (and an optional comparison-count
-mode) into this harness is tracked in #170. The measured results so far are in
-[`HEAD-TO-HEAD.md`](./HEAD-TO-HEAD.md).
+`scenarios.bench.mjs` runs the head-to-head per shape: construction (which
+includes building the #45 map), then **algorithm-only timings** for both
+sides — `dijkstra-adj.mjs`'s prebuilt-adjacency Dijkstra and
+`BMSSP.calculateShortestPaths()` consume the same adjacency Map, so neither
+timed window contains graph loading. Outputs are verified node-by-node every
+run; the `mismatches` column must read 0.
 
-The five shapes are chosen to stress the axes that separate the two algorithms:
+The shapes stress the axes that separate the two algorithms:
 
 | scenario | shape | why it's here |
 |----------|-------|---------------|
@@ -69,32 +76,50 @@ The five shapes are chosen to stress the axes that separate the two algorithms:
 | `dense-random` | avg degree 32 | edge-relaxation-bound; the `m` term dominates and sorting is cheap |
 | `grid-4nbr` | 200×200 lattice | large diameter, low uniform degree (spatial/mesh) |
 | `chain` | one long path | worst-case depth, minimal branching |
-| `star` | one hub, n−1 spokes | extreme degree skew |
+| `star` | one hub, n−1 spokes | extreme degree skew — the #182 blowup case |
+| `sparse-random-l4` | degree 3, n = 300k | just past the `topLevel` 3→4 step at n = 2^18 — the #182 level-transition case |
+
+## Result 3 — comparison counts (the sorting barrier, measured)
+
+`npm run bench:counts` adds the paper's own cost metric: **comparisons between
+path lengths**. Every BMSSP-side comparison funnels through
+`compareKeys` (`src/tieBreak.mjs` keeps an unconditional counter); the
+Dijkstra baseline counts its heap sifts, stale-pop checks and relaxations the
+same way. Counts are deterministic, so one run per side is exact. On sparse
+graphs the bmssp/dijkstra ratio falls as n grows and **crosses below 1.0
+between n = 200k and n = 1M** — the measured form of the paper's asymptotic
+claim (`1.0.0` record: 1.18× at 50k → 1.01× at 200k → 0.96× at 1M → 0.91× at
+2M).
 
 ---
 
-## When to use which (measured guidance, 1.0.0)
+## When to use which (measured guidance)
 
 BMSSP's advantage is **asymptotic and narrow**: `O(m · log^(2/3) n)` vs.
-Dijkstra's `O(m + n · log n)`. With the full algorithm now functional, the
-question is measured rather than asserted — see
-[`HEAD-TO-HEAD.md`](./HEAD-TO-HEAD.md) for methodology and tables:
+Dijkstra's `O(m + n · log n)`. The question is measured, not asserted — the
+harness reruns it on every `npm run bench` (fresh capture:
+[`RESULTS.md`](./RESULTS.md); the deeper 1.0.0 record up to n = 4M:
+[`HEAD-TO-HEAD.md`](./HEAD-TO-HEAD.md)):
 
 - **Use Dijkstra for wall-clock speed:** it wins on every shape and size
-  measured so far (algorithm-only timing, ~1.6–2× faster on large sparse
-  graphs, more on dense/chain/star). `bmssp-js` itself uses Dijkstra as the
-  oracle precisely because it is correct and fast.
-- **BMSSP's asymptotics are real and visible:** on sparse graphs the wall-clock
-  gap narrows steadily with n (2.5× at 50k nodes → 1.57× at 2M), and in the
-  paper's own metric — comparisons between path lengths — **BMSSP does fewer
-  comparisons than Dijkstra from about n = 1M**, improving with size. The
-  sorting barrier is measurably broken; the remaining loss is constant factors.
-- **Shapes that blunt BMSSP's edge:** `dense-random` (relaxation-bound, nothing
-  to save), `chain` (depth, not sorting, is the cost), and `star` (extreme
-  fanout — currently a real performance defect, tracked in #182).
+  measured (algorithm-only timing, ~1.6–3× on sparse graphs, more on
+  dense/chain/star). `bmssp-js` itself uses Dijkstra as the oracle precisely
+  because it is correct and fast.
+- **BMSSP's asymptotics are real and visible:** on sparse graphs the
+  wall-clock gap narrows with n (2.5× at 50k → 1.57× at 2M in the 1.0.0
+  record), and in the paper's own metric the harness's count mode shows the
+  ratio crossing below 1.0: 1.20× at 50k → 1.03× at 200k → **0.98× at 1M**
+  (0.91× at 2M in the record). The sorting barrier is measurably broken; the
+  remaining loss is constant factors.
+- **Shapes that blunt BMSSP's edge, per the harness:** `dense-random`
+  (relaxation-bound, ~4.8×), `chain` (depth, not sorting, is the cost —
+  ~8.9× against the prebuilt-adjacency baseline), `star` (extreme fanout,
+  ~8.7× already at 50k — the #182 defect), and the `topLevel` 3→4 window
+  (`sparse-random-l4`: 3.11× at 300k, against the narrowing trend on either
+  side — the #182 level-transition cliff, a regression sentinel).
 
 **Bottom line for this repo:** BMSSP is implemented here for **correctness and
 readability** — a faithful, tested rendering of the 2025 result. Pick Dijkstra
 for real workloads; reach for BMSSP to study the algorithm. The measured
-crossover in comparison counts (#170 tracks putting it in the harness) is the
+crossover in comparison counts — now one `npm run bench:counts` away — is the
 honest demonstration of the paper's claim.

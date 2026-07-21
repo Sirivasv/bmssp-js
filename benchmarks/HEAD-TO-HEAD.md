@@ -12,6 +12,11 @@ node v26.5.0, darwin/arm64, with the seeded generators from
   with n. The "sorting barrier" is measurably broken; the wall-clock loss is JS constant
   factors (Map churn, allocation), not algorithmic work.
 
+> This document is the frozen 1.0.0 measurement record (sizes up to n = 4M). Since #170
+> the harness reruns the head-to-head on every `npm run bench` (both timing columns,
+> outputs verified) and `npm run bench:counts` reproduces the comparison-count crossover;
+> the latest capture lives in [`RESULTS.md`](./RESULTS.md).
+
 ## Methodology — algorithm time only
 
 Timing starts when the algorithm starts and stops when it finishes. Everything that is

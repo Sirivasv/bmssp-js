@@ -125,7 +125,12 @@ export const SCENARIOS = [
   },
   {
     name: "star",
-    blurb: "one hub, n-1 spokes — extreme degree skew",
+    blurb: "one hub, n-1 spokes — extreme degree skew (#182)",
     build: () => star(50_000, 15),
+  },
+  {
+    name: "sparse-random-l4",
+    blurb: "n just past the topLevel 3→4 step at n = 2^18 (#182)",
+    build: () => sparseRandom(300_000, 3, 16),
   },
 ];

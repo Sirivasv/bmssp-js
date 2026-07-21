@@ -5,6 +5,8 @@ import {
   makeTies,
   orderKey,
   relaxEdge,
+  resetComparisonCount,
+  getComparisonCount,
 } from "../src/tieBreak.mjs";
 import { BMSSP } from "../src/bmssp.mjs";
 import { dijkstra } from "../src/dijkstra.mjs";
@@ -404,5 +406,40 @@ describe("canonical labels (#163): hops and preds are the lexicographic optimum"
         }
       }
     }
+  });
+});
+
+describe("comparison counter (#170): benchmark instrumentation", () => {
+  test("resets to zero and counts each compareKeys call", () => {
+    resetComparisonCount();
+    expect(getComparisonCount()).toBe(0);
+    compareKeys([1, 0, 0], [2, 0, 0]);
+    compareKeys([1, 0, 0], [1, 0, 0]);
+    expect(getComparisonCount()).toBe(2);
+    resetComparisonCount();
+    expect(getComparisonCount()).toBe(0);
+  });
+
+  test("counts comparisons made inside relaxEdge", () => {
+    const dHat = new Map([
+      [0, 0],
+      [1, Infinity],
+    ]);
+    const ties = makeTies();
+    resetComparisonCount();
+    relaxEdge(0, 1, 5, dHat, ties);
+    expect(getComparisonCount()).toBeGreaterThan(0);
+  });
+
+  test("a full BMSSP run performs comparisons through the counter", () => {
+    const bmssp = new BMSSP([
+      [0, 1, 1],
+      [1, 2, 2],
+      [0, 2, 5],
+    ]);
+    resetComparisonCount();
+    bmssp.calculateShortestPaths(0);
+    expect(getComparisonCount()).toBeGreaterThan(0);
+    expect(bmssp.shortestPaths.get(2)).toBe(3);
   });
 });
