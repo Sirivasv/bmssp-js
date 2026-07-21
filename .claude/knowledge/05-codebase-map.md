@@ -1,16 +1,18 @@
 # 05 — Codebase Map (current state)
 
-<!-- BOOKMARK-COMMIT: 50faa4a -->
-<!-- PENDING-PR-BRANCH: feat/172-typed-flexible-inputs -->
-<!-- Last validated: 2026-07-21 (Phase C of the #172 PR, branch
-     feat/172-typed-flexible-inputs, based on main 50faa4a). This PR adds typed/flexible
-     graph inputs (milestone 2.0.0, mid-milestone → no bump): new src/graph.mjs (`Graph`
-     builder + `normalizeGraphInput`), re-exported `Graph` from index.mjs, and a BMSSP
-     constructor that accepts an edge array (unchanged), an adjacency Map/object, or a
-     Graph — plus an explicit declarable vertex universe (isolated nodes). Node IDs stay
-     finite numbers; canonical [length, hops, id] tie-break order unchanged. Body describes
-     post-merge reality; markers fast-path on the next session's Phase A. Also folds in the
-     PR #207 marker flip (BOOKMARK 50faa4a) that had been left as a local bookkeeping edit. -->
+<!-- BOOKMARK-COMMIT: 6cab602 -->
+<!-- PENDING-PR-BRANCH: feat/171-multi-source-entrypoint -->
+<!-- Last validated: 2026-07-21 (Phase C of the #171 PR, branch
+     feat/171-multi-source-entrypoint, based on main 6cab602). This PR adds the public
+     multi-source / bounded entrypoint (milestone 2.0.0, mid-milestone → no bump):
+     BMSSP.calculateShortestPathsFrom(sources, { bound }) + the normalizeSources helper —
+     a thin, ergonomic surface over the existing bmssp(topLevel, B, S) wrapper that hides the
+     recursion level and the seed-the-Map ritual. Flexible `sources` (Map | object | [id,dist]
+     pairs | bare id array), bound defaults to Infinity, finite-bound runs prune the mirror to
+     the completed set U. Additive only — calculateShortestPaths / bmssp / reconstructPath
+     unchanged; node-ID + tie-break semantics untouched. Body describes post-merge reality;
+     markers fast-path on the next session's Phase A. Also folds in the #172-PR Phase E marker
+     flip (BOOKMARK 6cab602) that had been left as a local bookkeeping edit. -->
 
 
 Snapshot of what exists in `bmssp-js` today, so you know what to build on vs. what's missing.
@@ -88,6 +90,7 @@ test/
   constantDegree.test.mjs # #164: 11 tests — degree ≤ 2 on hand + seeded shapes (incl. star hub), distance preservation via oracle, BMSSP-on-transform, determinism, empty/validation
   graph.test.mjs          # #172: 18 tests — Graph builder (chain/idempotent/copies/eager validation), adjacency Map/object inputs, object-key coercion, isolated vertices (empty & null neighbor lists, declared, as source), cross-shape oracle equivalence (seeded 2k), unrecognized-input + malformed-adjacency throws
   pathReconstruction.test.mjs # #169: 3 public-API tests — Dijkstra path oracle, unreachable/pre-run/source switching, target validation
+  multiSource.test.mjs     # #171: 19 tests — calculateShortestPathsFrom: single-source equivalence, nearest-of-many + custom-d0 multi-source oracle, bounded pruning, all input shapes, reconstructPath/state-reset integration, validation
   blockList.test.mjs      # #42: 25 BlockList tests incl. seeded random stress, #182 many-chunk/M=1 regression tests + #167 machinery tests
   boundIndex.test.mjs     # #167: 8 BoundIndex tests — sequence ops, monotone findFirst, AVL invariants under seeded churn
   select.test.mjs         # #167: 9 partitionByRank tests — every-rank contract, worst-case orderings, duplicates, determinism
@@ -165,6 +168,11 @@ class BMSSP {
                                    //      space (S/U = indices, keys = [len,hops,index], CSR + labels)
   calculateShortestPaths(startNode)// #43: validates, sets labels.dist[startIdx] = 0, runs
                                    //      bmsspIndex(topLevel, ∞, {startIdx}), then syncLabelsOut
+  normalizeSources(sources)        // #171: flexible sources → Map<id, initialDistance>
+                                   //      (Map | {id:dist} | [id,dist][] | id[]; validated)
+  calculateShortestPathsFrom(sources, { bound }) // #171 PUBLIC multi-source/bounded entry:
+                                   //      seed shortestPaths, run bmssp(topLevel, bound, S),
+                                   //      prune the mirror to U under a finite bound
   reconstructPath(target)          // #169: source→target path from the public preds mirror
 }
 ```
@@ -214,6 +222,28 @@ result's indices/key are translated to id space (`keyToPublic`). `calculateShort
 skips the wrapper (runs `bmsspIndex` directly, then one `syncLabelsOut`). `reconstructPath`
 reads the public `preds` mirror as before. This is why #205 is **API-non-breaking** despite
 being in the 2.0.0 milestone: it re-engineers the interior, not the surface.
+
+**Public multi-source / bounded entrypoint (#171).**
+`calculateShortestPathsFrom(sources, { bound } = {})` exposes the paper's `BMSSP(l, B, S)`
+generalization (§04) as ergonomic public API — an additive surface over the existing
+`bmssp(topLevel, B, S)` wrapper, hiding both the recursion level and the "seed
+`this.shortestPaths` first" ritual the fuzz suite uses directly. `normalizeSources` reduces
+the flexible `sources` argument (`Map<id,dist>` | object `{id:dist}` (numeric-string keys
+coerced) | array of `[id,dist]` pairs | bare id array → distance 0) to a validated
+`Map<id, initialDistance>` (each id a known node, each distance finite ≥ 0; a repeated source
+keeps its smallest distance). The method seeds those distances into `this.shortestPaths`, runs
+`this.bmssp(this.topLevel, bound, new Set(ids))`, and — like `calculateShortestPaths` — writes
+results into the public Maps and returns nothing. **Bounded-run cleanup:** BMSSP relaxes some
+vertices at/above `B` without completing them, leaving over-estimates in the mirror, so under
+a **finite** bound the method prunes `shortestPaths`/`hops`/`preds` to the returned completed
+set `U` (exactly the vertices with `d(v) < B`); an unbounded run's `U` already equals the
+reachable set, so no pruning is needed. Single-source SSSP is the special case
+`calculateShortestPathsFrom([start])`. `bound` accepts a non-negative number or `Infinity`
+(default). The multi-source ground truth is `trueDist(v) = min_s(d0[s] + dist_s(v))`; initial
+distances are treated as the sources' true (complete) distances (the paper's precondition,
+trivially met by the common all-zero seeding). **Additive only** — `calculateShortestPaths`,
+`bmssp`, and `reconstructPath` are untouched, and node-ID / `[length, hops, id]` tie-break
+semantics are unchanged.
 
 **`bmsspIndex(l, boundKey, S)` (#43):** level 0 delegates to `baseCase`. At level ≥ 1:
 `findPivots` shrinks the frontier; pivots seed a `BlockList(M = 2^((l-1)·t), boundKey,
@@ -596,6 +626,19 @@ every accepted shape. See §"Flexible inputs (#172)" for the per-shape contract.
   checked against an independent Dijkstra path oracle, including competing paths, an
   unreachable vertex, calls before a run, source switching on one instance, and rejection
   of a target that is not in the graph.
+- `test/multiSource.test.mjs` (19, #171): the public `calculateShortestPathsFrom(sources,
+  { bound })` entrypoint. **Single-source equivalence** (`[s]` matches
+  `calculateShortestPaths(s)` and the Dijkstra oracle on a seeded 400-node sparse graph;
+  `[[s,0]]` == `[s]`); **multi-source semantics** against the `trueDist(v) =
+  min_s(d0[s]+dist_s(v))` oracle (nearest-of-many on a hand graph, custom initial distances
+  on a seeded 600-node graph, smallest-distance-wins for a repeated source); **bounded runs**
+  (a bound between two oracle distances completes exactly `d < B` and prunes the rest to ∞;
+  `bound = 0` completes nothing incl. the source; default `∞` is unbounded); **input shapes
+  agree** (Map / object / `[id,dist]` pairs / bare ids); **integration** (`reconstructPath`
+  and state-reset across `calculateShortestPaths`↔`calculateShortestPathsFrom` calls, isolated
+  declared vertex valid as a source); and **validation** (unknown source, negative/NaN/∞
+  initial distance, malformed pair, empty set, unrecognized shape, negative/NaN/non-number
+  bound, non-numeric object key).
 - `test/graph.test.mjs` (18, #172): the flexible-input surface. `Graph` builder
   (chaining, idempotent `addVertex`, endpoint auto-declare, `toNormalized` copy isolation,
   eager id/weight validation); `new BMSSP` from an adjacency **object** and **Map** and a
@@ -632,8 +675,9 @@ every accepted shape. See §"Flexible inputs (#172)" for the per-shape contract.
   (identical maps incl. Infinity → 0; wrong/missing entries counted); `runScenarioBenchmark`
   and `runComparisonCountBenchmark` on tiny injected scenarios return the expected columns
   with **zero mismatches**.
-- Current suite: **209 tests — 208 passing + 1 XL skipped by default** (#172 added the
-  18-test `graph.test.mjs`; `bmssp.mjs`, `index.mjs` and the new `graph.mjs` at 100%),
+- Current suite: **228 tests — 227 passing + 1 XL skipped by default** (#171 added the
+  19-test `multiSource.test.mjs`; #172 the 18-test `graph.test.mjs`; `bmssp.mjs`, `index.mjs`
+  and `graph.mjs` at 100%),
   ~100% statement coverage, ~7.5 s wall-clock (the #164 distance-preservation sweeps run
   BMSSP/Dijkstra from every source). No graph data files: every generated test graph comes
   from a seed; the #162 fixtures are hand-built and fully deterministic. The #205 dense-index
@@ -691,11 +735,13 @@ BMSSP-vs-Dijkstra head-to-head itself:
 | Exact Lemma 3.3 asymptotics (BST bound index + linear selection) | `src/boundIndex.mjs` + `src/select.mjs` + `src/blockList.mjs` | #167 | ✅ merged (PR #202, no bump) |
 | Relaxation micro-optimizations (allocation-free relaxEdge, unpacked routing, heap measurement) | `src/tieBreak.mjs` + `src/bmssp.mjs` + `src/baseCase.mjs` + `src/findPivots.mjs` | #168 | ✅ merged (PR #203, **minor → 1.2.0**, released 2026-07-21) |
 | Dense-index core: typed-array labels + CSR adjacency | `src/tieBreak.mjs` (makeLabels) + `src/bmssp.mjs` (buildIndex/CSR) + `src/baseCase.mjs` + `src/findPivots.mjs` | #205 | ✅ merged (PR #206, no bump — API-non-breaking) |
-| Typed / flexible graph inputs (Graph builder + adjacency Map/object + explicit vertex universe) | `src/graph.mjs` (new) + `src/bmssp.mjs` (constructor) + `index.mjs` (Graph export) + `test/graph.test.mjs` | #172 | ✅ done-pending-merge (this PR, no bump — mid-2.0.0) |
+| Typed / flexible graph inputs (Graph builder + adjacency Map/object + explicit vertex universe) | `src/graph.mjs` (new) + `src/bmssp.mjs` (constructor) + `index.mjs` (Graph export) + `test/graph.test.mjs` | #172 | ✅ merged (PR #208, no bump — mid-2.0.0) |
+| Public multi-source / bounded entrypoint (`calculateShortestPathsFrom`) | `src/bmssp.mjs` + `test/multiSource.test.mjs` | #171 | ✅ done-pending-merge (this PR, no bump — mid-2.0.0) |
 
 Milestones `1.1.0` (correctness hardening) and `1.2.0` (performance & ergonomics) are
 both **closed** — 1.2.0 released 2026-07-21 (npm + Docker Hub). Milestone `2.0.0`
-(API-breaking generalization) is current: **#205** (dense-index core) merged (PR #206) and
-**#172** (typed/flexible inputs) done-pending-merge (this PR, no bump), leaving
-**#171 → #173** (build order in `06`; #171 next, #173 closes the milestone with the
-**major → 2.0.0** bump). See [06-milestones-roadmap.md](06-milestones-roadmap.md).
+(API-breaking generalization) is current: **#205** (dense-index core, PR #206) and **#172**
+(typed/flexible inputs, PR #208) merged, and **#171** (public multi-source/bounded
+entrypoint) done-pending-merge (this PR, no bump), leaving **#173** — the last open issue,
+which closes the milestone with the **major → 2.0.0** bump (API stabilization + migration
+note + docs). See [06-milestones-roadmap.md](06-milestones-roadmap.md).

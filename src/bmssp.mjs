@@ -429,6 +429,126 @@ class BMSSP {
     this.syncLabelsOut();
   }
 
+  // Internal (#171): reduce the flexible `sources` argument of
+  // calculateShortestPathsFrom to a Map<id, initialDistance>. Accepts a
+  // Map<id, dist>, a plain object { id: dist } (numeric-string keys coerced
+  // like #172's adjacency objects), an array of [id, dist] pairs, or a bare
+  // array of ids (each seeded at distance 0). Every id must be a known node
+  // and every initial distance a finite non-negative number; a repeated
+  // source keeps its smallest initial distance.
+  normalizeSources(sources) {
+    const out = new Map();
+    const add = (id, dist) => {
+      if (!this.nodeIDs.has(id)) {
+        throw new Error(`Source ${id} not found in the graph`);
+      }
+      if (!Number.isFinite(dist) || dist < 0) {
+        throw new Error(
+          `Source ${id} must have a non-negative finite initial distance`,
+        );
+      }
+      const prev = out.get(id);
+      out.set(id, prev === undefined ? dist : Math.min(prev, dist));
+    };
+
+    if (sources instanceof Map) {
+      for (const [id, dist] of sources) add(id, dist);
+    } else if (Array.isArray(sources)) {
+      for (const entry of sources) {
+        if (Array.isArray(entry)) {
+          if (entry.length !== 2) {
+            throw new Error("Each source pair must be [id, initialDistance]");
+          }
+          add(entry[0], entry[1]);
+        } else {
+          add(entry, 0);
+        }
+      }
+    } else if (sources && typeof sources === "object") {
+      for (const key of Object.keys(sources)) {
+        add(Number(key), sources[key]);
+      }
+    } else {
+      throw new Error(
+        "sources must be a Map, object, array of [id, dist] pairs, or array of ids",
+      );
+    }
+    return out;
+  }
+
+  /**
+   * Multi-source, optionally-bounded shortest paths — the public form of the
+   * paper's BMSSP(l, B, S) generalization (§04). Runs from a SET of sources,
+   * each with an initial distance, optionally under a strict distance bound B.
+   * Single-source SSSP is exactly the special case sources = [start],
+   * bound = Infinity — what calculateShortestPaths does.
+   *
+   * Results land in this.shortestPaths (and the hops/preds mirror), like
+   * calculateShortestPaths: every completed vertex holds its distance;
+   * vertices not reached — or, in a bounded run, not completed below B — keep
+   * Infinity. Read the answer from this.shortestPaths after the call. Under a
+   * finite bound only the completed set U is exposed: BMSSP may relax vertices
+   * above B without completing them, so those leftover estimates are pruned
+   * back to Infinity, leaving exactly the vertices with distance < B.
+   *
+   * The initial distances are treated as the sources' TRUE (complete)
+   * distances — the paper's precondition on S. With the common all-zero
+   * seeding this is trivially satisfied (nearest-of-many). Passing custom
+   * initial distances where one source's shortest path undercuts another's
+   * declared distance violates the precondition; the multi-source ground
+   * truth is trueDist(v) = min over sources s of (d0[s] + dist_s(v)).
+   *
+   * @param {Map<number,number>|Object<string,number>|Array<[number,number]>|number[]} sources
+   *   The source set. A Map<id, dist>, a plain object { id: dist } (numeric
+   *   string keys coerced), an array of [id, dist] pairs, or a bare array of
+   *   ids (each seeded at distance 0).
+   * @param {object} [options]
+   * @param {number} [options.bound=Infinity] - Strict distance upper bound B;
+   *   only vertices with distance < B are completed. Infinity runs unbounded.
+   * @throws {Error} If sources is empty or an unrecognized shape, a source id
+   *   is not in the graph, an initial distance is not a non-negative finite
+   *   number, or bound is not a non-negative number / Infinity.
+   */
+  calculateShortestPathsFrom(sources, { bound = Infinity } = {}) {
+    this.initializeShortestPaths();
+
+    const seeded = this.normalizeSources(sources);
+    if (seeded.size === 0) {
+      throw new Error("At least one source is required");
+    }
+    if (typeof bound !== "number" || Number.isNaN(bound) || bound < 0) {
+      throw new Error("bound must be a non-negative number or Infinity");
+    }
+
+    // Seed each source's initial distance into the public estimate; the
+    // bmssp() wrapper's syncLabelsIn snapshots these finite distances into the
+    // engine as complete roots (hop 0, no predecessor).
+    for (const [id, dist] of seeded) {
+      this.shortestPaths.set(id, dist);
+    }
+    const { vertices } = this.bmssp(
+      this.topLevel,
+      bound,
+      new Set(seeded.keys()),
+    );
+
+    // Under a finite bound the top-level call is a successful execution whose
+    // returned set U is exactly the vertices completed below B. BMSSP relaxes
+    // (but does not complete) some vertices at or above B, leaving over-
+    // estimates in the mirror; prune everything outside U so the public Maps
+    // report only the exact in-bound distances (matching an unbounded run,
+    // whose U already equals the reachable set — no pruning needed there).
+    if (bound !== Infinity) {
+      for (const id of this.nodeIDs) {
+        if (!vertices.has(id)) {
+          this.shortestPaths.set(id, Infinity);
+          this.hops.delete(id);
+          this.preds.delete(id);
+        }
+      }
+    }
+  }
+
   /**
    * Reconstruct the canonical shortest path from the most recent source to
    * target. Returns an empty array when target is unreachable or no shortest
