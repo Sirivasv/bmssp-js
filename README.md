@@ -40,6 +40,7 @@ with every building block shipped, tested, and released individually:
 | Relaxation micro-optimizations: allocation-free hot loops, −13–23% wall-clock ([#168](https://github.com/Sirivasv/bmssp-js/issues/168)) | `src/tieBreak.mjs` + the algorithm modules | ✅ done — **1.2.0** |
 | Dense-index core: typed-array labels + CSR adjacency, ~½ the wall-clock ([#205](https://github.com/Sirivasv/bmssp-js/issues/205)) | `src/bmssp.mjs` (CSR) + `src/tieBreak.mjs` (typed labels) | ✅ done |
 | Typed / flexible graph inputs: `Graph` builder + adjacency Map/object + explicit vertex universe ([#172](https://github.com/Sirivasv/bmssp-js/issues/172)) | `src/graph.mjs` + `BMSSP` constructor | ✅ done |
+| Public multi-source / bounded entrypoint ([#171](https://github.com/Sirivasv/bmssp-js/issues/171)) | `BMSSP.calculateShortestPathsFrom()` | ✅ done |
 
 > **Honest note:** the paper's win is asymptotic, and this repo optimizes for correctness
 > and readability first — but the constant factors have come down a lot. Measured
@@ -149,6 +150,45 @@ console.log(graph.shortestPaths.get(9)); // Infinity
 (Plain-object keys are strings in JavaScript, so the object form coerces them to numbers;
 use a `Map` or the `Graph` builder if you want to keep numeric keys explicit.)
 
+### Multi-source and bounded runs
+
+`calculateShortestPathsFrom(sources, { bound })` runs the paper's `BMSSP(l, B, S)`
+generalization directly: from a **set** of sources, each with an initial distance, optionally
+under a strict distance **bound `B`**. Results land in `shortestPaths` just like
+`calculateShortestPaths` — single-source SSSP is exactly the special case
+`calculateShortestPathsFrom([start])`.
+
+```javascript
+import { BMSSP } from "bmssp";
+
+const g = new BMSSP([
+  [0, 1, 2],
+  [1, 2, 3],
+  [5, 2, 1],
+]);
+
+// Nearest of several sources (each seeded at distance 0):
+g.calculateShortestPathsFrom([0, 5]);
+console.log(g.shortestPaths.get(2)); // 1  (via 5 -> 2, beating 0 -> 1 -> 2 = 5)
+
+// Sources with explicit initial distances, as pairs / a Map / an object:
+g.calculateShortestPathsFrom([
+  [0, 0],
+  [5, 10],
+]);
+console.log(g.shortestPaths.get(2)); // 5  (via 0 -> 1 -> 2; 5's head start no longer wins)
+
+// Bounded: only vertices with distance < B are completed; the rest stay Infinity.
+g.calculateShortestPathsFrom([0], { bound: 4 });
+console.log(g.shortestPaths.get(1)); // 2
+console.log(g.shortestPaths.get(2)); // Infinity  (distance 5 is not < 4)
+```
+
+Sources accept a `Map<id, dist>`, an object `{ id: dist }`, an array of `[id, dist]` pairs, or
+a bare array of ids (each seeded at distance 0). Initial distances are treated as the sources'
+true (complete) distances — with the common all-zero seeding this is automatic. `bound`
+defaults to `Infinity` (unbounded).
+
 ### Optional: constant-degree transform
 
 The paper's bound assumes every vertex has in-degree and out-degree ≤ 2. That preprocessing
@@ -232,7 +272,7 @@ graphs in a few seconds), and set `FUZZ_XL=1` for an additional 2-million-node r
 | [`1.0.0`](https://github.com/Sirivasv/bmssp-js/milestones) | First end-to-end functional BMSSP (issues #40–#45) | ✅ done |
 | `1.1.0` | Correctness hardening — fuzz tests, edge cases, tie-breaking, input validation, constant-degree transform, API docs | ✅ done |
 | `1.2.0` | Performance & ergonomics — exact Lemma 3.3 asymptotics, BMSSP-vs-Dijkstra benchmarks, cliff investigation, relaxation micro-optimizations | ✅ done |
-| `2.0.0` | API generalization — dense-index engine (done), typed/flexible inputs (done), public multi-source/bounded entry point | 🔨 current |
+| `2.0.0` | API generalization — dense-index engine (done), typed/flexible inputs (done), public multi-source/bounded entry point (done); API stabilization remaining | 🔨 current |
 
 ## Contributing (humans and AI agents welcome)
 

@@ -1,8 +1,9 @@
 # 06 — Milestones Roadmap
 
-<!-- SYNCED-FROM-GITHUB: 2026-07-21 (RKB at start of the #172 session): 1.2.0 CLOSED; 2.0.0
-     open, 1 closed (#205) + 3 open (#171/#172/#173). #172 is done-pending-merge on branch
-     feat/172-typed-flexible-inputs (not yet closed on GitHub — Phase E) → #171 next -->
+<!-- SYNCED-FROM-GITHUB: 2026-07-21 (Phase C of the #171 PR, branch
+     feat/171-multi-source-entrypoint, based on main 6cab602): 1.2.0 CLOSED; 2.0.0 open,
+     2 closed (#205, #172) + 2 open (#171/#173). #171 done-pending-merge this PR (no bump,
+     mid-2.0.0), leaving #173 as the milestone-closing issue (major → 2.0.0). -->
 <!-- Current package version: 1.2.0 — released 2026-07-21 (tag + GitHub Release with
      Announcements discussion → npm + Docker Hub via publish.yml); tag matches -->
 <!-- Release-discussion convention (user-directed 2026-07-21): every GitHub Release also
@@ -43,28 +44,39 @@ it runs the same Phase C reconciliation directly on `main`.
 
 ## 📋 Roadmap proposals (pending user approval)
 
-**From the #172 PR (`feat/172-typed-flexible-inputs`, no issue-close beyond #172, no bump):**
+**#171 PR (this PR) — one proposal:**
 
-1. **Comment on #172 before closing it** — record what shipped vs. deferred: the flexible
-   input *surface* (`Graph` builder + adjacency Map/object + explicit vertex universe) is
-   done, but the #206-comment's "construct straight into index+CSR without the
-   `[from,to,weight]` round-trip" perf lever was **not** taken, because `this.graph` /
-   `this.adjacency` are public tested fields the constructor must populate anyway. That
-   construction-perf optimization is coupled to whether those fields stay public → carry it
-   into #173. _Rationale: keeps the issue's history honest about the scope call and prevents
-   a future reader assuming direct-CSR construction landed here._
+1. **Comment on #173** (API stabilization, the milestone-closing issue) recording the
+   #171-derived decisions it must resolve, now that the public multi-source surface exists:
+   - #171 shipped `calculateShortestPathsFrom` as **additive** (write-to-Map, returns nothing)
+     rather than taking the "may change existing signatures" latitude the #171 body mentioned —
+     so #173 owns every remaining breaking decision. Decide the **public/private split** for
+     the now-plain-method interior (`bmssp(l,B,S)`, `bmsspIndex`, `syncLabelsIn/Out`,
+     `boundToEngine`/`keyToPublic`, `normalizeSources`) — should the raw `bmssp` wrapper stay
+     public or move behind a private boundary?
+   - Document `calculateShortestPathsFrom` in the **migration note + `docs/index.html`** as a
+     public export alongside `Graph` (#172): its flexible `sources` shapes and the
+     **bounded-run pruning semantic** (finite `B` exposes only the completed set `U`).
+   - Consider whether to surface the richer `{ bound, vertices }` result #171 **discarded**
+     (write-to-Map was chosen for parallelism with `calculateShortestPaths`) — e.g. an
+     optional return or a companion method — as part of finalizing the 2.0 surface.
 
-2. **Comment on #173** (Stabilize the public API surface) — add two concrete decisions this
-   PR surfaces: (a) whether `this.graph` / `this.adjacency` stay public (if they go, the
-   constructor can build CSR directly from normalized input — the deferred #172 perf lever);
-   and (b) document the new `Graph` / adjacency-input surface + the numeric-string object-key
-   coercion rule in the 1.0→2.0 migration note, and mirror a `Graph`-builder example into the
-   `examples/` gallery (which #173 already owns per the PR #207 proposal). _Rationale: #173 is
-   the natural home for the public/private field decision the input work depends on._
+   _(No new issues and no milestone re-slicing: 2.0.0 is on track with **#173 the only issue
+   left**; #171's substrate is exactly what #173 stabilizes.)_
 
-_(No proposal on #171 beyond the existing build order: #172's normalization + explicit
-vertex-set API is exactly the substrate #171's public multi-source entrypoint will consume,
-which the current #171 notes already anticipate.)_
+_Previously executed proposals (kept for provenance):_
+
+_(The #172-PR proposals (PR #208) — scope-summary comment on closed **#172** (flexible-input
+surface shipped; direct-CSR construction perf lever deferred because `this.graph` /
+`this.adjacency` are public tested fields) and a carry-over comment on **#173** (decide the
+fate of those public fields → unblocks direct-CSR construction; document the `Graph` /
+adjacency surface + object-key coercion in the migration note, add `Graph` as the 4th export
+on `docs/index.html`, mirror a `Graph` example into the gallery) — were approved and executed
+2026-07-21: both comments posted.)_
+
+_(No #171 proposal was needed: #172's normalization + explicit vertex-set API is exactly the
+substrate #171's public multi-source entrypoint will consume, which the #171 notes already
+anticipate.)_
 
 _(The examples/Docker-PR proposal (PR #207) — comment on **#173** pointing its migration
 note / public-surface decision at the new `examples/` gallery as the canonical runnable
@@ -237,8 +249,8 @@ executed 2026-07-17.)_
   unit tests rewritten to drive the index API); 100% statement coverage, lint clean,
   FUZZ_ROUNDS=25 + FUZZ_XL green. Phase E: engine-baseline comment posted on #172; the
   build-order confirmation needed no GitHub write. **#172 is next.**
-- **#172 done-pending-merge (branch `feat/172-typed-flexible-inputs`, 2026-07-21; no
-  bump — mid-2.0.0):** typed / flexible graph inputs. New `src/graph.mjs` exports a
+- **#172 merged (PR #208, 2026-07-21, commit 6cab602; no bump — mid-2.0.0):** typed /
+  flexible graph inputs. New `src/graph.mjs` exports a
   chainable **`Graph`** builder (`addVertex`/`addEdge`, isolated-vertex declaration) and
   `normalizeGraphInput`; the BMSSP constructor now accepts an **edge array** (unchanged),
   an **adjacency `Map`**, a **plain adjacency object** (`{ from: [[to,weight]…] }`,
@@ -255,6 +267,22 @@ executed 2026-07-17.)_
   because `this.graph` (and `this.adjacency`) are public, tested fields that must be
   populated regardless; removing them to build CSR directly is a breaking change better
   owned by **#173** (API stabilization). See Roadmap proposals.
+- **#171 done-pending-merge (this PR, no bump — mid-2.0.0):** public multi-source /
+  bounded entrypoint. `BMSSP.calculateShortestPathsFrom(sources, { bound })` is a thin,
+  ergonomic surface over the existing `bmssp(topLevel, B, S)` wrapper — it hides the
+  recursion level and the "seed `this.shortestPaths` first" ritual the fuzz suite uses
+  directly. `sources` accepts a `Map<id,dist>`, object `{id:dist}`, array of `[id,dist]`
+  pairs, or bare id array (distance 0), reduced by the new `normalizeSources` helper;
+  `bound` defaults to `Infinity`. Results write into the public Maps (returns nothing, like
+  `calculateShortestPaths`); under a **finite** bound the mirror is pruned to the returned
+  completed set `U`, so only vertices with `d(v) < B` keep their exact distance (BMSSP's
+  above-`B` over-estimates are cleared). **Additive only** — `calculateShortestPaths`,
+  `bmssp`, `reconstructPath` and the `[length, hops, id]` tie-break are untouched; the
+  breaking-signature latitude the #171 body mentioned is deferred to #173. New 19-test
+  `multiSource.test.mjs` (single-source equivalence, nearest-of-many + custom-`d0`
+  multi-source oracle, bounded pruning, all input shapes, integration, validation); suite
+  228 (227 + 1 XL skip), `bmssp.mjs` 100%, lint clean. **#173 is the only 2.0.0 issue
+  left** (milestone-closing, major → 2.0.0). One Roadmap proposal (comment on #173).
 - **Examples + Docker refresh (PR #207 merged, 2026-07-21, commit 50faa4a;
   user-directed, no issue, no bump):** the stale single `examples/main.mjs` (it only
   printed the raw edge list — never ran the algorithm) is replaced by a standalone gallery
@@ -333,7 +361,8 @@ _Note:_ both #182 shapes stay as regression sentinels in every `npm run bench` (
 ## Milestone `2.0.0` (milestone #4) — API-breaking generalization — CURRENT
 
 Build order (derived 2026-07-21 at RKB, after 1.2.0 closed): ~~#205~~
-(merged, PR #206) → ~~#172~~ (done-pending-merge, this PR) → **#171 → #173**. Rationale:
+(merged, PR #206) → ~~#172~~ (merged, PR #208) → ~~#171~~ (done-pending-merge, this PR) →
+**#173**. Rationale:
 the dense-index engine (#205) decides the internal shapes every new API wraps, so it went
 first; typed/flexible inputs (#172) generalized the constructor surface over it; the public
 multi-source entrypoint (#171) is designed value-in/value-out over the finished engine and
@@ -343,9 +372,9 @@ the surface last and takes the **major → 2.0.0** bump as the milestone-closing
 | # | Issue | Labels | Notes |
 |---|---|---|---|
 | 205 | Dense-index core: typed-array labels + CSR adjacency | enhancement | ✅ merged (PR #206, no bump — API-non-breaking): sorted-id index + CSR + typed labels; wall-clock ~halved (sparse head-to-head 2.5× → 1.38×), counts unchanged |
-| 172 | Typed / flexible graph inputs | enhancement · help wanted | ✅ done-pending-merge (this PR, no bump): `Graph` builder + adjacency Map/object inputs + explicit declarable vertex universe, reduced via `normalizeGraphInput`; node-ID semantics unchanged. Deferred the direct-CSR construction perf lever to #173 (coupled to public `this.graph`) — see Roadmap proposals |
-| 171 | Public multi-source / bounded BMSSP entrypoint | enhancement · help wanted | **NEXT** — value-in/value-out API over the dense engine; #205 kept the id-based `bmssp(l,B,S)` wrapper and #172 added the input normalization + vertex-set substrate it consumes, so this is surface design |
-| 173 | Stabilize the public API surface for 1.0 → 2.0 | documentation · enhancement | milestone-closing: per-module public/private decision (incl. whether `this.graph`/`this.adjacency` stay public — the deferred #172 direct-CSR lever), migration note + `Graph` example, **major → 2.0.0** |
+| 172 | Typed / flexible graph inputs | enhancement · help wanted | ✅ merged (PR #208, no bump): `Graph` builder + adjacency Map/object inputs + explicit declarable vertex universe, reduced via `normalizeGraphInput`; node-ID semantics unchanged. Deferred the direct-CSR construction perf lever to #173 (coupled to public `this.graph`) |
+| 171 | Public multi-source / bounded BMSSP entrypoint | enhancement · help wanted | ✅ done-pending-merge (this PR, no bump): `calculateShortestPathsFrom(sources, { bound })` — additive surface over the `bmssp(l,B,S)` wrapper, flexible `sources` shapes + finite-bound pruning to the completed set `U`. Breaking-signature latitude deferred to #173 |
+| 173 | Stabilize the public API surface for 1.0 → 2.0 | documentation · enhancement | **NEXT / milestone-closing**: per-module public/private decision (incl. whether the raw `bmssp(l,B,S)` wrapper stays public, and whether `this.graph`/`this.adjacency` stay public — the deferred #172 direct-CSR lever), migration note + `Graph`/`calculateShortestPathsFrom` docs, **major → 2.0.0** |
 
 _Note after #43:_ `bmssp(l, B, S)` already **is** a bounded multi-source call internally —
 #171 is mostly about designing the public API around it (initial per-source distances,

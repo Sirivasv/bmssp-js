@@ -212,6 +212,18 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
   (`boundToEngine`), runs `bmsspIndex`, then mirrors labels back (`syncLabelsOut`) and
   translates the result to ids (`keyToPublic`). Returns `{ bound, boundKey, vertices }`
   (= the paper's `B'`, its composite key, `U`); scalar `B` in → scalar `bound` out.
+- **`calculateShortestPathsFrom(sources, { bound })`** (#171) — the PUBLIC multi-source /
+  bounded entrypoint: the ergonomic surface over `bmssp(topLevel, B, S)`. Normalizes
+  `sources` (a `Map<id,dist>`, object `{id:dist}`, array of `[id,dist]` pairs, or bare id
+  array → distance 0) via `normalizeSources`, seeds each into `this.shortestPaths`, and runs
+  `bmssp(this.topLevel, bound, …)` — hiding the recursion level and the seed-the-Map ritual.
+  Writes results into `shortestPaths`/`hops`/`preds` and returns nothing (read the Maps).
+  Under a **finite** bound it prunes the mirror to the returned completed set `U`, so only
+  the exact distances of vertices with `d(v) < B` remain (BMSSP's above-`B` over-estimates
+  are cleared); unbounded runs need no pruning. Single-source SSSP = `[start]`, `bound = ∞`.
+- **`normalizeSources(sources)`** (#171) — internal `BMSSP` helper reducing the flexible
+  `sources` argument to a validated `Map<id, initialDistance>` (every id a known node, every
+  distance finite ≥ 0; a repeated source keeps its smallest distance).
 - **`bmsspIndex(l, boundKey, S)`** (#43; dense engine #205) — the actual Algorithm 3
   recursion, **entirely in dense-index space**: `S`/`U` are index sets, keys are
   `[len, hops, index]`, the graph is `this.csr`, labels are `this.labels`. Level 0
@@ -366,6 +378,6 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
   exports — `BMSSP` (constructor contract, `calculateShortestPaths`, `reconstructPath`),
   `dijkstra`, `constantDegreeTransform` — and explicitly keeps algorithm internals out.
   Static, dependency-free HTML. **Note:** the #172 `Graph` export + flexible-input surface
-  is **not yet on this page** — it reaches npm only with the 2.0.0 release, and the docs
-  pass is folded into #173 (migration note + public-surface doc); tracked in the #172
-  Roadmap proposals.
+  and the #171 `calculateShortestPathsFrom` multi-source/bounded entrypoint are **not yet on
+  this page** — they reach npm only with the 2.0.0 release, and the docs pass is folded into
+  #173 (migration note + public-surface doc); tracked in the Roadmap proposals.
