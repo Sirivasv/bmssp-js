@@ -1,17 +1,16 @@
 # 05 — Codebase Map (current state)
 
-<!-- BOOKMARK-COMMIT: cbcaab1 -->
-<!-- PENDING-PR-BRANCH: chore/examples-docker-gallery -->
-<!-- Last validated: 2026-07-21 (Phase C of the examples/Docker PR, branch
-     chore/examples-docker-gallery, based on main cbcaab1). This PR rewrites the examples/
-     directory into a standalone gallery (01-basic, 02-dijkstra-oracle, 03-constant-degree,
-     04-larger-graph, run-all + README), modernizes the Dockerfile (COPY examples/ dir,
-     OCI labels, run-all as default CMD), and refreshes the README Docker section. No src/
-     test change; no version bump (docs/tooling, no bug fix, no milestone close). Verified
-     end-to-end inside Docker (docker build + run: all four examples + oracle checks pass;
-     single-example override and volume-mount forms confirmed). Not tied to a GitHub issue
-     (user-directed). Body describes post-merge reality; markers flip on the next session's
-     Phase A fast path. -->
+<!-- BOOKMARK-COMMIT: 50faa4a -->
+<!-- PENDING-PR-BRANCH: feat/172-typed-flexible-inputs -->
+<!-- Last validated: 2026-07-21 (Phase C of the #172 PR, branch
+     feat/172-typed-flexible-inputs, based on main 50faa4a). This PR adds typed/flexible
+     graph inputs (milestone 2.0.0, mid-milestone → no bump): new src/graph.mjs (`Graph`
+     builder + `normalizeGraphInput`), re-exported `Graph` from index.mjs, and a BMSSP
+     constructor that accepts an edge array (unchanged), an adjacency Map/object, or a
+     Graph — plus an explicit declarable vertex universe (isolated nodes). Node IDs stay
+     finite numbers; canonical [length, hops, id] tie-break order unchanged. Body describes
+     post-merge reality; markers fast-path on the next session's Phase A. Also folds in the
+     PR #207 marker flip (BOOKMARK 50faa4a) that had been left as a local bookkeeping edit. -->
 
 
 Snapshot of what exists in `bmssp-js` today, so you know what to build on vs. what's missing.
@@ -60,10 +59,15 @@ feature branch name. Step 2 above then fast-paths the post-merge session start.
 ## Layout
 
 ```
-index.mjs                 # re-exports { BMSSP }, { dijkstra } and { constantDegreeTransform },
-                          # each with public-API JSDoc (#166); internals stay unexported
+index.mjs                 # re-exports { BMSSP }, { dijkstra }, { constantDegreeTransform }
+                          # and { Graph } (#172), each with public-API JSDoc (#166);
+                          # algorithm internals stay unexported
 src/
-  bmssp.mjs               # BMSSP class — full Algorithm 3 recursion (#43); wires the pieces below
+  bmssp.mjs               # BMSSP class — full Algorithm 3 recursion (#43); wires the pieces below.
+                          #      Constructor accepts flexible inputs via normalizeGraphInput (#172)
+  graph.mjs               # #172: public `Graph` input builder (addVertex/addEdge, chainable) +
+                          #      normalizeGraphInput — edge array | adjacency Map/object | Graph →
+                          #      canonical { edges, vertices }; `vertices` = explicit vertex universe
   dijkstra.mjs            # reference Dijkstra (array binary-heap) — DONE, used as oracle
   constantDegree.mjs      # #164: opt-in constant-degree transform (in/out-degree ≤ 2); public, re-exported
   tieBreak.mjs            # #163: composite [length, hops, index] keys — Assumption 2.1 realized; since #205
@@ -82,6 +86,7 @@ test/
   edgeCases.test.mjs      # #162: 9 deterministic disconnection fixtures — isolated/sink sources, many components, source switching
   tieBreak.test.mjs       # #163: 16 tests — key order, canonical relaxEdge, edge-order determinism, strict Lemma 3.1, lex-oracle hops/preds
   constantDegree.test.mjs # #164: 11 tests — degree ≤ 2 on hand + seeded shapes (incl. star hub), distance preservation via oracle, BMSSP-on-transform, determinism, empty/validation
+  graph.test.mjs          # #172: 18 tests — Graph builder (chain/idempotent/copies/eager validation), adjacency Map/object inputs, object-key coercion, isolated vertices (empty & null neighbor lists, declared, as source), cross-shape oracle equivalence (seeded 2k), unrecognized-input + malformed-adjacency throws
   pathReconstruction.test.mjs # #169: 3 public-API tests — Dijkstra path oracle, unreachable/pre-run/source switching, target validation
   blockList.test.mjs      # #42: 25 BlockList tests incl. seeded random stress, #182 many-chunk/M=1 regression tests + #167 machinery tests
   boundIndex.test.mjs     # #167: 8 BoundIndex tests — sequence ops, monotone findFirst, AVL invariants under seeded churn
@@ -128,8 +133,11 @@ direct `git push origin main` is rejected, including for docs-only bookkeeping c
 
 ```js
 class BMSSP {
-  constructor(inputGraph)          // validates an array of [from, to, weight]: finite numeric
-                                   // node IDs, finite non-negative weights; [] remains valid
+  constructor(inputGraph)          // #172: normalizeGraphInput accepts an edge array,
+                                   // an adjacency Map/object, or a Graph builder → { edges,
+                                   // vertices }; validates edges (finite numeric node IDs,
+                                   // finite non-negative weights) + folds in declared
+                                   // vertices (isolated OK); [] / {} / empty Graph remain valid
   //   this.graph          : deep-copied edge array
   //   this.nodeIDs        : Set of all node IDs (from both endpoints)
   //   this.shortestPaths  : Map<nodeId, distance>, initialized to Infinity  ← public d̂[·]
@@ -161,11 +169,30 @@ class BMSSP {
 }
 ```
 
-**Constructor input validation (#165).** `inputGraph` must be an array; every entry must be
-an exact three-element `[from, to, weight]` array. Node IDs and weights must be finite
-numbers, and weights must be non-negative. Failures identify the offending edge index.
-An empty edge list remains valid and preserves the #162 contract: construction succeeds,
-then `calculateShortestPaths()` rejects any start node because the graph has no nodes.
+**Constructor input validation (#165, generalized by #172).** The constructor first calls
+`normalizeGraphInput` (`src/graph.mjs`) to reduce the input to `{ edges, vertices }`, then
+validates the edges: every entry must be an exact three-element `[from, to, weight]` array,
+node IDs and weights must be finite numbers, and weights non-negative — failures identify the
+offending edge index (unchanged messages). Declared `vertices` (the explicit universe from a
+`Graph`/adjacency form) must be finite numbers too. An empty graph in any form
+(`[]` / `{}` / `new Map()` / `new Graph()`) remains valid and preserves the #162 contract:
+construction succeeds, then `calculateShortestPaths()` rejects any start node because the
+graph has no nodes.
+
+**Flexible inputs (#172, `src/graph.mjs`).** `normalizeGraphInput(input)` recognizes four
+shapes and always yields `{ edges: [[from,to,weight]…], vertices: [id…] }`:
+- a **`Graph`** builder instance → `input.toNormalized()`;
+- an **edge array** → `{ edges: input, vertices: [] }` (nodes inferred from edges — exact
+  pre-#172 behavior);
+- an **adjacency `Map`** `Map<from, Iterable<[to,weight]>>` → keys declare the vertex
+  universe (a key with an empty/`null` list is an isolated vertex);
+- a **plain object** `{ from: [[to,weight]…] }` → same as Map, but string keys are coerced to
+  numbers (`Number(key)`; non-numeric keys fail the constructor's finite-vertex check).
+Only structural checks live in the normalizer; per-edge value validation stays in the
+constructor so the "Edge at index N" messages remain the single source of truth. Node-ID
+semantics are unchanged (finite numbers, indices assigned in ascending-id order), so the
+canonical `[length, hops, id]` tie-break and every oracle/determinism assertion are
+untouched — this is a **surface generalization, not an engine change**.
 
 **Dense-index engine (#205).** The algorithm no longer touches Maps in its hot path. The
 constructor assigns every node id a dense index **in ascending numeric id order**
@@ -480,6 +507,29 @@ calls it; BMSSP is correct on the untransformed graph. A caller opts in by trans
 graph, running from `sourceCopy(source)`, and `collapse()`-ing the result. Output is
 edge-order deterministic (copies allocated in edge order); ~2m copies, ~3m edges — O(m).
 
+## `src/graph.mjs` — flexible input builder + normalizer (#172)
+
+```js
+class Graph {                    // PUBLIC — re-exported from index.mjs (like constantDegree)
+  addVertex(id)                  // declare a vertex (isolated OK); finite-number; idempotent; → this
+  addEdge(from, to, weight)      // directed edge, endpoints auto-declared; validates eagerly; → this
+  hasVertex(id) / vertexCount / edgeCount
+  toNormalized()                 // → { edges: [[f,t,w]…] (copies), vertices: [id…] }
+}
+normalizeGraphInput(input)       // → { edges, vertices }; accepts Graph | edge array |
+                                 //   adjacency Map | plain object (numeric-string keys)
+export { Graph, normalizeGraphInput };  // Graph is public; normalizeGraphInput is used by
+                                 //   the BMSSP constructor (not re-exported from index.mjs)
+```
+
+The builder is the ergonomic front door: mutators chain
+(`new Graph().addEdge(0,1,50).addVertex(9)`), `addVertex` is the only way to introduce an
+isolated vertex, and both mutators validate at the call site (friendlier than the
+constructor's index-based errors). `toNormalized` deep-copies edges so mutating the builder
+after `new BMSSP(g)` can't reach the constructed graph. `normalizeGraphInput` is the shared
+reducer described in the BMSSP-class section above — the constructor's sole entry point for
+every accepted shape. See §"Flexible inputs (#172)" for the per-shape contract.
+
 ## Tests — the contract
 
 - `test/main.test.mjs` (16): constructor input-validation failures (#165), nodeIDs,
@@ -546,6 +596,14 @@ edge-order deterministic (copies allocated in edge order); ~2m copies, ~3m edges
   checked against an independent Dijkstra path oracle, including competing paths, an
   unreachable vertex, calls before a run, source switching on one instance, and rejection
   of a target that is not in the graph.
+- `test/graph.test.mjs` (18, #172): the flexible-input surface. `Graph` builder
+  (chaining, idempotent `addVertex`, endpoint auto-declare, `toNormalized` copy isolation,
+  eager id/weight validation); `new BMSSP` from an adjacency **object** and **Map** and a
+  **`Graph`** all equal the edge-array result; object string-keys coerce to numeric ids;
+  isolated vertices via empty/`null` neighbor lists and `addVertex` (present-but-∞, and
+  valid as a source reaching only itself); cross-shape **oracle equivalence** on a seeded
+  2k sparse graph; and the failure modes — unrecognized top-level input, malformed
+  adjacency entry, non-finite declared vertex, and the unchanged indexed edge-array messages.
 - `test/edgeCases.test.mjs` (9, #162): deterministic hand-built disconnection fixtures,
   each checked against a hand-computed full distance map **and** the Dijkstra oracle
   (Infinity entries included): self-loop-only source, sink source (adjacency keeps an
@@ -574,10 +632,11 @@ edge-order deterministic (copies allocated in edge order); ~2m copies, ~3m edges
   (identical maps incl. Infinity → 0; wrong/missing entries counted); `runScenarioBenchmark`
   and `runComparisonCountBenchmark` on tiny injected scenarios return the expected columns
   with **zero mismatches**.
-- Current suite: **191 tests — 190 passing + 1 XL skipped by default**, ~100% statement
-  coverage, ~7.5 s wall-clock (the #164 distance-preservation sweeps run BMSSP/Dijkstra
-  from every source). No graph data files: every generated test graph comes from a
-  seed; the #162 fixtures are hand-built and fully deterministic. The #205 dense-index
+- Current suite: **209 tests — 208 passing + 1 XL skipped by default** (#172 added the
+  18-test `graph.test.mjs`; `bmssp.mjs`, `index.mjs` and the new `graph.mjs` at 100%),
+  ~100% statement coverage, ~7.5 s wall-clock (the #164 distance-preservation sweeps run
+  BMSSP/Dijkstra from every source). No graph data files: every generated test graph comes
+  from a seed; the #162 fixtures are hand-built and fully deterministic. The #205 dense-index
   engine changed the internal function signatures (`baseCase`/`findPivots` take
   `labels`/`csr` + index sets) but not a single oracle/determinism assertion — the fuzz,
   edge-case, tie-break-determinism and constant-degree suites pass unchanged, which is
@@ -632,9 +691,11 @@ BMSSP-vs-Dijkstra head-to-head itself:
 | Exact Lemma 3.3 asymptotics (BST bound index + linear selection) | `src/boundIndex.mjs` + `src/select.mjs` + `src/blockList.mjs` | #167 | ✅ merged (PR #202, no bump) |
 | Relaxation micro-optimizations (allocation-free relaxEdge, unpacked routing, heap measurement) | `src/tieBreak.mjs` + `src/bmssp.mjs` + `src/baseCase.mjs` + `src/findPivots.mjs` | #168 | ✅ merged (PR #203, **minor → 1.2.0**, released 2026-07-21) |
 | Dense-index core: typed-array labels + CSR adjacency | `src/tieBreak.mjs` (makeLabels) + `src/bmssp.mjs` (buildIndex/CSR) + `src/baseCase.mjs` + `src/findPivots.mjs` | #205 | ✅ merged (PR #206, no bump — API-non-breaking) |
+| Typed / flexible graph inputs (Graph builder + adjacency Map/object + explicit vertex universe) | `src/graph.mjs` (new) + `src/bmssp.mjs` (constructor) + `index.mjs` (Graph export) + `test/graph.test.mjs` | #172 | ✅ done-pending-merge (this PR, no bump — mid-2.0.0) |
 
 Milestones `1.1.0` (correctness hardening) and `1.2.0` (performance & ergonomics) are
 both **closed** — 1.2.0 released 2026-07-21 (npm + Docker Hub). Milestone `2.0.0`
-(API-breaking generalization) is current: **#205** (dense-index core) merged (PR #206,
-no bump), then **#172 → #171 → #173** (build order in `06`; #172 is next, #173 closes the
-milestone with the **major → 2.0.0** bump). See [06-milestones-roadmap.md](06-milestones-roadmap.md).
+(API-breaking generalization) is current: **#205** (dense-index core) merged (PR #206) and
+**#172** (typed/flexible inputs) done-pending-merge (this PR, no bump), leaving
+**#171 → #173** (build order in `06`; #171 next, #173 closes the milestone with the
+**major → 2.0.0** bump). See [06-milestones-roadmap.md](06-milestones-roadmap.md).

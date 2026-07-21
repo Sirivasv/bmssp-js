@@ -18,9 +18,11 @@ describe("BMSSP constructor", () => {
     expect(myBMSSP.graph).toEqual(mediumSparse);
   });
 
-  test("rejects a non-array input graph", () => {
+  test("rejects an unrecognized input graph type", () => {
+    // #172: arrays, adjacency maps/objects, and Graph builders are accepted;
+    // a bare string is none of those.
     expect(() => new BMSSP("not an edge array")).toThrow(
-      "Input graph must be an array of edges",
+      "Input graph must be an edge array, an adjacency map/object, or a Graph instance",
     );
   });
 

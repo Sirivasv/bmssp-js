@@ -1,9 +1,10 @@
 # 07 — Glossary
 
-<!-- Updated on: 2026-07-21 (#205 PR: dense-index engine — makeLabels, labelKey, CSR,
-     dense index, buildIndex, syncLabelsIn/Out, boundToEngine/keyToPublic, bmsspIndex;
-     NO_PRED now -1; relaxEdge/baseCase/findPivots entries updated to the typed-array
-     signature. Previous update the same day: #168 PR added compareKeyParts + RELAX_*) -->
+<!-- Updated on: 2026-07-21 (#172 PR: flexible inputs — Graph builder, normalizeGraphInput,
+     explicit vertex universe; four public exports now. Previous update the same day:
+     #205 PR dense-index engine — makeLabels, labelKey, CSR, dense index, buildIndex,
+     syncLabelsIn/Out, boundToEngine/keyToPublic, bmsspIndex; NO_PRED now -1;
+     relaxEdge/baseCase/findPivots typed-array signatures; #168 compareKeyParts + RELAX_*) -->
 
 > **Lifecycle: dynamic — updated in Phase C of every PR.** When a PR introduces new symbols
 > or terms (module names, data-structure fields, paper notation newly used in code), add
@@ -89,6 +90,29 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
   IDs (min over a vertex's copies). **Public** — re-exported from `index.mjs` (unlike the
   algorithm-internal modules). Correctness-independent: BMSSP never calls it. Usage:
   `const t = constantDegreeTransform(g); …run from t.sourceCopy(s)…; t.collapse(dist)`.
+- **`Graph`** (#172) — `src/graph.mjs`, a small mutable input builder. **Public** —
+  re-exported from `index.mjs`. `addVertex(id)` declares a vertex (the only way to add an
+  **isolated** one; idempotent), `addEdge(from, to, weight)` adds a directed edge and
+  auto-declares its endpoints; both validate eagerly (finite numeric IDs, finite
+  non-negative weights) and return `this` so calls chain. `hasVertex`/`vertexCount`/
+  `edgeCount` introspect; `toNormalized()` → `{ edges, vertices }` (deep-copied edges, so
+  later mutation can't reach a constructed graph). Hand it straight to `new BMSSP(g)`.
+- **`normalizeGraphInput(input)`** (#172) — `src/graph.mjs`, the shared reducer the BMSSP
+  constructor calls on every input: a `Graph`, an edge array, an adjacency
+  `Map<from, Iterable<[to,weight]>>`, or a plain object `{ from: [[to,weight]…] }`
+  (numeric-string keys coerced via `Number`). Always returns
+  `{ edges: [[f,t,w]…], vertices: [id…] }`; `vertices` is the **explicit vertex universe**
+  (declared nodes incl. isolated — an adjacency key with an empty/`null` list). Only
+  structural checks live here; per-edge value validation stays in the constructor (the
+  "Edge at index N" messages). **Not** re-exported from `index.mjs` (only `Graph` is public).
+  An edge-array input yields empty `vertices`, reproducing the pre-#172 "infer nodes from
+  edges" behavior exactly.
+- **explicit vertex universe** (#172) — the set of nodes a caller *declares*, as opposed to
+  the set *inferred* from edge endpoints. Before #172 the vertex set was always inferred; a
+  `Graph` (`addVertex`) or an adjacency form (a key with no neighbors) can now declare
+  **isolated** vertices, which flow through to `nodeIDs` and get an index, an empty CSR
+  range, an empty adjacency list, an ∞ estimate, and are valid as a `calculateShortestPaths`
+  source (reaching only themselves).
 - **`adjacency`** (#45) — `Map<nodeId, Array<[to, weight]>>` field on the `BMSSP` class:
   a node's outgoing edges. Since #205 this is the **public edge view** behind `getEdges`
   (and the fair-baseline Dijkstra in the benchmarks); the algorithm's hot path uses the
@@ -338,7 +362,10 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
   known behavior, constant-factor work tracked in #168. Both shapes stay as regression
   sentinels in every `npm run bench` (`star`, `sparse-random-l4`).
 - **Docs page (#166)** — `docs/index.html`, the GitHub-Pages-published public-API reference
-  (deployed by `static.yml` on `docs/**` changes). Documents exactly the three `index.mjs`
+  (deployed by `static.yml` on `docs/**` changes). Documents the `index.mjs`
   exports — `BMSSP` (constructor contract, `calculateShortestPaths`, `reconstructPath`),
   `dijkstra`, `constantDegreeTransform` — and explicitly keeps algorithm internals out.
-  Static, dependency-free HTML.
+  Static, dependency-free HTML. **Note:** the #172 `Graph` export + flexible-input surface
+  is **not yet on this page** — it reaches npm only with the 2.0.0 release, and the docs
+  pass is folded into #173 (migration note + public-surface doc); tracked in the #172
+  Roadmap proposals.
