@@ -1,14 +1,15 @@
 # 05 — Codebase Map (current state)
 
-<!-- BOOKMARK-COMMIT: 4891318 -->
-<!-- PENDING-PR-BRANCH: fix/182-performance-cliffs -->
-<!-- Last validated: 2026-07-21 (Phase C of the #182 PR). Describes the tree as it will
-     exist once that PR merges: the #182 cliff investigation. Star cliff root-caused to
-     quadratic per-chunk d0.unshift in BlockList.batchPrepend and FIXED (one concat;
-     star 500k 61s -> ~3.1s, 67.8x -> ~5.5x, superlinearity gone); topLevel 3->4 cliff
-     measured at the exact straddle n = 2^18 -> 2^18+1 as an inherent ~+24% step (one
-     extra full relax pass per level), documented in HEAD-TO-HEAD's #182 addendum.
-     Bug fix -> patch bump 1.1.1 (release in Phase E after merge). -->
+<!-- BOOKMARK-COMMIT: 16e53f2 -->
+<!-- PENDING-PR-BRANCH: feat/167-exact-lemma33-asymptotics -->
+<!-- Last validated: 2026-07-21 (Phase C of the #167 PR). Describes the tree as it will
+     exist once that PR merges: BlockList's two documented shortcuts replaced to meet
+     Lemma 3.3's exact bounds — the plain-array bound index by an AVL sequence tree
+     (src/boundIndex.mjs) and the sort-based splits/chunking/pulls by deterministic
+     linear-time selection (src/select.mjs, median of medians). Behavior-preserving:
+     all pre-existing tests unchanged. No version bump (not a bug fix; #168 still open
+     in milestone 1.2.0). -->
+
 
 Snapshot of what exists in `bmssp-js` today, so you know what to build on vs. what's missing.
 
@@ -467,9 +468,9 @@ BMSSP-vs-Dijkstra head-to-head itself:
 | Optional constant-degree transform (in/out-degree ≤ 2) | `src/constantDegree.mjs` + `test/constantDegree.test.mjs` | #164 | ✅ merged (PR #195, no bump) |
 | JSDoc on `index.mjs` exports + public-API docs page | `index.mjs` + `docs/index.html` | #166 | ✅ merged (PR #196, **minor → 1.1.0**, released 2026-07-21) |
 | BMSSP-vs-Dijkstra head-to-head in the harness | `benchmarks/` + `src/tieBreak.mjs` counter | #170 | ✅ merged (PR #198, no bump) |
-| Performance-cliff investigation + quadratic batchPrepend fix | `src/blockList.mjs` + HEAD-TO-HEAD addendum | #182 | ✅ done-pending-merge (this PR, **patch → 1.1.1**) |
+| Performance-cliff investigation + quadratic batchPrepend fix | `src/blockList.mjs` + HEAD-TO-HEAD addendum | #182 | ✅ merged (PR #200, **patch → 1.1.1**, released 2026-07-21) |
 
 Milestone `1.1.0` (correctness hardening) is **closed** — released 2026-07-21 (npm +
-Docker Hub). Milestone `1.2.0` is the current focus: after #182 merges, **#167 / #168**
-remain (the structural/constant-factor work the investigation informs); see
-[06-milestones-roadmap.md](06-milestones-roadmap.md).
+Docker Hub). Milestone `1.2.0` is the current focus: **#167 / #168** remain (the
+structural/constant-factor work the #182 investigation informs — findings posted on both
+issues 2026-07-21); see [06-milestones-roadmap.md](06-milestones-roadmap.md).

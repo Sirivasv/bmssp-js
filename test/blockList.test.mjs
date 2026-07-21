@@ -303,6 +303,103 @@ describe("BlockList batchPrepend", () => {
   });
 });
 
+describe("BlockList #167 machinery (balanced bound index + selection)", () => {
+  test("hundreds of splits at a small M still drain in sorted order", () => {
+    // M = 2 with 600 shuffled distinct inserts forces ~hundreds of d1
+    // blocks, exercising the AVL bound index's splits and searches deep
+    // into rebalancing territory
+    const M = 2;
+    const list = new BlockList(M, Infinity);
+    const values = new Map();
+    for (let i = 0; i < 600; i += 1) {
+      const value = (i * 389) % 600; // distinct values 0..599, shuffled
+      list.insert(i, value);
+      values.set(i, value);
+    }
+    expect(list.size).toBe(600);
+    let previous = -Infinity;
+    for (const { keys, bound } of drain(list)) {
+      expect(keys.size).toBeLessThanOrEqual(M);
+      const pulled = [...keys].map((k) => values.get(k));
+      expect(Math.min(...pulled)).toBeGreaterThan(previous);
+      previous = Math.max(...pulled);
+      if (bound !== Infinity) expect(bound).toBeGreaterThan(previous);
+    }
+    expect(previous).toBe(599);
+  });
+
+  test("duplicate-key replacements empty and drop interior d1 blocks", () => {
+    // Insert enough to split into several blocks, then move every key of
+    // the middle band to tiny values: each move deletes from an interior
+    // block (dropping it when emptied — a BST removal) and re-inserts
+    const M = 3;
+    const list = new BlockList(M, 1000);
+    const values = new Map();
+    for (let i = 0; i < 30; i += 1) {
+      list.insert(i, 100 + i * 10);
+      values.set(i, 100 + i * 10);
+    }
+    for (let i = 10; i < 20; i += 1) {
+      list.insert(i, i - 10); // 0..9, far below the stored 200..290
+      values.set(i, i - 10);
+    }
+    expect(list.size).toBe(30);
+    const first = list.pull();
+    expect(first.keys).toEqual(new Set([10, 11, 12]));
+    let previous = Math.max(...[...first.keys].map((k) => values.get(k)));
+    let drained = first.keys.size;
+    for (const { keys } of drain(list)) {
+      const pulled = [...keys].map((k) => values.get(k));
+      expect(Math.min(...pulled)).toBeGreaterThan(previous);
+      previous = Math.max(...pulled);
+      drained += keys.size;
+    }
+    expect(drained).toBe(30);
+    expect(previous).toBe(390); // key 29's untouched original value
+  });
+
+  test("a large batchPrepend chunks by median and drains sorted", () => {
+    const M = 8;
+    const list = new BlockList(M, Infinity);
+    list.insert("far", 1e9);
+    const values = new Map([["far", 1e9]]);
+    const batch = [];
+    for (let i = 0; i < 1000; i += 1) {
+      const value = (i * 761) % 1000; // distinct values 0..999, shuffled
+      batch.push([i, value]);
+      values.set(i, value);
+    }
+    list.batchPrepend(batch);
+    expect(list.size).toBe(1001);
+    let previous = -Infinity;
+    for (const { keys } of drain(list)) {
+      expect(keys.size).toBeLessThanOrEqual(M);
+      const pulled = [...keys].map((k) => values.get(k));
+      expect(Math.min(...pulled)).toBeGreaterThan(previous);
+      previous = Math.max(...pulled);
+    }
+    expect(previous).toBe(1e9);
+  });
+
+  test("insert replacement can empty and unlink a middle d0 block", () => {
+    // M = 1 turns every prepended pair into its own d0 block; replacing the
+    // middle block's key exercises the linked-list unlink of an interior
+    // block (head and tail unlinks are covered by the drain tests)
+    const list = new BlockList(1, 100);
+    list.insert("seed", 90);
+    list.pull();
+    list.batchPrepend([
+      ["a", 3],
+      ["b", 2],
+      ["c", 1],
+    ]);
+    list.insert("b", 0.5); // removes b from the middle d0 block, re-inserts
+    expect(list.size).toBe(3);
+    const order = drain(list).map(({ keys }) => [...keys][0]);
+    expect(order).toEqual(["b", "c", "a"]);
+  });
+});
+
 describe("BlockList stress (seeded)", () => {
   // Mimics how Algorithm 3 drives D: after a pull with separator Bi, new
   // inserts land in [Bi, B) and batch-prepends land in [Bi', Bi) — i.e. at
