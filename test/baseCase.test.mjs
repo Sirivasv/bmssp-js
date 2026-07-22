@@ -3,6 +3,7 @@ import { baseCase } from "../src/baseCase.mjs";
 import { BMSSP } from "../src/bmssp.mjs";
 import { dijkstra } from "../src/dijkstra.mjs";
 import { compareKeys, labelKey } from "../src/tieBreak.mjs";
+import { edgesOf } from "./helpers.mjs";
 
 // Small deterministic PRNG so stress-test failures are reproducible
 function mulberry32(seed) {
@@ -198,7 +199,7 @@ describe("baseCase vs Dijkstra oracle (seeded)", () => {
     for (let round = 0; round < 20; round += 1) {
       const edges = randomEdges(rand, 40, 160);
       const g = setup(edges, 0);
-      const oracle = dijkstra(g.graph, g.nodeIDs, 0);
+      const oracle = dijkstra(edgesOf(g), g.nodeIDs, 0);
       const result = baseCase(
         Infinity,
         idxSet(g, [0]),
@@ -222,7 +223,7 @@ describe("baseCase vs Dijkstra oracle (seeded)", () => {
     for (let round = 0; round < 30; round += 1) {
       const edges = randomEdges(rand, 50, 200);
       const g = setup(edges, 0);
-      const oracle = dijkstra(g.graph, g.nodeIDs, 0);
+      const oracle = dijkstra(edgesOf(g), g.nodeIDs, 0);
       const finite = [...oracle.values()]
         .filter((d) => d < Infinity)
         .sort((a, b) => a - b);

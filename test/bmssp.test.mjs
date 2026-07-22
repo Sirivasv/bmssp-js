@@ -1,6 +1,7 @@
 import { describe, test, expect } from "@jest/globals";
 import { BMSSP } from "../src/bmssp.mjs";
 import { dijkstra } from "../src/dijkstra.mjs";
+import { edgesOf } from "./helpers.mjs";
 
 // Small deterministic PRNG so stress-test failures are reproducible
 function mulberry32(seed) {
@@ -30,7 +31,7 @@ function randomEdges(rand, n, m, maxWeight) {
 function expectMatchesOracle(edges, source) {
   const bmssp = new BMSSP(edges);
   bmssp.calculateShortestPaths(source);
-  const oracle = dijkstra(bmssp.graph, bmssp.nodeIDs, source);
+  const oracle = dijkstra(edgesOf(bmssp), bmssp.nodeIDs, source);
   expect(bmssp.shortestPaths.size).toBe(oracle.size);
   for (const [v, d] of oracle) {
     expect(bmssp.shortestPaths.get(v)).toBe(d);
@@ -126,7 +127,7 @@ describe("BMSSP end-to-end on hand-built graphs", () => {
     const bmssp = new BMSSP(edges);
     bmssp.calculateShortestPaths(0);
     bmssp.calculateShortestPaths(2);
-    const oracle = dijkstra(bmssp.graph, bmssp.nodeIDs, 2);
+    const oracle = dijkstra(edgesOf(bmssp), bmssp.nodeIDs, 2);
     for (const [v, d] of oracle) {
       expect(bmssp.shortestPaths.get(v)).toBe(d);
     }
@@ -188,7 +189,7 @@ describe("BMSSP recursion contract (Lemma 3.1)", () => {
     for (let round = 0; round < 25; round += 1) {
       const edges = randomEdges(rand, 30, 120, 1000);
       const bmssp = new BMSSP(edges);
-      const oracle = dijkstra(bmssp.graph, bmssp.nodeIDs, 0);
+      const oracle = dijkstra(edgesOf(bmssp), bmssp.nodeIDs, 0);
       const finite = [...oracle.values()]
         .filter((d) => d < Infinity)
         .sort((a, b) => a - b);
@@ -305,7 +306,7 @@ describe("BMSSP recursion contract (Lemma 3.1)", () => {
       Infinity,
       new Set([0]),
     );
-    const oracle = dijkstra(bmssp.graph, bmssp.nodeIDs, 0);
+    const oracle = dijkstra(edgesOf(bmssp), bmssp.nodeIDs, 0);
     expect(bound).toBe(Infinity);
     const reachable = new Set(
       [...oracle].filter(([, d]) => d < Infinity).map(([v]) => v),

@@ -9,6 +9,7 @@ import {
   chain,
   star,
 } from "../benchmarks/generators.mjs";
+import { edgesOf } from "./helpers.mjs";
 
 // High-volume property/fuzz suite (#161): seeded random graphs across many
 // shapes and weight regimes, always validated against the Dijkstra oracle.
@@ -99,7 +100,7 @@ function pickSource(rng, nodeIDs) {
 function checkFullMapAgainstOracle(edges, source, label) {
   const bmssp = new BMSSP(edges);
   bmssp.calculateShortestPaths(source);
-  const oracle = dijkstra(bmssp.graph, bmssp.nodeIDs, source);
+  const oracle = dijkstra(edgesOf(bmssp), bmssp.nodeIDs, source);
   if (bmssp.shortestPaths.size !== oracle.size) {
     throw new Error(
       `${label}: map size mismatch: BMSSP ${bmssp.shortestPaths.size}, ` +
@@ -313,7 +314,7 @@ describe("fuzz: multi-source bounded bmssp() against per-source oracles", () => 
 
     const oracles = new Map();
     for (const s of initial.keys()) {
-      oracles.set(s, dijkstra(bmssp.graph, bmssp.nodeIDs, s));
+      oracles.set(s, dijkstra(edgesOf(bmssp), bmssp.nodeIDs, s));
     }
     const trueDist = new Map();
     for (const v of nodes) {

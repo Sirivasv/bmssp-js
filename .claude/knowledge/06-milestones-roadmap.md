@@ -1,11 +1,14 @@
 # 06 — Milestones Roadmap
 
-<!-- SYNCED-FROM-GITHUB: 2026-07-21 (Phase C of the #173 PR, branch feat/173-stabilize-public-api,
-     based on main d56bc86): 1.2.0 CLOSED; 2.0.0 open, 3 closed (#205, #172, #171) + 1 open
-     (#173). #173 done-pending-merge this PR (public-API stabilization, **major → 2.0.0**) —
-     the milestone-closing issue; on merge + release, milestone 2.0.0 closes. -->
-<!-- Current package version: 2.0.0 — BUMPED in the #173 PR (npm version major), NOT yet
-     released. Latest tag is 1.2.0. On merge, Phase 2 tags 2.0.0 + GitHub Release (with
+<!-- SYNCED-FROM-GITHUB: 2026-07-22 (Phase C of the #212 PR, branch feat/212-direct-csr-construction,
+     based on main 47fae54). 1.1.0/1.2.0/2.0.0 CLOSED + RELEASED. Milestone **3.0.0 —
+     performance** (number 5) has its only issue #212 (direct-CSR construction) done-pending-
+     merge in this PR (**major → 3.0.0** — milestone-closing). On merge + release, 3.0.0
+     closes. This file also still carries the #173-PR Phase E reconciliation (2.0.0 closed,
+     3.0.0 + #212 created) that branch protection had stranded as a local edit — it rides this
+     PR branch. -->
+<!-- Current package version: 3.0.0 — BUMPED in the #212 PR (npm version major), NOT yet
+     released. Latest tag is 2.0.0. On merge, Phase 2 tags 3.0.0 + GitHub Release (with
      Announcements discussion) → npm + Docker Hub via publish.yml. Until then this is a
      bumped-but-untagged version (Phase A step 5 surfaces it). -->
 <!-- Release-discussion convention (user-directed 2026-07-21): every GitHub Release also
@@ -46,31 +49,35 @@ it runs the same Phase C reconciliation directly on `main`.
 
 ## 📋 Roadmap proposals (pending user approval)
 
-**#173 PR (this PR, milestone-closing) — proposals:**
+**#212 PR (this PR, milestone-closing → 3.0.0) — proposals:**
 
-1. **Close milestone `2.0.0`** — #173 is its last open issue; on this PR's merge + the 2.0.0
-   release, the milestone is complete (4/4: #205, #172, #171, #173).
-2. **Create a new issue: "Direct-CSR construction — skip the edge-list round-trip."** The
-   #172/#206 perf lever, deferred again by #173's user-confirmed decision to keep
-   `this.graph` / `this.adjacency` public (tests + `main.test.mjs` depend on them). Building
-   the index/CSR straight from the input — bypassing the `[from,to,weight]` copy — needs those
-   fields to become lazy/derived or private, i.e. a breaking change. So it is a **3.0 / future-
-   major** candidate (or a carefully non-breaking lazy-getter approach in a minor). Needs a
-   home milestone — see proposal 4.
-3. **(Optional) Create a small enhancement issue: "Richer multi-source return."** #171 chose
-   write-to-Map / returns-nothing for `calculateShortestPathsFrom`; the internal wrapper still
-   produces `{ bound, vertices }`. Surfacing it (an optional return or companion method) is a
-   purely additive future enhancement — file only if the user wants it tracked.
-4. **Decide the next milestone direction with the user.** 2.0.0 is the last defined milestone;
-   the core algorithm is feature-complete. Natural next buckets: a **performance** milestone
-   (direct-CSR construction + further engine work) and/or an **ergonomics/polish** one. Propose
-   creating one milestone (name/number TBD with the user) to host proposals 2–3, rather than
-   leaving them unmilestoned.
+1. **Close milestone `3.0.0`** — #212 is its only issue; on this PR's merge + the 3.0.0
+   release, the milestone is complete (1/1).
+2. **Decide the next milestone direction with the user.** With 3.0.0 the core algorithm is
+   feature-complete *and* the big construction/engine perf levers (#205 dense-index, #212
+   direct-CSR) are spent. There is no defined next milestone. Options to weigh with the user:
+   (a) a **further-performance** milestone (see proposal 3 for a concrete candidate), (b) an
+   **ergonomics/interop** milestone (e.g. TypeScript type declarations, a streaming/large-graph
+   ingestion path), or (c) declare the project **feature-complete / maintenance-mode** and open
+   no new milestone. Recommend deciding (a/b/c) before filing anything.
+3. **(Optional) File a follow-up perf issue: "Skip the id sort for already-dense inputs."**
+   `buildIndex` still sorts the node-ID set (`O(n log n)`) to assign ascending-id indices; when
+   the input ids are already the dense range `0..n-1` (a common case, e.g. generated grids),
+   the sort is avoidable with a fast-path (detect contiguous ids, or a counting/radix pass).
+   Purely a construction micro-opt, label-preserving. File only if the user wants a further-perf
+   milestone (proposal 2a).
 
 _These are Phase E gated GitHub writes — execute only after the user confirms the merge, one
 confirmation per edit._
 
 _Previously executed proposals (kept for provenance):_
+
+_(The #173-PR proposals (PR #210) were approved and executed 2026-07-21 in Phase E:
+(1) milestone **2.0.0 closed** (4/4 done); (2) new issue **#212** "Direct-CSR construction —
+build the index/CSR without the edge-list round-trip" created — the deferred #172/#206 perf
+lever, breaking because it needs public `this.graph`/`this.adjacency` to become lazy/private;
+(3) new milestone **3.0.0 — performance** (number 5) created to host #212. The optional
+"richer multi-source return" enhancement was **not** filed (offered; not requested).)_
 
 _(The #171-PR proposal (PR #209) — a single comment on **#173** recording the #171-derived
 decisions it must resolve now that the public multi-source surface exists (the public/private
@@ -299,7 +306,8 @@ executed 2026-07-17.)_
   228 (227 + 1 XL skip), `bmssp.mjs` 100%, lint clean. **#173 is the only 2.0.0 issue
   left** (milestone-closing, major → 2.0.0). Roadmap proposal (comment on #173 recording the
   API-stabilization decisions #171 hands off) was approved and posted 2026-07-21.
-- **#173 done-pending-merge (this PR, major → 2.0.0 — milestone-closing):** public-API
+- **#173 merged (PR #210, 2026-07-21, commit 47fae54; major → 2.0.0, RELEASED + milestone
+  closed same day):** public-API
   stabilization, a **documentation + contract lockdown** with no behavior change.
   User-confirmed decisions (2026-07-21): **document-only** boundary (JSDoc `@public`/
   `@internal`, no `#`-privatization — the fuzz/baseCase/findPivots/tieBreak suites drive
@@ -312,8 +320,28 @@ executed 2026-07-17.)_
   + advanced `bmssp`; stale ~1M crossover claim corrected to <50k); two new examples
   (`05-flexible-inputs`, `06-multi-source`) wired into `run-all`; and `test/publicApi.test.mjs`
   (9 contract tests pinning the surface). **major → 2.0.0** (`npm version major`). Suite 237
-  (236 + 1 XL skip), lint clean. Roadmap proposals: close milestone 2.0.0, file the deferred
-  direct-CSR perf issue, and decide the next-milestone direction with the user (Phase E).
+  (236 + 1 XL skip), lint clean. **Released 2026-07-21** (tag 2.0.0 + GitHub Release with
+  Announcements discussion → npm 2.0.0 + Docker Hub, publish.yml succeeded). Phase E executed:
+  milestone **2.0.0 closed** (4/4), issue **#212** (direct-CSR construction) filed under a new
+  **3.0.0 — performance** milestone.
+- **#212 done-pending-merge (this PR, major → 3.0.0 — milestone-closing):** direct-CSR
+  construction, the only issue in milestone 3.0.0. The constructor now builds the dense index
+  + CSR + typed labels **directly** from the normalized input edges (`buildIndex(edges)`),
+  removing the intermediate `this.graph` deep-copy and the eager `this.adjacency` Map
+  (`buildAdjacency` gone). **BREAKING:** the public `this.graph`/`this.adjacency` fields are
+  **removed** — user-confirmed 2026-07-22 to remove them outright rather than keep a
+  non-breaking lazy getter — so `getEdges(nodeId)` now materializes a node's `[to,weight]`
+  edges from the CSR on demand. Because the CSR is built from the same edges in the same order
+  it is **byte-identical** to the pre-#212 round-trip: every oracle/determinism assertion is
+  unchanged (default suite + FUZZ_ROUNDS=25 + FUZZ_XL 2M all green). **Measured payoff:
+  construction ~halved** — clean A/B vs `main` 2.0.0 at n=500k/m=1.5M: ~510 → ~240 ms median.
+  Test/bench migration: `test/helpers.mjs` `edgesOf()` + `benchmarks/bench-util.mjs`
+  `adjacencyOf()` rebuild the oracle inputs from `getEdges`; `test/publicApi.test.mjs` pins the
+  two fields as **removed** (10 contract tests). Docs: `MIGRATION.md` 2→3 section,
+  `docs/index.html` + `README` note the removal. Suite 238 (237 + 1 XL skip), lint clean.
+  **major → 3.0.0** (`npm version major`). Roadmap proposals: close milestone 3.0.0, decide the
+  next-milestone direction with the user, optionally file the id-sort fast-path perf issue
+  (Phase E).
 - **Examples + Docker refresh (PR #207 merged, 2026-07-21, commit 50faa4a;
   user-directed, no issue, no bump):** the stale single `examples/main.mjs` (it only
   printed the raw edge list — never ran the algorithm) is replaced by a standalone gallery
@@ -389,11 +417,11 @@ _Note:_ both #182 shapes stay as regression sentinels in every `npm run bench` (
 `sparse-random-l4`), and `npm run bench:counts` reproduces the comparison-count crossover
 (below 1.0 before n = 50k since #167; ~n = 1M in the 1.0.0/1.1.1 records).
 
-## Milestone `2.0.0` (milestone #4) — API-breaking generalization — CURRENT
+## Milestone `2.0.0` (milestone #4) — API-breaking generalization — ✅ CLOSED (released 2026-07-21)
 
 Build order (derived 2026-07-21 at RKB, after 1.2.0 closed): ~~#205~~
 (merged, PR #206) → ~~#172~~ (merged, PR #208) → ~~#171~~ (merged, PR #209) →
-~~#173~~ (done-pending-merge, this PR, **major → 2.0.0**). Rationale:
+~~#173~~ (merged, PR #210, **major → 2.0.0**, released — milestone closed). Rationale:
 the dense-index engine (#205) decides the internal shapes every new API wraps, so it went
 first; typed/flexible inputs (#172) generalized the constructor surface over it; the public
 multi-source entrypoint (#171) is designed value-in/value-out over the finished engine and
@@ -405,11 +433,25 @@ the surface last and takes the **major → 2.0.0** bump as the milestone-closing
 | 205 | Dense-index core: typed-array labels + CSR adjacency | enhancement | ✅ merged (PR #206, no bump — API-non-breaking): sorted-id index + CSR + typed labels; wall-clock ~halved (sparse head-to-head 2.5× → 1.38×), counts unchanged |
 | 172 | Typed / flexible graph inputs | enhancement · help wanted | ✅ merged (PR #208, no bump): `Graph` builder + adjacency Map/object inputs + explicit declarable vertex universe, reduced via `normalizeGraphInput`; node-ID semantics unchanged. Deferred the direct-CSR construction perf lever to #173 (coupled to public `this.graph`) |
 | 171 | Public multi-source / bounded BMSSP entrypoint | enhancement · help wanted | ✅ merged (PR #209, no bump): `calculateShortestPathsFrom(sources, { bound })` — additive surface over the `bmssp(l,B,S)` wrapper, flexible `sources` shapes + finite-bound pruning to the completed set `U`. Breaking-signature latitude deferred to #173 |
-| 173 | Stabilize the public API surface for 1.0 → 2.0 | documentation · enhancement | ✅ done-pending-merge (this PR, **major → 2.0.0** — milestone-closing): document-only boundary (`@public`/`@internal` JSDoc + `test/publicApi.test.mjs` contract test), `MIGRATION.md` (no breaking changes), rewritten `docs/index.html`, `05-flexible-inputs`/`06-multi-source` examples. Kept `this.graph`/`this.adjacency` + raw `bmssp` public; direct-CSR perf lever deferred to a new post-2.0 issue |
+| 173 | Stabilize the public API surface for 1.0 → 2.0 | documentation · enhancement | ✅ merged (PR #210, **major → 2.0.0**, released 2026-07-21 — milestone-closing): document-only boundary (`@public`/`@internal` JSDoc + `test/publicApi.test.mjs` contract test), `MIGRATION.md` (no breaking changes), rewritten `docs/index.html`, `05-flexible-inputs`/`06-multi-source` examples. Kept `this.graph`/`this.adjacency` + raw `bmssp` public; direct-CSR perf lever deferred to #212 (3.0.0) |
 
 _Note after #43:_ `bmssp(l, B, S)` already **is** a bounded multi-source call internally —
-#171 is mostly about designing the public API around it (initial per-source distances,
-returning `{ bound, vertices }` sensibly) rather than new algorithm work.
+#171 designed the public API around it (`calculateShortestPathsFrom`), rather than new
+algorithm work.
+
+## Milestone `3.0.0` (milestone #5) — performance — being closed by this PR
+
+Opened 2026-07-21 (Phase E of the #173 PR) to host post-2.0 engine work. The core algorithm is
+feature-complete; this milestone is about speed. Its only issue, #212, is done-pending-merge in
+this PR (**major → 3.0.0**), so on merge + release the milestone closes.
+
+| # | Issue | Labels | Notes |
+|---|---|---|---|
+| 212 | Direct-CSR construction — build the index/CSR without the edge-list round-trip | enhancement | ✅ done-pending-merge (this PR, **major → 3.0.0** — milestone-closing): the constructor builds the dense index + CSR + typed labels straight from the normalized input; **removed** the public `this.graph`/`this.adjacency` fields (user-confirmed breaking approach, not lazy getters) → `getEdges` serves the edge view from CSR. Construction ~halved (n=500k/m=1.5M: ~510 → ~240 ms). CSR byte-identical → every oracle/determinism assertion unchanged |
+
+_Decision (user-confirmed 2026-07-22):_ took the **breaking** approach — remove `graph`/
+`adjacency` outright (not a non-breaking lazy-getter), so this PR is the **major → 3.0.0**
+milestone-closer rather than a pre-3.0 minor.
 
 ---
 

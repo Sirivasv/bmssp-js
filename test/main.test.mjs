@@ -1,6 +1,7 @@
 import { describe, test, expect } from "@jest/globals";
 import { BMSSP, dijkstra } from "../index.mjs";
 import { sparseRandom } from "../benchmarks/generators.mjs";
+import { edgesOf } from "./helpers.mjs";
 
 // Seeded medium-size sparse graph (m = O(n) — the regime the paper targets).
 // It replaces the old 87 MB roadNet-CA.txt fixture: the same full-map
@@ -14,8 +15,13 @@ const mediumSparse = sparseRandom(10_000, 3, 1601);
 const myBMSSP = new BMSSP(mediumSparse);
 
 describe("BMSSP constructor", () => {
-  test("initializes the graph correctly", () => {
-    expect(myBMSSP.graph).toEqual(mediumSparse);
+  test("ingests every input edge into the CSR", () => {
+    // #212: there is no public `this.graph` copy anymore — the CSR is the
+    // single source of truth. Rebuilding the edge multiset via getEdges must
+    // reproduce exactly the input edges (order-independent).
+    const sortEdges = (es) =>
+      [...es].sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
+    expect(sortEdges(edgesOf(myBMSSP))).toEqual(sortEdges(mediumSparse));
   });
 
   test("rejects an unrecognized input graph type", () => {
@@ -56,18 +62,18 @@ describe("BMSSP nodeIDs", () => {
   });
 });
 
-describe("BMSSP adjacency map", () => {
-  test("groups outgoing edges by source node", () => {
+describe("BMSSP getEdges (CSR edge view)", () => {
+  test("returns a node's outgoing edges in input order", () => {
     const small = new BMSSP([
       [0, 1, 50],
       [1, 2, 75],
       [0, 2, 25],
     ]);
-    expect(small.adjacency.get(0)).toEqual([
+    expect(small.getEdges(0)).toEqual([
       [1, 50],
       [2, 25],
     ]);
-    expect(small.adjacency.get(1)).toEqual([[2, 75]]);
+    expect(small.getEdges(1)).toEqual([[2, 75]]);
   });
 
   test("gives sink nodes an empty edge array", () => {
@@ -77,18 +83,20 @@ describe("BMSSP adjacency map", () => {
       [0, 2, 25],
     ]);
     // node 2 has no outgoing edges but is still a known node
-    expect(small.adjacency.has(2)).toBe(true);
-    expect(small.adjacency.get(2)).toEqual([]);
+    expect(small.nodeIDs.has(2)).toBe(true);
+    expect(small.getEdges(2)).toEqual([]);
   });
 
-  test("has one entry per unique node ID", () => {
-    expect(myBMSSP.adjacency.size).toBe(myBMSSP.nodeIDs.size);
+  test("covers every unique node ID with an edge list", () => {
+    for (const id of myBMSSP.nodeIDs) {
+      expect(Array.isArray(myBMSSP.getEdges(id))).toBe(true);
+    }
   });
 
-  test("preserves the total number of edges across all adjacency lists", () => {
+  test("preserves the total number of edges across all edge lists", () => {
     let edgeCount = 0;
-    for (const edges of myBMSSP.adjacency.values()) {
-      edgeCount += edges.length;
+    for (const id of myBMSSP.nodeIDs) {
+      edgeCount += myBMSSP.getEdges(id).length;
     }
     expect(edgeCount).toBe(mediumSparse.length);
   });

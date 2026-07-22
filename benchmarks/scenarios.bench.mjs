@@ -20,6 +20,7 @@ import {
   markdownTable,
   fmt,
   countMismatches,
+  adjacencyOf,
 } from "./bench-util.mjs";
 
 export function runScenarioBenchmark(scenarios = SCENARIOS, iters = 3) {
@@ -31,9 +32,12 @@ export function runScenarioBenchmark(scenarios = SCENARIOS, iters = 3) {
 
     const bmssp = new BMSSP(graph);
     const source = [...bmssp.nodeIDs][0];
+    // #212: the instance no longer prebuilds an adjacency Map; build the fair
+    // Dijkstra baseline's adjacency once here, outside the timed region.
+    const adjacency = adjacencyOf(bmssp);
 
     const dij = timeMany(
-      () => dijkstraAdjacency(bmssp.adjacency, bmssp.nodeIDs, source),
+      () => dijkstraAdjacency(adjacency, bmssp.nodeIDs, source),
       { iters, warmup: 1 },
     );
     const alg = timeMany(() => bmssp.calculateShortestPaths(source), {
@@ -42,11 +46,7 @@ export function runScenarioBenchmark(scenarios = SCENARIOS, iters = 3) {
     });
 
     // Verify: fresh run on each side, distances must agree node-by-node.
-    const dijkstraDist = dijkstraAdjacency(
-      bmssp.adjacency,
-      bmssp.nodeIDs,
-      source,
-    );
+    const dijkstraDist = dijkstraAdjacency(adjacency, bmssp.nodeIDs, source);
     bmssp.calculateShortestPaths(source);
     const mismatches = countMismatches(
       dijkstraDist,

@@ -24,9 +24,9 @@ export function run() {
   const graph = new BMSSP(edges);
   graph.calculateShortestPaths(source);
 
-  // The oracle takes the raw edge list and the node-ID set (both exposed
-  // on the BMSSP instance) plus the source.
-  const oracle = dijkstra(graph.graph, graph.nodeIDs, source);
+  // The oracle takes the raw edge list, the node-ID set (exposed on the
+  // BMSSP instance) and the source.
+  const oracle = dijkstra(edges, graph.nodeIDs, source);
 
   console.log("node │ BMSSP │ Dijkstra │ match");
   console.log("─────┼───────┼──────────┼──────");

@@ -39,14 +39,10 @@ describe("#173 BMSSP supported public methods and fields", () => {
     "reconstructPath",
     "getEdges",
   ];
-  const PUBLIC_FIELDS = [
-    "shortestPaths",
-    "nodeIDs",
-    "hops",
-    "preds",
-    "adjacency",
-    "graph",
-  ];
+  const PUBLIC_FIELDS = ["shortestPaths", "nodeIDs", "hops", "preds"];
+  // #212 removed these public fields (breaking, 3.0.0): the CSR engine is the
+  // single source of truth and the edge view is served on demand by getEdges().
+  const REMOVED_FIELDS = ["adjacency", "graph"];
 
   test("every documented public method exists on the prototype", () => {
     for (const name of PUBLIC_METHODS) {
@@ -61,8 +57,15 @@ describe("#173 BMSSP supported public methods and fields", () => {
     }
     expect(g.shortestPaths instanceof Map).toBe(true);
     expect(g.nodeIDs instanceof Set).toBe(true);
-    expect(g.adjacency instanceof Map).toBe(true);
-    expect(Array.isArray(g.graph)).toBe(true);
+    expect(g.hops instanceof Map).toBe(true);
+    expect(g.preds instanceof Map).toBe(true);
+  });
+
+  test("the #212-removed public fields are gone (breaking, 3.0.0)", () => {
+    const g = new BMSSP([[0, 1, 5]]);
+    for (const name of REMOVED_FIELDS) {
+      expect(g[name]).toBeUndefined();
+    }
   });
 
   test("the documented public methods behave as specified end-to-end", () => {

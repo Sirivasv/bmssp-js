@@ -1,6 +1,7 @@
 import { describe, test, expect } from "@jest/globals";
 import { BMSSP } from "../src/bmssp.mjs";
 import { dijkstra } from "../src/dijkstra.mjs";
+import { edgesOf } from "./helpers.mjs";
 
 // Deterministic edge-case fixtures for disconnected graphs and unreachable
 // nodes (#162). Every graph is hand-built and every expected distance map is
@@ -14,7 +15,7 @@ function expectDistances(edges, source, expected) {
   const bmssp = new BMSSP(edges);
   bmssp.calculateShortestPaths(source);
 
-  const oracle = dijkstra(bmssp.graph, bmssp.nodeIDs, source);
+  const oracle = dijkstra(edgesOf(bmssp), bmssp.nodeIDs, source);
   expect(bmssp.shortestPaths.size).toBe(oracle.size);
   for (const [v, d] of oracle) {
     expect(bmssp.shortestPaths.get(v)).toBe(d);
@@ -59,9 +60,10 @@ describe("Edge cases (#162): isolated and sink sources", () => {
         [2, Infinity],
       ]),
     );
-    // The adjacency map still knows the sink — with an empty edge list
+    // getEdges still knows the sink — with an empty edge list (it is a
+    // declared node in the CSR, just with an empty outgoing range)
     expect(bmssp.getEdges(1)).toEqual([]);
-    expect(bmssp.adjacency.has(1)).toBe(true);
+    expect(bmssp.nodeIDs.has(1)).toBe(true);
   });
 
   test("an empty graph rejects every start node", () => {

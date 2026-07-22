@@ -37,6 +37,19 @@ export function countMismatches(expectedDist, actualDist, nodeIDs) {
   return mismatches;
 }
 
+// Build a Map<from, [to, weight][]> adjacency (every node present, isolated
+// nodes → []) from a BMSSP instance via its public getEdges() view. Since #212
+// the instance no longer stores a `this.adjacency` Map — the CSR engine is the
+// single source of truth — so the fair-baseline Dijkstra oracle
+// (dijkstraAdjacency) builds the adjacency once here, outside the timed region.
+export function adjacencyOf(instance) {
+  const adjacency = new Map();
+  for (const from of instance.nodeIDs) {
+    adjacency.set(from, instance.getEdges(from));
+  }
+  return adjacency;
+}
+
 // Render an array of row objects as a GitHub-flavored markdown table.
 export function markdownTable(headers, rows) {
   const head = `| ${headers.join(" | ")} |`;

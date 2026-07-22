@@ -8,7 +8,7 @@ import {
 } from "../benchmarks/dijkstra-adj.mjs";
 import { runScenarioBenchmark } from "../benchmarks/scenarios.bench.mjs";
 import { runComparisonCountBenchmark } from "../benchmarks/compare-counts.bench.mjs";
-import { countMismatches } from "../benchmarks/bench-util.mjs";
+import { countMismatches, adjacencyOf } from "../benchmarks/bench-util.mjs";
 import { sparseRandom, chain, star } from "../benchmarks/generators.mjs";
 
 describe("countMismatches (#170): per-run output verification", () => {
@@ -48,7 +48,11 @@ describe("dijkstraAdjacency (#170): the fair prebuilt-adjacency baseline", () =>
       const bmssp = new BMSSP(graph);
       const source = [...bmssp.nodeIDs][0];
       const expected = dijkstra(graph, bmssp.nodeIDs, source);
-      const actual = dijkstraAdjacency(bmssp.adjacency, bmssp.nodeIDs, source);
+      const actual = dijkstraAdjacency(
+        adjacencyOf(bmssp),
+        bmssp.nodeIDs,
+        source,
+      );
       expect(actual.size).toBe(expected.size);
       for (const [id, d] of expected) {
         expect(actual.get(id)).toBe(d);
@@ -63,7 +67,7 @@ describe("dijkstraAdjacency (#170): the fair prebuilt-adjacency baseline", () =>
       [2, 3, 1],
     ];
     const bmssp = new BMSSP(graph);
-    const dist = dijkstraAdjacency(bmssp.adjacency, bmssp.nodeIDs, 0);
+    const dist = dijkstraAdjacency(adjacencyOf(bmssp), bmssp.nodeIDs, 0);
     expect(dist.get(1)).toBe(4);
     expect(dist.get(2)).toBe(Infinity);
     expect(dist.get(3)).toBe(Infinity);
@@ -71,16 +75,16 @@ describe("dijkstraAdjacency (#170): the fair prebuilt-adjacency baseline", () =>
 
   test("throws when the source is not in nodeIDs", () => {
     const bmssp = new BMSSP([[0, 1, 1]]);
-    expect(() => dijkstraAdjacency(bmssp.adjacency, bmssp.nodeIDs, 99)).toThrow(
-      "Source node not found",
-    );
+    expect(() =>
+      dijkstraAdjacency(adjacencyOf(bmssp), bmssp.nodeIDs, 99),
+    ).toThrow("Source node not found");
   });
 
   test("comparison counter counts and resets", () => {
     const bmssp = new BMSSP(sparseRandom(100, 3, 7));
     resetDijkstraComparisonCount();
     expect(getDijkstraComparisonCount()).toBe(0);
-    dijkstraAdjacency(bmssp.adjacency, bmssp.nodeIDs, 0);
+    dijkstraAdjacency(adjacencyOf(bmssp), bmssp.nodeIDs, 0);
     expect(getDijkstraComparisonCount()).toBeGreaterThan(0);
     resetDijkstraComparisonCount();
     expect(getDijkstraComparisonCount()).toBe(0);
@@ -89,10 +93,10 @@ describe("dijkstraAdjacency (#170): the fair prebuilt-adjacency baseline", () =>
   test("counts are deterministic for a fixed graph and source", () => {
     const bmssp = new BMSSP(sparseRandom(200, 3, 9));
     resetDijkstraComparisonCount();
-    dijkstraAdjacency(bmssp.adjacency, bmssp.nodeIDs, 0);
+    dijkstraAdjacency(adjacencyOf(bmssp), bmssp.nodeIDs, 0);
     const first = getDijkstraComparisonCount();
     resetDijkstraComparisonCount();
-    dijkstraAdjacency(bmssp.adjacency, bmssp.nodeIDs, 0);
+    dijkstraAdjacency(adjacencyOf(bmssp), bmssp.nodeIDs, 0);
     expect(getDijkstraComparisonCount()).toBe(first);
   });
 });

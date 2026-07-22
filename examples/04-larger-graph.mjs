@@ -52,7 +52,7 @@ export function run() {
   );
 
   // Spot-check against the oracle on a handful of nodes.
-  const oracle = dijkstra(graph.graph, graph.nodeIDs, 0);
+  const oracle = dijkstra(edges, graph.nodeIDs, 0);
   const sample = [corner, Math.floor((n * n) / 2), n - 1, n * (n - 1)];
   const allMatch = sample.every(
     (node) => graph.shortestPaths.get(node) === oracle.get(node),

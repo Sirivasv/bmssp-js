@@ -26,9 +26,9 @@ import {
  * - {@link BMSSP#bmssp} — the low-level bounded multi-source primitive (advanced;
  *   composite keys, returns `{ bound, boundKey, vertices }`).
  * - {@link BMSSP#reconstructPath} — canonical path for the latest run.
- * - {@link BMSSP#getEdges} — O(1) outgoing-edge lookup.
- * - Public fields: `shortestPaths`, `nodeIDs`, `hops`, `preds`, `adjacency`,
- *   `graph` (all documented in the constructor).
+ * - {@link BMSSP#getEdges} — outgoing-edge lookup, materialized from the CSR.
+ * - Public fields: `shortestPaths`, `nodeIDs`, `hops`, `preds` (all
+ *   documented in the constructor).
  *
  * **Everything else on this class is `@internal`** — the dense-index engine
  * (`csr`, `labels`, `ids`, `indexOf`, `bmsspIndex`, `syncLabelsIn/Out`,
@@ -56,16 +56,10 @@ class BMSSP {
     const { edges: inputEdges, vertices: declaredVertices } =
       normalizeGraphInput(inputGraph);
 
-    // Main graph represented as an array of edges
-    this.graph = [];
     // Set to store unique node IDs
     this.nodeIDs = new Set();
     // Map to store shortest paths
     this.shortestPaths = new Map();
-    // Adjacency map: nodeId -> array of [to, weight] outgoing edges.
-    // The public O(1) edge-lookup view (getEdges); since #205 the algorithm
-    // itself runs on the CSR arrays built by buildIndex below.
-    this.adjacency = new Map();
     // Canonical tie-break labels (#163): hops = edge count of the canonical
     // shortest path, preds = its predecessor pointer. Since #205 these Maps
     // are the PUBLIC mirror of the engine's typed-array labels, refreshed
@@ -75,6 +69,11 @@ class BMSSP {
     this.preds = new Map();
     this.ties = makeTies(this.hops, this.preds);
 
+    // Validate the edges and collect the node universe. #212: we no longer keep
+    // a deep-copied `this.graph` edge array or a `this.adjacency` Map — the CSR
+    // engine (buildIndex) is the single source of truth, built directly from
+    // `inputEdges`. Validation stays here so the indexed error messages remain
+    // the single source of truth.
     for (let [index, edge] of inputEdges.entries()) {
       if (!Array.isArray(edge) || edge.length !== 3) {
         throw new Error(`Edge at index ${index} must be [from, to, weight]`);
@@ -90,18 +89,14 @@ class BMSSP {
         );
       }
 
-      // Create a deep copy of each edge array
-      this.graph.push([...edge]);
-
       // Add node IDs to the set
-      this.nodeIDs.add(edge[0]);
-      this.nodeIDs.add(edge[1]);
+      this.nodeIDs.add(from);
+      this.nodeIDs.add(to);
     }
 
     // #172: fold in explicitly declared vertices (isolated nodes included).
-    // Same finiteness contract as edge endpoints; buildIndex/buildAdjacency
-    // then give every declared node an index, an empty CSR range and an
-    // empty neighbor list.
+    // Same finiteness contract as edge endpoints; buildIndex then gives every
+    // declared node an index and an empty CSR range (getEdges returns []).
     for (const id of declaredVertices) {
       if (!Number.isFinite(id)) {
         throw new Error("Declared vertex IDs must be finite numbers");
@@ -109,11 +104,10 @@ class BMSSP {
       this.nodeIDs.add(id);
     }
 
-    // Build the adjacency map from the copied edges
-    this.buildAdjacency();
-
-    // Build the dense-index engine state: sorted-id index + CSR + labels
-    this.buildIndex();
+    // Build the dense-index engine state directly from the validated edges:
+    // sorted-id index + CSR + labels. No intermediate edge-array / adjacency-Map
+    // copy — this is the #212 direct-CSR construction.
+    this.buildIndex(inputEdges);
 
     // Initialize shortest paths map
     this.initializeShortestPaths();
@@ -122,27 +116,10 @@ class BMSSP {
     this.deriveParameters();
   }
 
-  // Method to (re)build the adjacency map from this.graph.
-  // Every node ID gets an entry (an empty array for nodes with no
-  // outgoing edges) so callers can rely on .get(node) returning an array.
-  buildAdjacency() {
-    this.adjacency = new Map();
-
-    // Ensure every known node has an (initially empty) neighbor list
-    for (let nodeId of this.nodeIDs) {
-      this.adjacency.set(nodeId, []);
-    }
-
-    // Group outgoing edges by their source node
-    for (let [from, to, weight] of this.graph) {
-      this.adjacency.get(from).push([to, weight]);
-    }
-  }
-
   /**
-   * Build the dense-index engine state (#205): assign every node ID a dense
-   * index, lay the graph out in CSR form over those indices, and allocate
-   * the typed-array labels.
+   * Build the dense-index engine state (#205, direct-CSR since #212): assign
+   * every node ID a dense index, lay the given edges out in CSR form over
+   * those indices, and allocate the typed-array labels.
    *
    * Indices are assigned in ASCENDING NUMERIC ID ORDER. That makes index
    * order equal id order, so the composite-key id tie-break (#163) picks the
@@ -151,11 +128,13 @@ class BMSSP {
    * under edge-list permutation.
    *
    * @internal
+   * @param {Array<[number,number,number]>} edges - The validated input edges;
+   *   consumed directly into CSR (no intermediate `this.graph` copy).
    */
-  buildIndex() {
+  buildIndex(edges) {
     const sorted = [...this.nodeIDs].sort((a, b) => a - b);
     const n = sorted.length;
-    const m = this.graph.length;
+    const m = edges.length;
     // ids: index -> original node id; indexOf: original node id -> index
     this.ids = Float64Array.from(sorted);
     this.indexOf = new Map();
@@ -163,10 +142,10 @@ class BMSSP {
       this.indexOf.set(sorted[i], i);
     }
     // CSR: offsets[u]..offsets[u+1] delimit u's outgoing edges in
-    // targets/weights (edge order within a node follows this.graph; the
-    // #163 canonical labels are iteration-order independent anyway)
+    // targets/weights (edge order within a node follows the input edge order;
+    // the #163 canonical labels are iteration-order independent anyway)
     const offsets = new Uint32Array(n + 1);
-    for (const [from] of this.graph) {
+    for (const [from] of edges) {
       offsets[this.indexOf.get(from) + 1] += 1;
     }
     for (let i = 0; i < n; i += 1) {
@@ -175,7 +154,7 @@ class BMSSP {
     const targets = new Uint32Array(m);
     const weights = new Float64Array(m);
     const cursor = offsets.slice(0, n);
-    for (const [from, to, weight] of this.graph) {
+    for (const [from, to, weight] of edges) {
       const u = this.indexOf.get(from);
       const e = cursor[u];
       cursor[u] += 1;
@@ -187,10 +166,25 @@ class BMSSP {
     this.labels = makeLabels(n);
   }
 
-  // Return the outgoing edges of a node as an array of [to, weight].
-  // Unknown nodes return an empty array.
+  /**
+   * Return the outgoing edges of a node as a fresh array of `[to, weight]`
+   * pairs, materialized from the CSR (#212 — there is no stored adjacency Map).
+   * Unknown nodes return an empty array. Edge order follows the construction
+   * input order.
+   *
+   * @public
+   * @param {number} nodeId - A node in the graph
+   * @returns {Array<[number, number]>} Outgoing `[to, weight]` edges, `[]` if unknown
+   */
   getEdges(nodeId) {
-    return this.adjacency.get(nodeId) ?? [];
+    const u = this.indexOf.get(nodeId);
+    if (u === undefined) return [];
+    const { offsets, targets, weights } = this.csr;
+    const out = [];
+    for (let e = offsets[u]; e < offsets[u + 1]; e += 1) {
+      out.push([this.ids[targets[e]], weights[e]]);
+    }
+    return out;
   }
 
   // Method to initialize the shortest paths map, its #163 tie-break mirror

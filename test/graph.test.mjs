@@ -1,6 +1,7 @@
 import { describe, test, expect } from "@jest/globals";
 import { BMSSP, Graph, dijkstra } from "../index.mjs";
 import { sparseRandom } from "../benchmarks/generators.mjs";
+import { edgesOf } from "./helpers.mjs";
 
 // #172 — typed / flexible graph inputs. The BMSSP constructor now accepts an
 // edge array (unchanged), an adjacency Map/object, or a Graph builder, and
@@ -200,7 +201,7 @@ describe("cross-shape equivalence on seeded graphs (vs Dijkstra oracle)", () => 
 
     const fromArray = new BMSSP(edges);
     fromArray.calculateShortestPaths(source);
-    const oracle = dijkstra(fromArray.graph, fromArray.nodeIDs, source);
+    const oracle = dijkstra(edgesOf(fromArray), fromArray.nodeIDs, source);
 
     for (const input of [adjacencyMap, g]) {
       const bmssp = new BMSSP(input);
