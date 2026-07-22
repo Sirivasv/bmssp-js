@@ -22,7 +22,7 @@ import {
   getDijkstraComparisonCount,
 } from "./dijkstra-adj.mjs";
 import { sparseRandom, grid } from "./generators.mjs";
-import { markdownTable, countMismatches } from "./bench-util.mjs";
+import { markdownTable, countMismatches, adjacencyOf } from "./bench-util.mjs";
 
 // Sized to reproduce the crossover table in a couple of tens of seconds:
 // sparse d3 at 50k / 200k / 1M brackets the crossover; the grid shows a
@@ -53,13 +53,10 @@ export function runComparisonCountBenchmark(cases = COUNT_CASES) {
     const graph = testCase.build();
     const bmssp = new BMSSP(graph);
     const source = [...bmssp.nodeIDs][0];
+    const adjacency = adjacencyOf(bmssp);
 
     resetDijkstraComparisonCount();
-    const dijkstraDist = dijkstraAdjacency(
-      bmssp.adjacency,
-      bmssp.nodeIDs,
-      source,
-    );
+    const dijkstraDist = dijkstraAdjacency(adjacency, bmssp.nodeIDs, source);
     const dijkstraComparisons = getDijkstraComparisonCount();
 
     resetComparisonCount();

@@ -2,6 +2,7 @@ import { describe, test, expect } from "@jest/globals";
 import { findPivots } from "../src/findPivots.mjs";
 import { BMSSP } from "../src/bmssp.mjs";
 import { dijkstra } from "../src/dijkstra.mjs";
+import { edgesOf } from "./helpers.mjs";
 
 // Small deterministic PRNG so stress-test failures are reproducible
 function mulberry32(seed) {
@@ -176,7 +177,7 @@ describe("findPivots vs Dijkstra oracle (seeded)", () => {
     for (let round = 0; round < 20; round += 1) {
       const edges = randomEdges(rand, 40, 160);
       const g = setup(edges, { 0: 0 });
-      const oracle = dijkstra(g.graph, g.nodeIDs, 0);
+      const oracle = dijkstra(edgesOf(g), g.nodeIDs, 0);
       const n = g.nodeIDs.size;
       // k = n rounds of Bellman-Ford complete everything, and the early
       // exit (|W| > n·1) can never fire since W has at most n vertices
@@ -196,7 +197,7 @@ describe("findPivots vs Dijkstra oracle (seeded)", () => {
     for (let round = 0; round < 25; round += 1) {
       const edges = randomEdges(rand, 30, 90);
       const g = setup(edges, { 0: 0 });
-      const oracle = dijkstra(g.graph, g.nodeIDs, 0);
+      const oracle = dijkstra(edgesOf(g), g.nodeIDs, 0);
       const finite = [...oracle.values()]
         .filter((d) => d < Infinity)
         .sort((a, b) => a - b);
@@ -221,7 +222,7 @@ describe("findPivots vs Dijkstra oracle (seeded)", () => {
       // The frontier-shrink contract: every vertex with d(v) < B is either
       // complete in W, or some shortest path to it visits a pivot
       const pivotOracles = new Map(
-        [...pivotIds].map((p) => [p, dijkstra(g.graph, g.nodeIDs, p)]),
+        [...pivotIds].map((p) => [p, dijkstra(edgesOf(g), g.nodeIDs, p)]),
       );
       for (const [v, d] of oracle) {
         if (d >= B) continue;

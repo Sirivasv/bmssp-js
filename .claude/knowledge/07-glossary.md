@@ -1,8 +1,11 @@
 # 07 — Glossary
 
-<!-- Updated on: 2026-07-21 (#172 PR: flexible inputs — Graph builder, normalizeGraphInput,
-     explicit vertex universe; four public exports now. Previous update the same day:
-     #205 PR dense-index engine — makeLabels, labelKey, CSR, dense index, buildIndex,
+<!-- Updated on: 2026-07-22 (#212 PR: direct-CSR construction — removed the public
+     this.graph / this.adjacency fields + buildAdjacency; buildIndex(edges); getEdges
+     served from CSR; edgesOf/adjacencyOf test-bench helpers; breaking → 3.0.0.
+     Previous update 2026-07-21 (#172 PR): flexible inputs — Graph builder,
+     normalizeGraphInput, explicit vertex universe; four public exports. Same day:
+     #205 dense-index engine — makeLabels, labelKey, CSR, dense index, buildIndex,
      syncLabelsIn/Out, boundToEngine/keyToPublic, bmsspIndex; NO_PRED now -1;
      relaxEdge/baseCase/findPivots typed-array signatures; #168 compareKeyParts + RELAX_*) -->
 
@@ -111,17 +114,24 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
   the set *inferred* from edge endpoints. Before #172 the vertex set was always inferred; a
   `Graph` (`addVertex`) or an adjacency form (a key with no neighbors) can now declare
   **isolated** vertices, which flow through to `nodeIDs` and get an index, an empty CSR
-  range, an empty adjacency list, an ∞ estimate, and are valid as a `calculateShortestPaths`
+  range (`getEdges` → `[]`), an ∞ estimate, and are valid as a `calculateShortestPaths`
   source (reaching only themselves).
-- **`adjacency`** (#45) — `Map<nodeId, Array<[to, weight]>>` field on the `BMSSP` class:
-  a node's outgoing edges. Since #205 this is the **public edge view** behind `getEdges`
-  (and the fair-baseline Dijkstra in the benchmarks); the algorithm's hot path uses the
-  CSR arrays instead. Every known node has an entry (empty array for sinks). Built in the
-  constructor.
-- **`buildAdjacency()`** (#45) — class method that (re)builds `this.adjacency` from
-  `this.graph`. Called by the constructor.
-- **`getEdges(nodeId)`** (#45) — class method returning a node's outgoing edges as
-  `[to, weight]` pairs; returns `[]` for unknown nodes.
+- **`adjacency` / `buildAdjacency()` / `this.graph` (removed by #212)** — until #212 the
+  `BMSSP` class kept a deep-copied edge array (`this.graph`) and a
+  `Map<nodeId, Array<[to,weight]>>` (`this.adjacency`, built by `buildAdjacency()`) as
+  public fields. #212 (**breaking, 3.0.0**) removed all three: the CSR is the single source
+  of truth, built directly from the input (see "Direct-CSR construction"). `getEdges`
+  materializes the edge view on demand instead.
+- **`getEdges(nodeId)`** (#45; CSR-served since #212) — public class method returning a
+  node's outgoing edges as fresh `[to, weight]` pairs, materialized from `this.csr` (edge
+  order follows the construction input); returns `[]` for unknown nodes.
+- **Direct-CSR construction** (#212) — the constructor builds the dense index + CSR + typed
+  labels straight from the validated input edges, with no intermediate `this.graph` deep copy
+  or `this.adjacency` Map. `buildIndex(edges)` consumes the normalized edge array directly.
+  Purely construction-side and label-preserving (the CSR is byte-identical to the pre-#212
+  round-trip), so every oracle/determinism assertion is unchanged; it roughly **halves
+  construction time** (n = 500k / m = 1.5M: ~510 → ~240 ms median). **Breaking** only in that
+  the public `graph`/`adjacency` fields are gone — hence the 3.0.0 major.
 - **Dense index** (#205) — the `BMSSP` class maps every original node id to a contiguous
   integer `0..n-1`, assigned in **ascending numeric id order** (`buildIndex`). `this.ids`
   (`Float64Array`) is index → id, `this.indexOf` (`Map`) is the inverse. Index order
@@ -131,10 +141,18 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
   targets:Uint32Array, weights:Float64Array }`. Node `u`'s outgoing edges are
   `targets/weights[offsets[u] .. offsets[u+1])`. Replaces per-edge `adjacency.get` +
   iterator/destructuring in the hot loops.
-- **`buildIndex()`** (#205) — constructor step building the dense index (`ids`/`indexOf`),
-  the CSR arrays (`this.csr`), and the typed label state (`this.labels`).
+- **`buildIndex(edges)`** (#205; takes `edges` since #212) — constructor step building the
+  dense index (`ids`/`indexOf`), the CSR arrays (`this.csr`), and the typed label state
+  (`this.labels`) directly from the validated input edges (no `this.graph` copy).
 - **Adjacency list (oracle)** — the *local* adjacency `Map` that `src/dijkstra.mjs` builds
-  internally per call; distinct from the class's persistent `this.adjacency`.
+  internally per call. Since #212 the class no longer keeps a persistent adjacency Map; the
+  benchmark's fair baseline builds one once via `adjacencyOf` (below) from `getEdges`.
+- **`edgesOf` / `adjacencyOf` (test/bench helpers, #212)** — since #212 removed the public
+  `graph`/`adjacency` fields, tests rebuild what the oracles need from `getEdges`:
+  `edgesOf(instance)` (`test/helpers.mjs`) → a `[from,to,weight][]` array for the
+  `dijkstra(edges, …)` oracle; `adjacencyOf(instance)` (`benchmarks/bench-util.mjs`) → a
+  `Map<from,[to,weight][]>` for the benchmark `dijkstraAdjacency` baseline (built once,
+  outside the timed region).
 - **`BlockList`** (#42) — `src/blockList.mjs`, the Lemma 3.3 structure `D`. API:
   `insert(key, value)` / `batchPrepend(pairs)` / `pull() → { keys, bound }`, plus
   `size` / `isEmpty()`. `pull()`'s `{ keys, bound }` is Algorithm 3's `Si, Bi`. Values must
@@ -339,8 +357,9 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
   for #182's transition cliff.
 - **Head-to-head** — the measured BMSSP-vs-Dijkstra comparison. **Algorithm-only
   timing**: construction and adjacency building are excluded for both sides; the Dijkstra
-  baseline consumes the BMSSP instance's own prebuilt `adjacency` Map (the exported
-  `dijkstra()` builds its own per call — that's loading, not algorithm). Since #170 the
+  baseline consumes an adjacency Map built once from the BMSSP instance via `adjacencyOf`
+  (since #212 the class no longer stores one — the exported `dijkstra()` builds its own per
+  call, which is loading, not algorithm). Since #170 the
   harness runs it per shape with node-by-node output verification (`mismatches` column);
   `benchmarks/HEAD-TO-HEAD.md` is the frozen 1.0.0 record (2026-07-16, up to n = 4M),
   `benchmarks/RESULTS.md` the latest capture.
@@ -391,5 +410,6 @@ Quick lookup for the symbols and terms used across the paper, the notes, and the
   `@public`/`@internal` tags on the `BMSSP` class (documentation) and `test/publicApi.test.mjs`
   (a contract test pinning the 4 exports + supported members, so export/rename drift fails CI).
   User-confirmed **document-only** enforcement — no `#`-privatization (tests drive internals),
-  `this.graph`/`this.adjacency` kept public (direct-CSR perf lever deferred), raw `bmssp(l,B,S)`
-  kept as an advanced public entrypoint.
+  raw `bmssp(l,B,S)` kept as an advanced public entrypoint. (The `this.graph`/`this.adjacency`
+  fields, kept public in 2.0.0 with the direct-CSR perf lever deferred, were **removed in #212**
+  → 3.0.0; `test/publicApi.test.mjs` now pins that they are gone.)

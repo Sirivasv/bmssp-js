@@ -42,6 +42,7 @@ with every building block shipped, tested, and released individually:
 | Typed / flexible graph inputs: `Graph` builder + adjacency Map/object + explicit vertex universe ([#172](https://github.com/Sirivasv/bmssp-js/issues/172)) | `src/graph.mjs` + `BMSSP` constructor | ✅ done |
 | Public multi-source / bounded entrypoint ([#171](https://github.com/Sirivasv/bmssp-js/issues/171)) | `BMSSP.calculateShortestPathsFrom()` | ✅ done |
 | Public API stabilization + 1.0→2.0 migration note ([#173](https://github.com/Sirivasv/bmssp-js/issues/173)) | `MIGRATION.md` + `docs/index.html` + contract test | ✅ done — **2.0.0** |
+| Direct-CSR construction: build the index/CSR straight from the input, ~½ the construction time ([#212](https://github.com/Sirivasv/bmssp-js/issues/212)) | `BMSSP` constructor | ✅ done — **3.0.0** |
 
 > **Honest note:** the paper's win is asymptotic, and this repo optimizes for correctness
 > and readability first — but the constant factors have come down a lot. Measured
@@ -120,9 +121,10 @@ when the target is unreachable (or before any run) and throws for a node outside
 
 A reference `dijkstra` implementation is also exported. See the `examples/` directory for
 more, or the [public API reference](https://sirivasv.github.io/bmssp-js/) for the complete
-documented surface. The public API is **stable as of 2.0.0** — see
-[MIGRATION.md](MIGRATION.md) for the 1.0 → 2.0 note (no breaking changes) and the locked
-surface.
+documented surface. The public API has been **stable since 2.0.0** — see
+[MIGRATION.md](MIGRATION.md) for the migration notes and the locked surface. (3.0.0 is a
+performance release whose only public-surface change is removing the little-used
+`graph`/`adjacency` instance fields — use `getEdges(id)` for a node's outgoing edges.)
 
 ### Flexible graph inputs
 

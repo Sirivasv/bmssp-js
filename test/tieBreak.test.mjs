@@ -17,6 +17,7 @@ import {
 } from "../src/tieBreak.mjs";
 import { BMSSP } from "../src/bmssp.mjs";
 import { dijkstra } from "../src/dijkstra.mjs";
+import { edgesOf } from "./helpers.mjs";
 
 // Small deterministic PRNG so stress-test failures are reproducible
 function mulberry32(seed) {
@@ -269,7 +270,7 @@ describe("determinism (#163): edge order never changes the outcome", () => {
       const n = 25 + Math.floor(rand() * 25);
       const edges = tiedEdges(rand, n, n * 4);
       const probe = new BMSSP(edges);
-      const oracle = dijkstra(probe.graph, probe.nodeIDs, 0);
+      const oracle = dijkstra(edgesOf(probe), probe.nodeIDs, 0);
       const finite = [...oracle.values()]
         .filter((d) => d < Infinity)
         .sort((a, b) => a - b);
@@ -300,7 +301,7 @@ describe("strict Lemma 3.1 (#163): no boundary ties in the composite order", () 
       const n = 20 + Math.floor(rand() * 30);
       const edges = tiedEdges(rand, n, n * 4);
       const bmssp = new BMSSP(edges);
-      const oracle = dijkstra(bmssp.graph, bmssp.nodeIDs, 0);
+      const oracle = dijkstra(edgesOf(bmssp), bmssp.nodeIDs, 0);
       const finite = [...oracle.values()]
         .filter((d) => d < Infinity)
         .sort((a, b) => a - b);
@@ -370,7 +371,7 @@ describe("canonical labels (#163): hops and preds are the lexicographic optimum"
       const edges = tiedEdges(rand, n, n * 4);
       const bmssp = new BMSSP(edges);
       bmssp.calculateShortestPaths(0);
-      const { dist, hop } = lexDijkstra(bmssp.graph, bmssp.nodeIDs, 0);
+      const { dist, hop } = lexDijkstra(edgesOf(bmssp), bmssp.nodeIDs, 0);
       for (const v of bmssp.nodeIDs) {
         expect(bmssp.shortestPaths.get(v)).toBe(dist.get(v));
         if (dist.get(v) < Infinity) {
@@ -387,13 +388,13 @@ describe("canonical labels (#163): hops and preds are the lexicographic optimum"
       const edges = tiedEdges(rand, n, n * 4);
       const bmssp = new BMSSP(edges);
       bmssp.calculateShortestPaths(0);
-      const { dist, hop } = lexDijkstra(bmssp.graph, bmssp.nodeIDs, 0);
+      const { dist, hop } = lexDijkstra(edgesOf(bmssp), bmssp.nodeIDs, 0);
       for (const v of bmssp.nodeIDs) {
         if (v === 0 || dist.get(v) === Infinity) continue;
         // The canonical parent is the smallest-id in-neighbor u with a
         // (length, hops)-tight edge into v
         let expected = null;
-        for (const [from, to, weight] of bmssp.graph) {
+        for (const [from, to, weight] of edgesOf(bmssp)) {
           if (to !== v) continue;
           if (
             dist.get(from) + weight === dist.get(v) &&

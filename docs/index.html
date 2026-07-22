@@ -162,9 +162,11 @@ graph.reconstructPath(1); // [0, 1]</code></pre>
         <h2>Public API</h2>
         <p>The package has exactly four exports: <code>BMSSP</code>, <code>Graph</code>,
            <code>dijkstra</code>, and <code>constantDegreeTransform</code>. This surface is
-           <strong>stable as of 2.0.0</strong> — see the
+           <strong>stable since 2.0.0</strong> (3.0.0 removed only the little-used
+           <code>graph</code>/<code>adjacency</code> instance fields — use
+           <code>getEdges(id)</code> instead) — see the
            <a href="https://github.com/Sirivasv/bmssp-js/blob/main/MIGRATION.md"
-              target="_blank" rel="noopener">1.0&nbsp;→&nbsp;2.0 migration note</a> and the
+              target="_blank" rel="noopener">migration note</a> and the
            runnable <a href="https://github.com/Sirivasv/bmssp-js/tree/main/examples"
               target="_blank" rel="noopener">examples gallery</a>. Anything not listed here
            (the block list, the indexed heap, <code>BaseCase</code>/<code>FindPivots</code>,

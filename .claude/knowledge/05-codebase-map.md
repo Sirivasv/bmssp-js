@@ -1,19 +1,21 @@
 # 05 — Codebase Map (current state)
 
-<!-- BOOKMARK-COMMIT: d56bc86 -->
-<!-- PENDING-PR-BRANCH: feat/173-stabilize-public-api -->
-<!-- Last validated: 2026-07-21 (Phase C of the #173 PR, branch feat/173-stabilize-public-api,
-     based on main d56bc86). This PR is the milestone-closing 2.0.0 work: public-API
-     STABILIZATION (documentation + contract lockdown, no behavior change). Adds @public/
-     @internal JSDoc across the BMSSP class, a contract test (test/publicApi.test.mjs) pinning
-     the 4 exports + supported members, MIGRATION.md (1.0→2.0, no breaking changes), two new
-     examples (05-flexible-inputs, 06-multi-source), and a rewritten docs/index.html (4 exports
-     + calculateShortestPathsFrom + advanced bmssp). User-confirmed decisions: document-only
-     boundary (no #-privatization), keep this.graph/this.adjacency public (direct-CSR perf
-     lever deferred to a new post-2.0 issue), keep raw bmssp(l,B,S) as advanced public API.
-     **major → 2.0.0** (npm version major applied). Body describes post-merge reality; markers
-     fast-path on the next session's Phase A. Also folds in the #171-PR RKB marker flip
-     (BOOKMARK d56bc86) that had been left as a local bookkeeping edit. -->
+<!-- BOOKMARK-COMMIT: 47fae54 -->
+<!-- PENDING-PR-BRANCH: feat/212-direct-csr-construction -->
+<!-- Last validated: 2026-07-22 (Phase C of the #212 PR, branch feat/212-direct-csr-construction,
+     based on main 47fae54). This PR is the milestone-closing 3.0.0 work: DIRECT-CSR
+     CONSTRUCTION — the constructor builds the dense index + CSR + typed labels straight from
+     the validated input edges, removing the intermediate this.graph deep-copy and the
+     this.adjacency Map (and buildAdjacency). Purely construction-side + label-preserving (CSR
+     byte-identical), so every oracle/determinism assertion is unchanged; roughly HALVES
+     construction time (n=500k/m=1.5M: ~510 → ~240 ms median, clean A/B vs main 2.0.0).
+     BREAKING: the public this.graph / this.adjacency fields are gone → getEdges materializes
+     the edge view from CSR on demand. User-confirmed decision (2026-07-22): remove the fields
+     (not lazy getters). Test/bench migration: new test/helpers.mjs edgesOf() + bench-util
+     adjacencyOf() rebuild oracle inputs from getEdges; publicApi.test pins the fields as GONE.
+     **major → 3.0.0** (npm version major applied). Body describes post-merge reality; markers
+     fast-path on the next session's Phase A. Also carries the #173-PR Phase-E 06 reconciliation
+     that branch protection had stranded as a local bookkeeping edit. -->
 
 
 Snapshot of what exists in `bmssp-js` today, so you know what to build on vs. what's missing.
@@ -68,6 +70,8 @@ index.mjs                 # re-exports { BMSSP }, { dijkstra }, { constantDegree
 src/
   bmssp.mjs               # BMSSP class — full Algorithm 3 recursion (#43); wires the pieces below.
                           #      Constructor accepts flexible inputs via normalizeGraphInput (#172)
+                          #      and builds the index/CSR DIRECTLY from them (#212) — no this.graph
+                          #      deep-copy, no this.adjacency Map; getEdges reads the CSR on demand
   graph.mjs               # #172: public `Graph` input builder (addVertex/addEdge, chainable) +
                           #      normalizeGraphInput — edge array | adjacency Map/object | Graph →
                           #      canonical { edges, vertices }; `vertices` = explicit vertex universe
@@ -92,7 +96,8 @@ test/
   graph.test.mjs          # #172: 18 tests — Graph builder (chain/idempotent/copies/eager validation), adjacency Map/object inputs, object-key coercion, isolated vertices (empty & null neighbor lists, declared, as source), cross-shape oracle equivalence (seeded 2k), unrecognized-input + malformed-adjacency throws
   pathReconstruction.test.mjs # #169: 3 public-API tests — Dijkstra path oracle, unreachable/pre-run/source switching, target validation
   multiSource.test.mjs     # #171: 19 tests — calculateShortestPathsFrom: single-source equivalence, nearest-of-many + custom-d0 multi-source oracle, bounded pruning, all input shapes, reconstructPath/state-reset integration, validation
-  publicApi.test.mjs       # #173: 9 CONTRACT tests — pins the 4 exports + BMSSP/Graph supported members + constantDegreeTransform/dijkstra shapes; export/rename drift fails CI
+  publicApi.test.mjs       # #173: CONTRACT tests — pins the 4 exports + BMSSP/Graph supported members + constantDegreeTransform/dijkstra shapes; export/rename drift fails CI. #212: +1 test pinning graph/adjacency as REMOVED (10 total)
+  helpers.mjs              # #212: shared test helper edgesOf(instance) — rebuilds a [from,to,weight][] edge array from the public getEdges() view (the removed this.graph), to feed the dijkstra oracle
   blockList.test.mjs      # #42: 25 BlockList tests incl. seeded random stress, #182 many-chunk/M=1 regression tests + #167 machinery tests
   boundIndex.test.mjs     # #167: 8 BoundIndex tests — sequence ops, monotone findFirst, AVL invariants under seeded churn
   select.test.mjs         # #167: 9 partitionByRank tests — every-rank contract, worst-case orderings, duplicates, determinism
@@ -103,7 +108,8 @@ test/
   README.md               # test-suite principles (everything seeded, no data files) + file map
 benchmarks/               # dependency-free benchmark harness, `npm run bench` / `npm run bench:counts`
   generators.mjs          #   seeded graph builders + SCENARIOS registry (sparse/dense/grid/chain/star/sparse-l4)
-  bench-util.mjs          #   timing (timeMany), markdown-table + countMismatches helpers
+  bench-util.mjs          #   timing (timeMany), markdown-table + countMismatches helpers;
+                          #     #212 adjacencyOf(instance) — Map view rebuilt from getEdges for the fair Dijkstra baseline (built once, outside timing)
   adjacency.bench.mjs     #   adjacency map (#45) vs. linear edge scan
   scenarios.bench.mjs     #   #170: head-to-head per shape — construct + dijkstra + bmssp timings, verified outputs
   dijkstra-adj.mjs        #   #170: algorithm-only Dijkstra over prebuilt adjacency + comparison counter (fair baseline)
@@ -147,10 +153,10 @@ class BMSSP {
                                    // vertices }; validates edges (finite numeric node IDs,
                                    // finite non-negative weights) + folds in declared
                                    // vertices (isolated OK); [] / {} / empty Graph remain valid
-  //   this.graph          : deep-copied edge array
   //   this.nodeIDs        : Set of all node IDs (from both endpoints)
   //   this.shortestPaths  : Map<nodeId, distance>, initialized to Infinity  ← public d̂[·]
-  //   this.adjacency      : Map<nodeId, Array<[to, weight]>>  ← #45 public edge view (getEdges)
+  //   (#212 REMOVED this.graph + this.adjacency — CSR is the single source of truth;
+  //    getEdges() materializes a node's [to,weight] edges from the CSR on demand)
   //   this.hops, this.preds : Map — #163 canonical labels, public mirror refreshed after a run
   //   this.ties           : { hops, preds } bundle (public boundary compatibility)
   //   --- #205 dense engine (indices assigned in ascending-id order) ---
@@ -160,9 +166,10 @@ class BMSSP {
   //   this.labels         : { dist:Float64Array, hops:Uint32Array, preds:Int32Array } ← engine d̂
   //   this.k, this.t, this.topLevel : paper parameters, derived in the constructor
   initializeShortestPaths()        // reset public Maps AND engine label arrays to ∞ / 0 / NO_PRED
-  buildAdjacency()                 // #45: (re)build the public adjacency Map from this.graph
-  buildIndex()                     // #205: sorted-id index + CSR + typed labels (called in ctor)
-  getEdges(nodeId)                 // #45: O(1) outgoing-edge lookup; [] for unknown nodes
+  buildIndex(edges)                // #205/#212: sorted-id index + CSR + typed labels built
+                                   //      DIRECTLY from the validated input edges (called in ctor)
+  getEdges(nodeId)                 // #45/#212: node's [to,weight] edges materialized from the
+                                   //      CSR (input edge order); [] for unknown nodes
   deriveParameters()               // #43: k = max(1,⌊(log₂n)^⅓⌋), t = max(1,⌊(log₂n)^⅔⌋),
                                    //      topLevel = max(1,⌈log₂n / t⌉) — from this.nodeIDs.size
   syncLabelsIn() / syncLabelsOut() // #205: snapshot public shortestPaths → engine arrays before a
@@ -192,6 +199,22 @@ offending edge index (unchanged messages). Declared `vertices` (the explicit uni
 (`[]` / `{}` / `new Map()` / `new Graph()`) remains valid and preserves the #162 contract:
 construction succeeds, then `calculateShortestPaths()` rejects any start node because the
 graph has no nodes.
+
+**Direct-CSR construction (#212, milestone-closing → 3.0.0).** The constructor builds the
+dense index + CSR + typed labels **directly** from the validated input edges — there is no
+longer an intermediate `this.graph` deep-copy or an eager `this.adjacency` Map (`buildAdjacency`
+is gone). `buildIndex(edges)` takes the normalized edge array as a parameter: it validates
+node membership, counts per-node out-degrees, prefix-sums the `offsets`, and fills
+`targets`/`weights` straight from `edges`. **BREAKING:** the public `this.graph` and
+`this.adjacency` fields are removed (user-confirmed 2026-07-22 — remove, not lazy getters), so
+`getEdges(nodeId)` now materializes a node's `[to,weight]` edges from the CSR on demand
+(`[]` for unknown / isolated nodes). Because the CSR is built from the same edges in the same
+order, it is **byte-identical** to the pre-#212 round-trip, so every canonical label / oracle /
+determinism assertion is unchanged — this is a construction-side change, not an engine change.
+Measured payoff: construction time **roughly halved** (n=500k / m=1.5M: ~510 → ~240 ms median,
+clean A/B vs `main` 2.0.0). Test/bench code that fed the removed fields to the Dijkstra oracles
+rebuilds them from `getEdges` via `edgesOf` (`test/helpers.mjs`) / `adjacencyOf`
+(`benchmarks/bench-util.mjs`); `test/publicApi.test.mjs` pins the two fields as **removed**.
 
 **Flexible inputs (#172, `src/graph.mjs`).** `normalizeGraphInput(input)` recognizes four
 shapes and always yields `{ edges: [[from,to,weight]…], vertices: [id…] }`:
@@ -256,7 +279,8 @@ lockdown**, no behavior change (user-confirmed: document-only boundary, no `#`-p
 The class carries a class-level JSDoc enumerating the **supported public surface** — the
 constructor, `calculateShortestPaths`, `calculateShortestPathsFrom`, `bmssp(l,B,S)` (advanced
 primitive), `reconstructPath`, `getEdges`, and the public fields `shortestPaths` / `nodeIDs`
-/ `hops` / `preds` / `adjacency` / `graph` — with `@public`/`@internal` tags on the method
+/ `hops` / `preds` (in 2.0.0 also `adjacency` / `graph`, **removed by #212**) — with
+`@public`/`@internal` tags on the method
 JSDoc. Everything else (the dense-index engine: `csr`, `labels`, `ids`, `indexOf`,
 `bmsspIndex`, `syncLabelsIn/Out`, `boundToEngine`/`keyToPublic`, `normalizeSources`,
 `buildIndex`, `deriveParameters`, `k`/`t`/`topLevel`/`ties`) is `@internal` — may change in a
@@ -264,10 +288,11 @@ minor. `index.mjs` exports exactly four names (`BMSSP`, `Graph`, `dijkstra`,
 `constantDegreeTransform`); the algorithm-internal modules stay unexported. `MIGRATION.md`
 records the 1.0→2.0 story (**no breaking changes** — #205/#172/#171 all landed additively, so
 2.0.0 is a stability commitment + feature consolidation), and `test/publicApi.test.mjs` pins
-the surface so export/rename drift fails CI. **Deferred (user-directed):** `this.graph` /
-`this.adjacency` stay public, so the #172/#206 direct-CSR construction perf lever is deferred
-to a new post-2.0 issue (Roadmap proposal); the raw `bmssp(l,B,S)` wrapper stays a documented
-advanced entrypoint.
+the surface so export/rename drift fails CI. In 2.0.0 the raw `bmssp(l,B,S)` wrapper stayed a
+documented advanced entrypoint and `this.graph` / `this.adjacency` stayed public (the #172/#206
+direct-CSR construction perf lever deferred to #212). **#212 (3.0.0) then removed those two
+fields** and did the direct-CSR construction — see the "Direct-CSR construction (#212)"
+paragraph above; the contract test now pins them as gone.
 
 **`bmsspIndex(l, boundKey, S)` (#43):** level 0 delegates to `baseCase`. At level ≥ 1:
 `findPivots` shrinks the frontier; pivots seed a `BlockList(M = 2^((l-1)·t), boundKey,
@@ -531,7 +556,7 @@ into `{ hops, preds }` Maps for `reconstructPath` and external inspection.
 
 `dijkstra(graph, nodeIDs, source) → Map<nodeId, distance>`. Standard array binary min-heap
 with lazy stale-entry skipping (no `DecreaseKey`). Builds its own adjacency list from the edge
-array (independent of the class's `this.adjacency`). This is the **ground truth** the BMSSP
+array (independent of the class's CSR / `getEdges`). This is the **ground truth** the BMSSP
 implementation is tested against — and, since #43, no longer part of the BMSSP code path.
 
 ## `src/constantDegree.mjs` — constant-degree transform (#164)
@@ -587,7 +612,9 @@ every accepted shape. See §"Flexible inputs (#172)" for the per-shape contract.
 ## Tests — the contract
 
 - `test/main.test.mjs` (16): constructor input-validation failures (#165), nodeIDs,
-  adjacency, and shortestPaths contracts, plus the
+  `getEdges` (CSR edge view; #212-repurposed from the old adjacency-Map assertions —
+  ingests every input edge, sink → `[]`, edge count preserved), and shortestPaths
+  contracts, plus the
   **key one** — "BMSSP vs Dijkstra" on a **seeded 10k-node sparse graph** (`sparseRandom(10_000,
   3, 1601)`, already `topLevel` 3): for a fixed source, `myBMSSP.shortestPaths` must equal
   `dijkstra(...)` for every node. (Until 2026-07-17 this ran on `roadNet-CA.txt`, an 87 MB
@@ -676,7 +703,8 @@ every accepted shape. See §"Flexible inputs (#172)" for the per-shape contract.
   dijkstra }` and their kinds; the `BMSSP` prototype has every documented public method
   (`calculateShortestPaths`, `calculateShortestPathsFrom`, `bmssp`, `reconstructPath`,
   `getEdges`) and an instance carries the public fields (`shortestPaths`/`nodeIDs`/`hops`/
-  `preds`/`adjacency`/`graph`), with an end-to-end behavior smoke check; the `Graph` builder's
+  `preds`) — and, since #212, that the removed `adjacency`/`graph` fields are **absent** —
+  with an end-to-end behavior smoke check; the `Graph` builder's
   public methods + chaining/`toNormalized` shape; `constantDegreeTransform`'s locked return
   keys; and `dijkstra`'s signature. Adding/removing/renaming any of these fails CI — the teeth
   behind the document-only boundary.
@@ -708,16 +736,17 @@ every accepted shape. See §"Flexible inputs (#172)" for the per-shape contract.
   (identical maps incl. Infinity → 0; wrong/missing entries counted); `runScenarioBenchmark`
   and `runComparisonCountBenchmark` on tiny injected scenarios return the expected columns
   with **zero mismatches**.
-- Current suite: **237 tests — 236 passing + 1 XL skipped by default** (#173 added the
-  9-test contract `publicApi.test.mjs`; #171 the 19-test `multiSource.test.mjs`; #172 the
-  18-test `graph.test.mjs`; `bmssp.mjs`, `index.mjs` and `graph.mjs` at 100%),
-  ~100% statement coverage, ~7.5 s wall-clock (the #164 distance-preservation sweeps run
+- Current suite: **238 tests — 237 passing + 1 XL skipped by default** (#212 added a
+  contract test pinning `graph`/`adjacency` as removed, taking `publicApi.test.mjs` to 10;
+  #171 the 19-test `multiSource.test.mjs`; #172 the 18-test `graph.test.mjs`; `bmssp.mjs`,
+  `index.mjs`, `graph.mjs` and `test/helpers.mjs` at 100%),
+  ~100% statement coverage, ~7 s wall-clock (the #164 distance-preservation sweeps run
   BMSSP/Dijkstra from every source). No graph data files: every generated test graph comes
-  from a seed; the #162 fixtures are hand-built and fully deterministic. The #205 dense-index
-  engine changed the internal function signatures (`baseCase`/`findPivots` take
-  `labels`/`csr` + index sets) but not a single oracle/determinism assertion — the fuzz,
-  edge-case, tie-break-determinism and constant-degree suites pass unchanged, which is
-  the correctness proof that the id→index refactor preserved every canonical label.
+  from a seed; the #162 fixtures are hand-built and fully deterministic. Like #205, the #212
+  direct-CSR change touched construction and the test/bench oracle plumbing (`edgesOf`/
+  `adjacencyOf` rebuild the removed fields from `getEdges`) but not a single oracle/determinism
+  assertion — the fuzz (incl. FUZZ_ROUNDS=25 + FUZZ_XL 2M), edge-case, tie-break-determinism
+  and constant-degree suites pass unchanged, the correctness proof that the CSR is identical.
 
 ## Benchmarks (`benchmarks/`, `npm run bench` / `npm run bench:counts`)
 
@@ -726,8 +755,10 @@ BMSSP-vs-Dijkstra head-to-head itself:
 
 - `adjacency.bench.mjs`: the #45 map is ~thousands× faster per-node than a linear scan.
 - `scenarios.bench.mjs`: per shape, algorithm-only `dijkstra ms` / `bmssp ms` / `ratio`
-  columns — both sides consume the BMSSP instance's prebuilt adjacency (`dijkstra-adj.mjs`
-  is the fair baseline) and outputs are verified node-by-node (`mismatches` must be 0).
+  columns — both sides consume an adjacency Map built once from the BMSSP instance via
+  `adjacencyOf` (getEdges → Map; since #212 the class no longer stores one) outside the timed
+  region (`dijkstra-adj.mjs` is the fair baseline) and outputs are verified node-by-node
+  (`mismatches` must be 0).
   Scenario registry adds `sparse-random-l4` (n = 300k, degree 3): `topLevel` steps 3→4 at
   exactly n = 2^18 + 1 and stays 4 until t reaches 7 (~n = 376k), so 300k sits inside the
   #182 level-transition window (the step itself measures ~+24% at the exact straddle).
@@ -770,13 +801,14 @@ BMSSP-vs-Dijkstra head-to-head itself:
 | Dense-index core: typed-array labels + CSR adjacency | `src/tieBreak.mjs` (makeLabels) + `src/bmssp.mjs` (buildIndex/CSR) + `src/baseCase.mjs` + `src/findPivots.mjs` | #205 | ✅ merged (PR #206, no bump — API-non-breaking) |
 | Typed / flexible graph inputs (Graph builder + adjacency Map/object + explicit vertex universe) | `src/graph.mjs` (new) + `src/bmssp.mjs` (constructor) + `index.mjs` (Graph export) + `test/graph.test.mjs` | #172 | ✅ merged (PR #208, no bump — mid-2.0.0) |
 | Public multi-source / bounded entrypoint (`calculateShortestPathsFrom`) | `src/bmssp.mjs` + `test/multiSource.test.mjs` | #171 | ✅ merged (PR #209, no bump — mid-2.0.0) |
-| Public-API stabilization + 1.0→2.0 migration note | `src/bmssp.mjs` (JSDoc) + `MIGRATION.md` + `docs/index.html` + `examples/` + `test/publicApi.test.mjs` | #173 | ✅ done-pending-merge (this PR, **major → 2.0.0** — milestone-closing) |
+| Public-API stabilization + 1.0→2.0 migration note | `src/bmssp.mjs` (JSDoc) + `MIGRATION.md` + `docs/index.html` + `examples/` + `test/publicApi.test.mjs` | #173 | ✅ merged (PR #210, **major → 2.0.0**, released 2026-07-21 — milestone-closing) |
+| Direct-CSR construction: build index/CSR from the input, remove public `graph`/`adjacency` | `src/bmssp.mjs` (constructor/buildIndex/getEdges) + `test/helpers.mjs` + `benchmarks/bench-util.mjs` + test/docs migration | #212 | ✅ done-pending-merge (this PR, **major → 3.0.0** — milestone-closing) |
 
-Milestones `1.1.0` (correctness hardening) and `1.2.0` (performance & ergonomics) are
-both **closed** — 1.2.0 released 2026-07-21 (npm + Docker Hub). Milestone `2.0.0`
-(API-breaking generalization) is being closed by **this PR**: **#205** (dense-index core,
-PR #206), **#172** (typed/flexible inputs, PR #208), and **#171** (public multi-source/bounded
-entrypoint, PR #209) all merged (no bumps), and **#173** (this PR) stabilizes the public API
-surface and takes the **major → 2.0.0** bump. In practice the three generalizations landed
-additively, so 2.0.0 has **no breaking changes** on the documented surface — it is a stability
-commitment (see `MIGRATION.md`). See [06-milestones-roadmap.md](06-milestones-roadmap.md).
+Milestones `1.1.0` (correctness hardening), `1.2.0` (performance & ergonomics) and `2.0.0`
+(API-breaking generalization — #205/#172/#171/#173) are all **closed and released**
+(2.0.0 on 2026-07-21, npm + Docker Hub; landed additively, so 2.0.0 had **no breaking
+changes** — see `MIGRATION.md`). Milestone `3.0.0` (performance) is being closed by **this
+PR**: **#212** (direct-CSR construction) is its only issue — it builds the index/CSR straight
+from the input and removes the public `this.graph` / `this.adjacency` fields (the one breaking
+change, hence **major → 3.0.0**), roughly halving construction time. See
+[06-milestones-roadmap.md](06-milestones-roadmap.md).
