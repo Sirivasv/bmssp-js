@@ -1,4 +1,4 @@
-FROM node:26-alpine@sha256:e88a35be04478413b7c71c455cd9865de9b9360e1f43456be5951032d7ac1a66
+FROM node:26-alpine@sha256:0b36e8c136b94cd4fcf02188228e76c31ad5872eef3fec8cbd2eee500cfd9e80
 
 LABEL org.opencontainers.image.title="bmssp-js" \
       org.opencontainers.image.description="Pre-configured playground for the bmssp package — runs the bundled examples." \
